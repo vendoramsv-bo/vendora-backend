@@ -1,0 +1,395 @@
+// =============================================================================
+// 10-tenant.prisma — Módulo de identidad y perfiles del Tenant
+//
+// Schema PostgreSQL: `tenant`
+// Modelos: 12   Enums: 4
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "tenant"
+// -----------------------------------------------------------------------------
+
+model Tenant {
+  id                   String          @id @default(cuid())
+  // ---- Campos requeridos por Better-Auth Organization plugin ----
+  name                 String          @unique          // Mapeado a `name` en BA
+  slug                 String          @unique          // Mapeado a `slug` (usado en URLs)
+  logo                 String?                           // Mapeado a `logo`
+  metadata             String?                           // JSON serializado, manejado por BA
+
+  // ---- Campos adicionales del dominio (additionalFields) ----
+  nombreLargo          String          @unique
+  descripcion          String
+  // Un Tenant puede ser TIENDA, CONSULTORIO, RESTAURANTE o cualquier combinación.
+  // La existencia del perfil extendido (tienda, consultorio, restaurante) define
+  // las capacidades activas. ESTOS FLAGS SON SOLO DE PERFIL/UI — el catálogo,
+  // inventario, ventas, caja y proveedores viven directamente bajo Tenant, así
+  // que CUALQUIER vertical (sin importar los flags) puede vender productos y
+  // servicios usando los modelos compartidos.
+  // Casos típicos:
+  //   - Consultorio con farmacia    →  esConsultorio=true + esTienda=true
+  //   - Restaurante con tienda      →  esRestaurante=true + esTienda=true
+  //   - Restaurante puro            →  esRestaurante=true (usa Venta del Tenant)
+  //   - Consultorio puro            →  esConsultorio=true (puede vender suplementos
+  //                                     vía Venta del Tenant sin activar Tienda)
+  esTienda             Boolean         @default(false)
+  esConsultorio        Boolean         @default(false)
+  esRestaurante        Boolean         @default(false)
+  plan                 PlanTenant      @default(BASICO)
+  estado               Estado          @default(PENDIENTE)
+  ultimoPasoCreacion   Int             @default(1)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime?       @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Relaciones core compartidas
+  miembros             TenantMember[]
+  invitaciones         Invitacion[]
+  rolesPermisos        RolPermiso[]
+  notificaciones       Notificacion[]
+  mensajes             Mensaje[]
+  localizaciones       Localizacion[]
+  auditLogs            AuditLog[]
+  reportesLog          ReporteLog[]
+  // Identidad y presentación del Tenant (compartido entre Tienda, Consultorio y Restaurante)
+  propietarios         Propietario[]
+  imagenes             Imagen[]
+  descripciones        Descripcion[]
+  equipoDeTrabajo      EquipoDeTrabajo[]
+
+  // ---- CATÁLOGO COMERCIAL (cualquier perfil puede vender productos/servicios) ----
+  actividadesEconomicas  ActividadEconomica[]
+  categorias             Categoria[]
+  productos              Producto[]
+  unidadesMedida         UnidadMedida[]
+  ofertasDeProductos     ProductoOfertas[]
+  // ---- OPERACIONES (caja, ventas, pedidos) ----
+  clientes               Cliente[]
+  turnosDeAtencion       TurnosDeAtencion[]
+  puntosDeVenta          PuntosDeVenta[]
+  aperturasCierresDeCaja AperturaCierreDeCaja[]
+  ventas                 Venta[]
+  pedidos                Pedido[]
+  // ---- COMPRAS Y GASTOS ----
+  proveedores            Proveedor[]
+  compras                Compra[]
+  gastos                 Gastos[]
+  // ---- INVENTARIO ----
+  movimientosInventario  MovimientoInventario[]
+  recuentosInventario    RecuentoInventario[]
+  ajustesInventario      AjusteInventario[]
+  // ---- ALMACÉN ----
+  insumos                Insumo[]
+  movimientosAlmacen     MovimientoAlmacen[]
+  ingresosAlmacen        IngresoAlmacen[]
+  salidasAlmacen         SalidaAlmacen[]
+  recuentosAlmacen       RecuentoAlmacen[]
+  // ---- SOCIAL DE PRODUCTOS ----
+  reaccionesProducto     ProductoReaccion[]
+  comentariosProducto    ProductoComentario[]
+  valoracionesProducto   ProductoValoracion[]
+  preguntasProducto      ProductoPregunta[]
+  favoritosProducto      ProductoFavorito[]
+  publicaciones          Publicacion[]
+
+  // Perfil extendido (1-a-1 opcional según tipo)
+  tienda               Tienda?
+  consultorio          Consultorio?
+  restaurante          Restaurante?
+
+  // Mapeo a la tabla `organization` requerida por Better-Auth
+  @@map("organization")
+  @@schema("tenant")
+}
+
+model TenantMember {
+  id              String    @id @default(cuid())
+  // ---- Campos requeridos por Better-Auth ----
+  organizationId  String                                            // Mapeado al campo `organizationId` de BA
+  tenant          Tenant    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            String    @default("member")
+  createdAt       DateTime  @default(now())
+
+  // ---- Campos adicionales del dominio ----
+  estado          Estado    @default(ACTIVO)
+  updatedAt       DateTime? @updatedAt
+
+  // Relaciones de Tienda (null si el tenant es solo consultorio o restaurante)
+  ventasTienda           Venta[]
+  aperturasCierresCaja   AperturaCierreDeCaja[]
+  comprasTienda          Compra[]
+  gastosTienda           Gastos[]
+  ajustesInventario      AjusteInventario[]
+  recuentosInventario    RecuentoInventario[]
+  ingresosAlmacen        IngresoAlmacen[]
+  salidasAlmacen         SalidaAlmacen[]
+  recuentosAlmacen       RecuentoAlmacen[]
+
+  // Relaciones de Consultorio (null si el tenant es tienda o restaurante)
+  medicoProfile          Medico?
+
+  // Relaciones de Restaurante (null si el tenant es tienda o consultorio)
+  menusCreados           Menu[]                @relation("menusCreador")
+  publicacionesMenuRRSS  PublicacionMenuRRSS[]
+  reservasAtendidas      Reserva[]             @relation("reservasAtendidaPor")
+  cambiosEstadoCocina    PedidoEstadoLog[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("member")
+  @@schema("tenant")
+}
+
+model RolPermiso {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rol      String
+  modulo   String
+  accion   String
+
+  @@unique([tenantId, rol, modulo, accion])
+  @@schema("tenant")
+}
+
+model Localizacion {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  latitud      Float
+  longitud     Float
+  direccion    String
+  barrio       String?
+  ciudad       String
+  departamento String
+  email        String?
+  descripcion  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime? @updatedAt
+
+  @@index([latitud, longitud])
+  @@index([departamento, ciudad])
+  @@schema("tenant")
+}
+
+model Propietario {
+  id                 String    @id @default(cuid())
+  tenantId           String    @unique
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombres            String
+  telefono           String
+  domicilio          String
+  nombreReferencia   String
+  telefonoReferencia String
+  imagenUrl          String?
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  estado             Estado    @default(ACTIVO)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  @@unique([tenantId, telefono])
+  @@unique([tenantId, nombres])
+  @@schema("tenant")
+}
+
+model Imagen {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  descripcion String
+  imagenUrl   String
+  orden       Int       @default(0)
+  estado      Estado    @default(ACTIVO)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  @@unique([tenantId, imagenUrl])
+  @@index([tenantId, orden])
+  @@schema("tenant")
+}
+
+model Descripcion {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  descripcion String
+  orden       Int       @default(0)
+  estado      Estado    @default(ACTIVO)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  @@index([tenantId, orden])
+  @@schema("tenant")
+}
+
+model EquipoDeTrabajo {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombres     String
+  telefono    String
+  cargo       String
+  domicilio   String
+  descripcion String?
+  imagenUrl   String?
+  orden       Int       @default(0)
+  estado      Estado    @default(ACTIVO)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  @@unique([tenantId, telefono])
+  @@unique([tenantId, nombres])
+  @@index([tenantId, orden])
+  @@schema("tenant")
+}
+
+model Tienda {
+  id                     String                 @id @default(cuid())
+  tenantId               String                 @unique
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Configuración visual del perfil retail
+  configuracion          Configuracion?
+
+  // Vitrina social pública del comercio (perfil de tienda en la app)
+  reaccionesTienda       TiendaReaccion[]
+  comentariosTienda      TiendaComentario[]
+  valoracionesTienda     TiendaValoracion[]
+  preguntasTienda        TiendaPregunta[]
+  favoritosTienda        TiendaFavorito[]
+  seguidoresTienda       TiendaSeguidor[]
+
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime?              @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById            String?
+  updatedById            String?
+  @@schema("tenant")
+}
+
+model Configuracion {
+  id                    String               @id @default(cuid())
+  tiendaId              String               @unique
+  tienda                Tienda               @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  tipoDeTienda          TipoDeConfiguracion  @default(PEQUENA)
+  cantidadPuntosDeVenta Int                  @default(1)
+  cantidadVendedores    Int                  @default(1)
+  tipoDespliegueVentas  TipoDespliegueVentas @default(BARRA_LATERAL)
+  tema                  String               @default("green")
+  tipoLineado           String               @default("curvedLine")
+  estado                Estado               @default(ACTIVO)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime?            @updatedAt
+  @@schema("tenant")
+}
+
+model Consultorio {
+  id          String    @id @default(cuid())
+  tenantId    String    @unique
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Configuración clínica
+  especialidades String[]  // ["ODONTOLOGIA","PEDIATRIA","MEDICINA_GENERAL"]
+  nroRegistro    String?   // número de habilitación del establecimiento
+  estado         Estado    @default(PENDIENTE)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Relaciones clínicas
+  medicos          Medico[]
+  pacientes        Paciente[]
+  citas            Cita[]
+  serviciosMedicos ServicioMedico[]
+  atencionesMedicas AtencionMedica[]
+  recetasMedicas    RecetaMedica[]
+  @@schema("tenant")
+}
+
+model Restaurante {
+  id                String      @id @default(cuid())
+  tenantId          String      @unique
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Configuración operativa
+  capacidadMesas    Int?                                       // número total de mesas
+  capacidadComensales Int?                                     // capacidad máxima simultánea
+  tipoServicio      String?     // "MESA","DELIVERY","PARA_LLEVAR","MIXTO"
+  duracionPromedioMin Int       @default(60)                   // duración estimada por comensal
+
+  // Plantillas RRSS (colores, logo, tipografía para generación automática)
+  plantillaRRSS     Json?
+  publicacionAutomatica Boolean @default(false)
+  horaPublicacionMenu String? // "07:00" — hora de publicación automática del menú del día
+
+  estado            Estado      @default(PENDIENTE)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Relaciones del módulo
+  tiemposComida           TiempoComida[]
+  menus                   Menu[]
+  reservas                Reserva[]
+  publicacionesMenuRRSS   PublicacionMenuRRSS[]
+  @@schema("tenant")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "tenant"
+// -----------------------------------------------------------------------------
+
+enum PlanTenant {
+  BASICO
+  PROFESIONAL
+  EMPRESARIAL
+  @@schema("tenant")
+}
+
+enum TipoDeConfiguracion {
+  PEQUENA
+  MEDIANA
+  EMPRESARIAL
+  @@schema("tenant")
+}
+
+enum TipoDespliegueVentas {
+  BARRA_LATERAL
+  BARRA_SUPERIOR
+  BARRA_INFERIOR
+  @@schema("tenant")
+}
+
+enum PasosCreacionTienda {
+  PASO_1
+  PASO_2
+  PASO_3
+  PASO_4
+  PASO_5
+  PASO_6
+  PASO_7
+  PASO_8
+  PASO_9
+  PASO_10
+  @@schema("tenant")
+}
+

@@ -1,0 +1,44 @@
+// =============================================================================
+// schema.prisma — Punto de entrada de la base de datos modularizada
+//
+// Esta plataforma utiliza la feature `prismaSchemaFolder` (GA en Prisma 6.7+):
+// los modelos viven en archivos separados bajo `prisma/models/`, organizados
+// por dominio. Cada modelo tiene `@@schema("…")` que lo asigna a un namespace
+// de PostgreSQL (feature `multiSchema`, también GA).
+//
+// Schemas de PostgreSQL (todos en español):
+//   • autenticacion  — Better-Auth: User, Session, Account, Verification, Invitacion
+//   • tenant         — Identidad y perfiles: Tenant, TenantMember, Tienda, Consultorio,
+//                       Restaurante, Propietario, EquipoDeTrabajo, Imagen, etc.
+//   • compartido     — Servicios cross-módulo: Notificacion, Mensaje, AuditLog,
+//                       clasificadores globales y enums genéricos
+//   • catalogo       — Catálogo comercial: Producto, Categoria, ActividadEconomica,
+//                       variantes, atributos, ofertas
+//   • almacen        — Inventario y almacén: Insumo, movimientos, ajustes,
+//                       recuentos, ingresos y salidas
+//   • ventas         — Operación comercial: Venta, Compra, Pedido, Cliente,
+//                       Proveedor, Caja, Puntos de venta, Turnos
+//   • consultorio    — TuConsultorioAmigo completo
+//   • restaurante    — TuRestaurant completo
+//   • social         — Interacciones sociales: reacciones, comentarios,
+//                       valoraciones, publicaciones, seguidores
+//
+// Las relaciones entre schemas funcionan transparentemente — PostgreSQL
+// soporta foreign keys cross-schema y Prisma las gestiona automáticamente.
+//
+// CONFIGURACIÓN REQUERIDA:
+//   1) En package.json: "prisma": { "schema": "./prisma" }
+//   2) Variable de entorno: DATABASE_URL apuntando a PostgreSQL
+//   3) Comando: npx prisma migrate dev (crea los 9 schemas y todas las tablas)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["almacen", "autenticacion", "catalogo", "compartido", "consultorio", "restaurante", "social", "tenant", "ventas"]
+}

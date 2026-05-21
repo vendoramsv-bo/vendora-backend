@@ -1,0 +1,255 @@
+// =============================================================================
+// 20-compartido.prisma — Servicios y datos maestros compartidos
+//
+// Schema PostgreSQL: `compartido`
+// Modelos: 11   Enums: 5
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "compartido"
+// -----------------------------------------------------------------------------
+
+model Notificacion {
+  id             String             @id @default(cuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User               @relation(name: "notificacionesUser", fields: [userId], references: [id])
+  actorUserId    String
+  actorUser      User               @relation(name: "notificacionesActor", fields: [actorUserId], references: [id])
+  titulo         String
+  mensaje        String
+  respuesta      String?
+  fecha          DateTime           @default(now())
+  estado         EstadoNotificacion @default(NO_LEIDO)
+  leido          DateTime?
+  referenciaId   String?
+  referenciaTipo ReferenciaTipo?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime?
+  @@schema("compartido")
+}
+
+model Mensaje {
+  id              String      @id @default(cuid())
+  tenantId        String
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  senderUserId    String
+  senderUser      User        @relation(name: "senderUser", fields: [senderUserId], references: [id])
+  recipientUserId String
+  recipientUser   User        @relation(name: "recipientUser", fields: [recipientUserId], references: [id])
+  fecha           DateTime    @default(now())
+  tipo            MensajeTipo @default(TEXTO)
+  texto           String?
+  imagenUrl       String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?
+  reacciones      Reaccion[]
+
+  @@index([tenantId, senderUserId, recipientUserId])
+  @@schema("compartido")
+}
+
+model Reaccion {
+  id        String   @id @default(cuid())
+  mensajeId String
+  mensaje   Mensaje  @relation(fields: [mensajeId], references: [id], onDelete: Cascade)
+  emoji     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([mensajeId, emoji, userId])
+  @@schema("compartido")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String
+  tabla      String
+  accion     String   // CREATE, UPDATE, DELETE
+  cambios    Json
+  fecha      DateTime @default(now())
+  ipAddress  String?
+
+  @@index([tenantId, tabla, fecha])
+  @@schema("compartido")
+}
+
+model ReporteLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  generadoPorId String
+  tipoReporte   String
+  parametros    Json
+  urlArchivo    String?
+  generadoEn   DateTime @default(now())
+  @@schema("compartido")
+}
+
+model ClaActividadEconomica {
+  id                    String               @id @default(cuid())
+  codigo                String               @unique
+  nombre                String
+  imagenUrl             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime?            @updatedAt
+  claCategoria          ClaCategoria[]
+  claProducto           ClaProducto[]
+  actividadesEconomicas ActividadEconomica[]
+  @@schema("compartido")
+}
+
+model ClaUnidadMedida {
+  id               String         @id @default(cuid())
+  unidad           String         @unique
+  sigla            String         @unique
+  descripcion      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime?
+  claProducto      ClaProducto[]
+  unidadesDeMedida UnidadMedida[]
+  @@schema("compartido")
+}
+
+model ClaCategoria {
+  id                    String                @id @default(cuid())
+  claActividadId        String
+  claActividadEconomica ClaActividadEconomica @relation(fields: [claActividadId], references: [id], onDelete: Cascade)
+  nivel                 Int                   @default(1)
+  nombre                String
+  descripcion           String?
+  imagenUrl             String?
+  padreId               String?
+  padre                 ClaCategoria?         @relation("ClaCategorias", fields: [padreId], references: [id])
+  hijos                 ClaCategoria[]        @relation("ClaCategorias")
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime?             @updatedAt
+  claProducto           ClaProducto[]
+  categorias            Categoria[]
+
+  @@unique([claActividadId, nivel, nombre])
+  @@schema("compartido")
+}
+
+model ClaProducto {
+  id                    String                @id @default(cuid())
+  claActividadId        String
+  claActividadEconomica ClaActividadEconomica @relation(fields: [claActividadId], references: [id], onDelete: Cascade)
+  claCategoriaId        String
+  claCategoria          ClaCategoria          @relation(fields: [claCategoriaId], references: [id], onDelete: Cascade)
+  codigo                String
+  nombre                String
+  descripcion           String?
+  imagenUrl             String?
+  claUnidadId           String
+  claUnidadMedida       ClaUnidadMedida       @relation(fields: [claUnidadId], references: [id], onDelete: Cascade)
+  tipoProducto          TipoDeProducto        @default(COMERCIALIZACION)
+  precio                Decimal               @default(0) @db.Decimal(10, 2)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime?             @updatedAt
+
+  @@unique([claActividadId, claCategoriaId, codigo])
+  @@unique([claActividadId, claCategoriaId, nombre])
+  @@schema("compartido")
+}
+
+model ClaProveedor {
+  id              String    @id @default(cuid())
+  nombre          String    @unique
+  direccion       String?
+  telefono        String?
+  nit             String?   @unique
+  departamento    String?
+  productosOfrece String?
+  sitioWeb        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime? @updatedAt
+  @@schema("compartido")
+}
+
+model ClaTurnosDeAtencion {
+  id          String    @id @default(cuid())
+  turno       String    @unique
+  descripcion String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  @@schema("compartido")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "compartido"
+// -----------------------------------------------------------------------------
+
+enum Estado {
+  PENDIENTE
+  ACTIVO
+  INACTIVO
+  SUSPENDIDO
+  ELIMINADO
+  FINALIZADO
+  ACEPTADO
+  RECHAZADO
+  APROBADO
+  PUBLICADO
+  ELABORADO
+  VENDIDO
+  @@schema("compartido")
+}
+
+enum EstadoNotificacion {
+  NO_LEIDO
+  LEIDO
+  @@schema("compartido")
+}
+
+enum TipoDeDocumento {
+  CEDULA_IDENTIFICACION
+  NIT
+  PASAPORTE
+  OTRO
+  @@schema("compartido")
+}
+
+enum ReferenciaTipo {
+  PEDIDO
+  VENTA
+  CITA
+  HISTORIA_CLINICA
+  ATENCION_MEDICA
+  // ---- Restaurante ----
+  RESERVA
+  MENU
+  PUBLICACION_MENU
+  STOCK_CRITICO
+  // ---- Social ----
+  PRODUCTO_REACCION
+  PRODUCTO_COMENTARIO
+  PRODUCTO_VALORACION
+  PRODUCTO_PREGUNTA
+  PUBLICACION
+  PUBLICACION_COMENTARIO
+  TIENDA_REACCION
+  TIENDA_COMENTARIO
+  TIENDA_VALORACION
+  TIENDA_PREGUNTA
+  OTRO
+  @@schema("compartido")
+}
+
+enum MensajeTipo {
+  TEXTO
+  IMAGEN
+  AUDIO
+  VIDEO
+  MAPA
+  PRODUCTO
+  PEDIDO
+  DIRECCION
+  CITA          // nuevo: compartir cita desde consultorio
+  @@schema("compartido")
+}
+

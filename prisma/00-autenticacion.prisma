@@ -1,0 +1,158 @@
+// =============================================================================
+// 00-autenticacion.prisma — Módulo de autenticación (Better-Auth)
+//
+// Schema PostgreSQL: `autenticacion`
+// Modelos: 5   Enums: 0
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "autenticacion"
+// -----------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  // ---- Campos requeridos por Better-Auth ----
+  name         String                                  // Nombre completo (BA lo usa por defecto)
+  email        String   @unique
+  emailVerified Boolean  @default(false)
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // ---- Campos adicionales del dominio (additionalFields en la config de BA) ----
+  userName     String   @unique
+  firstName    String?
+  lastName     String?
+
+  // ---- Campos del plugin admin de Better-Auth (opcional) ----
+  // Si se habilita el plugin admin, BA gestiona estos campos automáticamente.
+  role         String?  @default("user")               // Rol global: "user" | "admin"
+  banned       Boolean  @default(false)
+  banReason    String?
+  banExpiresAt DateTime?
+
+  // Bloqueo aplicativo independiente del ban administrativo
+  locked       Boolean  @default(false)
+
+  // ---- Relaciones de autenticación (Better-Auth) ----
+  sessions     Session[]
+  accounts     Account[]
+  invitacionesEnviadas Invitacion[] @relation("invitacionesInviter")
+
+  // ---- Relaciones del dominio ----
+  // Membresías en tenants
+  memberships                     TenantMember[]
+  // Módulo social compartido
+  reacciones                      Reaccion[]
+  // Notificaciones (actor/destinatario)
+  notificacionesRecibidas          Notificacion[]                  @relation("notificacionesUser")
+  notificacionesGeneradas          Notificacion[]                  @relation("notificacionesActor")
+  mensajesEnviados                 Mensaje[]                       @relation("senderUser")
+  mensajesRecibidos                Mensaje[]                       @relation("recipientUser")
+  pedidos                          Pedido[]
+  // Un User puede ser propietario de al menos un Tenant
+  propietario                      Propietario?
+
+  // ---- Social productos ----
+  reaccionesProducto               ProductoReaccion[]
+  comentariosProducto              ProductoComentario[]
+  reaccionesComentarioProducto     ProductoComentarioReaccion[]
+  valoracionesProducto             ProductoValoracion[]
+  preguntasProducto                ProductoPregunta[]
+  respuestasProducto               ProductoRespuesta[]
+  favoritosProducto                ProductoFavorito[]
+
+  // ---- Social publicaciones ----
+  publicaciones                    Publicacion[]                   @relation("publicacionesAutor")
+  reaccionesPublicacion            PublicacionReaccion[]           @relation("reaccionesPublicacion")
+  comentariosPublicacion           PublicacionComentario[]         @relation("comentariosPublicacion")
+  reaccionesComentarioPublicacion  PublicacionComentarioReaccion[] @relation("reaccionesComentarioPublicacion")
+  compartidosPublicacion           PublicacionCompartido[]         @relation("compartidosPublicacion")
+
+  // ---- Social tienda (vitrina del comercio) ----
+  reaccionesTienda                 TiendaReaccion[]                @relation("reaccionesTienda")
+  comentariosTienda                TiendaComentario[]              @relation("comentariosTienda")
+  reaccionesComentarioTienda       TiendaComentarioReaccion[]      @relation("reaccionesComentarioTienda")
+  valoracionesTienda               TiendaValoracion[]              @relation("valoracionesTienda")
+  preguntasTienda                  TiendaPregunta[]                @relation("preguntasTienda")
+  respuestasTienda                 TiendaRespuesta[]               @relation("respuestasTienda")
+  favoritosTienda                  TiendaFavorito[]                @relation("favoritosTienda")
+  seguidoresTienda                 TiendaSeguidor[]                @relation("seguidoresTienda")
+
+  @@map("user")
+  @@schema("autenticacion")
+}
+
+model Session {
+  id                    String   @id @default(cuid())
+  expiresAt             DateTime
+  token                 String   @unique
+  ipAddress             String?
+  userAgent             String?
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Tenant (organization) activo en esta sesión — gestionado por el plugin Organization
+  activeOrganizationId  String?
+  // Impersonación administrativa (opcional, plugin admin)
+  impersonatedBy        String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+  @@schema("autenticacion")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String                                    // ID del proveedor (sub de OAuth o email)
+  providerId            String                                    // "credential" | "google" | "github" | etc.
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?                                   // Hash de contraseña (solo para providerId="credential")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+  @@schema("autenticacion")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String                                               // email o teléfono al que se envió el token
+  value      String                                               // token o código (suele estar hasheado)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+  @@schema("autenticacion")
+}
+
+model Invitacion {
+  id              String   @id @default(cuid())
+  organizationId  String
+  tenant          Tenant   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email           String                                            // Email del invitado
+  role            String?                                           // Rol que tendrá al aceptar
+  status          String   @default("pending")                       // "pending" | "accepted" | "rejected" | "canceled"
+  expiresAt       DateTime
+  inviterId       String                                            // User que envió la invitación
+  inviter         User     @relation("invitacionesInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+
+  @@index([email])
+  @@index([organizationId, status])
+  @@map("invitation")
+  @@schema("autenticacion")
+}
+

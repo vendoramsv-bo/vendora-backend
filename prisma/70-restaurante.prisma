@@ -1,0 +1,320 @@
+// =============================================================================
+// 70-restaurante.prisma — Módulo TuRestaurant
+//
+// Schema PostgreSQL: `restaurante`
+// Modelos: 7   Enums: 6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "restaurante"
+// -----------------------------------------------------------------------------
+
+model TiempoComida {
+  id             String      @id @default(cuid())
+  restauranteId  String
+  restaurante    Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  nombre         String      // "DESAYUNO","ALMUERZO","CENA","BRUNCH","MERIENDA"
+  horaInicio     String      // "07:00"
+  horaFin        String      // "10:30"
+  orden          Int         @default(0)
+  icono          String?     // emoji o ruta de ícono
+  estado         Estado      @default(ACTIVO)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Items de menú asignados a este tiempo de comida
+  menuItems      MenuItem[]
+
+  @@unique([restauranteId, nombre])
+  @@index([restauranteId, orden])
+  @@schema("restaurante")
+}
+
+model Menu {
+  id              String        @id @default(cuid())
+  restauranteId   String
+  restaurante     Restaurante   @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+
+  // Identificación del menú
+  nombre          String                                                  // "Menú del 10 de mayo"
+  tipo            TipoMenu      @default(DIARIO)
+  fechaInicio     DateTime                                                 // inicio de vigencia
+  fechaFin        DateTime                                                 // fin de vigencia (mismo día para DIARIO)
+
+  // Visualización
+  descripcion     String?
+  imagenPortada   String?                                                  // imagen generada para RRSS
+  tema            String?                                                  // tema visual de la plantilla
+
+  // Quién lo creó (para auditoría)
+  creadoPorId     String?
+  creadoPor       TenantMember? @relation("menusCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  // Estado del menú
+  estado          EstadoMenu    @default(BORRADOR)
+  fechaPublicacion DateTime?                                                // cuándo se aprobó para publicar
+  fechaPublicacionRRSS DateTime?                                            // cuándo se publicó en redes
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime?     @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  items           MenuItem[]
+  publicacionesMenuRRSS PublicacionMenuRRSS[]
+  reservas        Reserva[]
+
+  @@index([restauranteId, tipo, fechaInicio])
+  @@index([restauranteId, estado])
+  @@schema("restaurante")
+}
+
+model MenuItem {
+  id              String       @id @default(cuid())
+  menuId          String
+  menu            Menu         @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  tiempoComidaId  String
+  tiempoComida    TiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
+
+  // Producto del catálogo de Tienda (debe tener tipoProducto=PLATO/BEBIDA/POSTRE)
+  productoId      String
+  producto        Producto     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  // Snapshot para mostrar en el menú aunque el producto se modifique
+  nombreSnapshot  String
+  descripcionSnapshot String?
+  imagenSnapshot  String?
+
+  // Precio en este menú (puede diferir del precio base del producto)
+  precio          Decimal      @default(0) @db.Decimal(10, 2)
+
+  // Flags específicos del menú
+  esEspecial      Boolean      @default(false)   // plato especial fuera de carta regular
+  destacado       Boolean      @default(false)   // resaltar visualmente
+  disponible      Boolean      @default(true)    // disponible HOY (puede agotarse)
+  orden           Int          @default(0)
+  notaMenu        String?                         // ej: "Sin gluten", "Picante"
+
+  estado          Estado       @default(ACTIVO)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime?    @updatedAt
+
+  reservaDetalles ReservaDetalle[]
+
+  @@unique([menuId, tiempoComidaId, productoId])
+  @@index([menuId, orden])
+  @@schema("restaurante")
+}
+
+model Reserva {
+  id              String          @id @default(cuid())
+  restauranteId   String
+  restaurante     Restaurante     @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+
+  // Número correlativo amigable (ej: "RES-2026-0123")
+  codigo          String
+
+  // Cliente (puede ser registrado o invitado)
+  clienteId       String?
+  cliente         Cliente?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  // Datos del cliente invitado (cuando clienteId es null)
+  clienteNombre   String
+  clienteTelefono String?
+  clienteEmail    String?
+
+  // Menú activo en el momento de la reserva (para snapshot histórico)
+  menuId          String?
+  menu            Menu?           @relation(fields: [menuId], references: [id], onDelete: SetNull)
+
+  // Datos de la reserva
+  fechaReserva    DateTime        @default(now())                          // cuándo se hizo la reserva
+  fechaLlegada    DateTime                                                  // cuándo llega el cliente
+  numeroComensales Int            @default(1)
+  numeroMesa      String?                                                   // asignada al confirmar
+  observaciones   String?
+  canalOrigen     String?         // "WEB","APP","WHATSAPP","TELEFONO","PRESENCIAL"
+
+  // Totales estimados (calculados de los detalles; pueden ajustarse al confirmar)
+  totalCantidad   Int             @default(0)
+  totalEstimado   Decimal         @default(0) @db.Decimal(10, 2)
+
+  // Estado y flujo
+  estado          EstadoReserva   @default(RESERVADA)
+  // Quién atendió finalmente la reserva (mesero/encargado)
+  atendidaPorId   String?
+  atendidaPor     TenantMember?   @relation("reservasAtendidaPor", fields: [atendidaPorId], references: [id], onDelete: SetNull)
+  fechaConfirmacion DateTime?                                               // cuándo el cliente confirmó al llegar
+  fechaCancelacion DateTime?
+  motivoCancelacion String?
+
+  // Cuando se cobra, se enlaza a una Venta del Tenant (caja unificada)
+  ventaId         String?         @unique
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime?       @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  detalles        ReservaDetalle[]
+  estadosLog      PedidoEstadoLog[]
+
+  @@unique([restauranteId, codigo])
+  @@index([restauranteId, fechaLlegada])
+  @@index([restauranteId, estado])
+  @@index([clienteId])
+  @@schema("restaurante")
+}
+
+model ReservaDetalle {
+  id              String   @id @default(cuid())
+  reservaId       String
+  reserva         Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  // Item del menú reservado (mantiene contexto del menú original)
+  menuItemId      String?
+  menuItem        MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+
+  // Producto efectivamente reservado (snapshot directo si el menuItem se elimina)
+  productoId      String
+  producto        Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  productoNombre  String
+  productoImagen  String?
+
+  cantidad        Int      @default(1)
+  precio          Decimal  @default(0) @db.Decimal(10, 2)
+  subtotal        Decimal  @default(0) @db.Decimal(10, 2)
+  observacion     String?  // "sin cebolla", "termino medio", etc.
+
+  // Estado en cocina (cada plato puede estar en distinto estado)
+  estadoCocina    EstadoCocina @default(PENDIENTE)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime?
+
+  @@index([reservaId])
+  @@schema("restaurante")
+}
+
+model PedidoEstadoLog {
+  id            String        @id @default(cuid())
+  reservaId     String
+  reserva       Reserva       @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  estadoAnterior EstadoReserva?
+  estadoNuevo   EstadoReserva
+  cambiadoPorId String?
+  cambiadoPor   TenantMember? @relation(fields: [cambiadoPorId], references: [id], onDelete: SetNull)
+  nota          String?
+  fecha         DateTime      @default(now())
+
+  @@index([reservaId, fecha])
+  @@schema("restaurante")
+}
+
+model PublicacionMenuRRSS {
+  id              String      @id @default(cuid())
+  restauranteId   String
+  restaurante     Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  menuId          String
+  menu            Menu        @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  // Si se creó una Publicacion social asociada, se enlaza aquí.
+  // (puede ser null si solo se publicó vía WhatsApp Business sin post en feed)
+  publicacionId   String?
+
+  redSocial       RedSocial
+  urlPublicacion  String?     // URL del post real en la red social
+  urlImagenGenerada String?   // imagen PNG/JPG generada por el sistema
+  fechaProgramada DateTime?   // cuándo debe publicarse (si es programada)
+  fechaPublicada  DateTime?   // cuándo se publicó realmente
+
+  // Métricas (actualizables vía webhook de la red social)
+  alcance         Int?
+  reacciones      Int?
+  comentarios     Int?
+
+  estado          EstadoPublicacionRRSS @default(PROGRAMADA)
+  errorMensaje    String?     // si falló la publicación, motivo
+
+  // Quién la generó/programó
+  creadoPorId     String?
+  creadoPor       TenantMember? @relation(fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  @@index([restauranteId, fechaProgramada])
+  @@index([menuId])
+  @@schema("restaurante")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "restaurante"
+// -----------------------------------------------------------------------------
+
+enum TipoMenu {
+  DIARIO          // Menú del día (vigencia de un día)
+  SEMANAL         // Menú planificado para una semana completa
+  ESPECIAL        // Carta de platos especiales con vigencia variable
+  PERMANENTE      // Carta regular siempre vigente (bebidas, postres base)
+  EVENTO          // Menú para evento puntual (catering, banquete)
+  @@schema("restaurante")
+}
+
+enum EstadoMenu {
+  BORRADOR        // En edición, no visible al público
+  APROBADO        // Listo para publicarse
+  PUBLICADO       // Visible en web/app/RRSS
+  ARCHIVADO       // Pasado de fecha, conservado para histórico
+  CANCELADO       // Anulado antes de publicarse
+  @@schema("restaurante")
+}
+
+enum EstadoReserva {
+  RESERVADA       // Cliente reservó, esperando llegada
+  CONFIRMADA      // Cliente llegó y confirmó en persona
+  EN_PREPARACION  // Cocina está preparando
+  LISTA           // Pedido listo para servirse
+  ENTREGADA       // Pedido entregado al cliente
+  PAGADA          // Cliente pagó en caja (Venta asociada creada)
+  CANCELADA       // Reserva cancelada (cliente o admin)
+  NO_ASISTIO      // Cliente no se presentó (no-show)
+  @@schema("restaurante")
+}
+
+enum EstadoCocina {
+  PENDIENTE       // Aún no se empezó
+  EN_PREPARACION  // Cocinándose
+  LISTO           // Listo para servir
+  ENTREGADO       // Servido al cliente
+  CANCELADO       // No se preparará (cancelación del ítem)
+  @@schema("restaurante")
+}
+
+enum RedSocial {
+  INSTAGRAM
+  FACEBOOK
+  WHATSAPP
+  TIKTOK
+  TWITTER_X
+  OTRO
+  @@schema("restaurante")
+}
+
+enum EstadoPublicacionRRSS {
+  BORRADOR        // Preparado, no programado
+  PROGRAMADA      // Esperando hora programada
+  PUBLICANDO      // En proceso de envío a la API de la red
+  PUBLICADA       // Publicada exitosamente
+  FALLIDA         // Error al publicar
+  CANCELADA       // Cancelada antes de publicarse
+  @@schema("restaurante")
+}
+

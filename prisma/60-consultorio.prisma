@@ -1,0 +1,767 @@
+// =============================================================================
+// 60-consultorio.prisma — Módulo TuConsultorioAmigo
+//
+// Schema PostgreSQL: `consultorio`
+// Modelos: 19   Enums: 8
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "consultorio"
+// -----------------------------------------------------------------------------
+
+model Medico {
+  id             String       @id @default(cuid())
+  consultorioId  String
+  consultorio    Consultorio  @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+  memberId       String       @unique
+  member         TenantMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  especialidad   String
+  nroRegistro    String?      // matrícula profesional
+  bio            String?
+  fotoUrl        String?
+  estado         Estado       @default(ACTIVO)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime?    @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  horariosAtencion  HorarioAtencion[]
+  citas             Cita[]
+  historiasClinicas HistoriaClinica[]
+  atencionesMedicas AtencionMedica[]
+  recetasMedicas    RecetaMedica[]
+
+  @@unique([consultorioId, nroRegistro])
+  @@schema("consultorio")
+}
+
+model HorarioAtencion {
+  id        String   @id @default(cuid())
+  medicoId  String
+  medico    Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  diaSemana Int      // 0=Lun … 6=Dom
+  horaInicio String  // "08:00"
+  horaFin    String  // "12:00"
+  activo     Boolean @default(true)
+  createdAt  DateTime @default(now())
+
+  @@unique([medicoId, diaSemana, horaInicio])
+  @@schema("consultorio")
+}
+
+model Paciente {
+  id              String      @id @default(cuid())
+  consultorioId  String
+  consultorio     Consultorio @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+  nombre          String
+  apellido        String
+  fechaNacimiento DateTime?
+  genero          String?
+  telefono        String?
+  email           String?
+  direccion       String?
+  tipoSangre      String?
+  alergias        String?
+  // Datos del seguro / obra social
+  seguroNombre    String?
+  seguroNumero    String?
+  estado          Estado      @default(ACTIVO)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  citas              Cita[]
+  historiasClinicas  HistoriaClinica[]
+  vacunaciones       Vacunacion[]
+  atencionesMedicas  AtencionMedica[]
+  recetasMedicas     RecetaMedica[]
+
+  @@unique([consultorioId, email])
+  @@index([consultorioId, apellido])
+  @@schema("consultorio")
+}
+
+model ServicioMedico {
+  id             String      @id @default(cuid())
+  consultorioId  String
+  consultorio    Consultorio @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+  nombre         String
+  especialidad   String?
+  descripcion    String?
+  duracionMin    Int         @default(30)
+  precioBase     Decimal     @default(0) @db.Decimal(10, 2)
+  estado         Estado      @default(ACTIVO)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  citas             Cita[]
+  atencionesMedicas AtencionMedica[]
+  atencionesDetalle AtencionDetalle[]
+
+  @@unique([consultorioId, nombre])
+  @@schema("consultorio")
+}
+
+model Cita {
+  id             String      @id @default(cuid())
+  consultorioId  String
+  consultorio    Consultorio @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+  pacienteId     String
+  paciente       Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId       String
+  medico         Medico      @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  servicioId     String?
+  servicio       ServicioMedico? @relation(fields: [servicioId], references: [id], onDelete: SetNull)
+  fechaHora      DateTime
+  duracionMin    Int         @default(30)
+  // Estados: PENDIENTE, CONFIRMADA, ATENDIDA, CANCELADA, NO_ASISTIO
+  estado         Estado      @default(PENDIENTE)
+  motivo         String?
+  canalOrigen    String?     // WEB, TELEFONO, PRESENCIAL
+  notas          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  recordatorios    RecordatorioCita[]
+  historiaClinica  HistoriaClinica?
+  atencionMedica   AtencionMedica?
+
+  @@index([consultorioId, medicoId, fechaHora])
+  @@index([consultorioId, pacienteId])
+  @@schema("consultorio")
+}
+
+model RecordatorioCita {
+  id         String   @id @default(cuid())
+  citaId     String
+  cita       Cita     @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  canal      String   // EMAIL, SMS, WHATSAPP
+  enviadoEn  DateTime @default(now())
+  estadoEnvio String  @default("ENVIADO")
+  @@schema("consultorio")
+}
+
+model HistoriaClinica {
+  id              String      @id @default(cuid())
+  consultorioId  String
+  pacienteId      String
+  paciente        Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId        String
+  medico          Medico      @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  citaId          String?     @unique
+  cita            Cita?       @relation(fields: [citaId], references: [id], onDelete: SetNull)
+  especialidad    String      // ODONTOLOGIA, PEDIATRIA, MEDICINA_GENERAL, OTRO
+  motivoConsulta  String
+  diagnostico     String?
+  tratamiento     String?
+  observaciones   String?
+  fecha           DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?   @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Extensiones por especialidad (1-a-1 opcional)
+  hcOdontologia   HcOdontologia?
+  hcPediatria     HcPediatria?
+  hcGeneral       HcGeneral?
+  hcPerinatal     HcPerinatal?
+  adjuntos        AdjuntoClinico[]
+
+  @@index([pacienteId, fecha])
+  @@index([medicoId, fecha])
+  @@schema("consultorio")
+}
+
+model HcOdontologia {
+  id           String          @id @default(cuid())
+  historiaId   String          @unique
+  historia     HistoriaClinica @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+  // odontograma: JSON con estado de cada pieza dental
+  // { "11": { "estado": "CARIES", "tratamiento": "OBTURACION" }, ... }
+  odontograma  Json
+  procedimiento String?
+  dienteNumero  String?
+  estadoDiente  String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime?       @updatedAt
+  @@schema("consultorio")
+}
+
+model HcPediatria {
+  id                 String          @id @default(cuid())
+  historiaId         String          @unique
+  historia           HistoriaClinica @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+  pesoKg             Decimal?        @db.Decimal(5, 2)
+  tallaCm            Decimal?        @db.Decimal(5, 2)
+  perimetroCefalico  Decimal?        @db.Decimal(5, 2)
+  percentilPeso      String?
+  percentilTalla     String?
+  desarrolloPsicomotor String?
+  observacionNutricional String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime?       @updatedAt
+  @@schema("consultorio")
+}
+
+model HcGeneral {
+  id                  String          @id @default(cuid())
+  historiaId          String          @unique
+  historia            HistoriaClinica @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+  presionArterial     String?
+  temperatura         Decimal?        @db.Decimal(4, 1)
+  frecuenciaCardiaca  Int?
+  frecuenciaRespiratoria Int?
+  saturacionO2        Decimal?        @db.Decimal(4, 1)
+  recetaMedica        String?
+  examenesOlicitados  String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime?       @updatedAt
+  @@schema("consultorio")
+}
+
+// -----------------------------------------------------------------------------
+// HC PERINATAL — Historia Clínica Perinatal (CLAP / OPS / OMS)
+//
+// Extensión de HistoriaClinica para pacientes embarazadas en consulta de
+// Obstetricia. Se llena UNA SOLA VEZ por embarazo (la relación 1-a-1 con
+// HistoriaClinica vía historiaId @unique lo garantiza). Modela el formulario
+// estándar CLAP usado en Bolivia (Ministerio de Salud y Deportes).
+//
+// CRITERIO DE MODELADO:
+//   - Campos consultables/filtrables/reportables  →  columnas tipadas.
+//   - Bloques densos de marcadores clínicos (antecedentes, factores de riesgo,
+//     enfermedades del embarazo, exámenes de laboratorio, datos del recién
+//     nacido)                                       →  Json estructurado.
+//   Esto evita una tabla de ~200 columnas manteniendo la consulta eficiente
+//   sobre los datos que importan para reportes epidemiológicos y seguimiento.
+//
+// Los controles prenatales individuales (cada visita) NO van aquí: son filas
+// de HcPerinatalControl (1 perinatal → N controles), porque son repetitivos.
+// -----------------------------------------------------------------------------
+model HcPerinatal {
+  id            String          @id @default(cuid())
+  historiaId    String          @unique
+  historia      HistoriaClinica @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+
+  // ---- Identificación perinatal ----
+  nroCarpetaFamiliar String?
+  codigoSeguro       String?
+
+  // ============ 1. ANTECEDENTES ============
+  // Familiares, personales y obstétricos (TBC, diabetes, hipertensión,
+  // preeclampsia, eclampsia, cirugías, etc.) como conjunto de banderas.
+  // { "familiares": { "tbc": false, "diabetes": true, ... },
+  //   "personales": { "cardiopatia": false, ... },
+  //   "obstetricos": { "preeclampsia": false, "eclampsia": false } }
+  antecedentes       Json?
+
+  // Antecedentes obstétricos cuantitativos (consultables para riesgo)
+  gestasPrevias      Int?
+  abortos            Int?
+  partosVaginales    Int?
+  cesareas           Int?
+  nacidosVivos       Int?
+  nacidosMuertos     Int?
+  viven              Int?
+  muertos1raSemana   Int?
+  muertosDespues1ra  Int?
+  embarazoPlaneado   Boolean?
+  finEmbarazoAnteriorFecha DateTime?
+  embarazoMenosDeUnAnio    Boolean?   // < 1 año desde embarazo anterior
+  antecedenteGemelares     Boolean?
+  fracasoMetodoAnticonceptivo String? // no_usaba, barrera, DIU, hormonal, natural, emergencia
+
+  // ============ 2. GESTACIÓN ACTUAL ============
+  pesoAnteriorKg     Decimal?        @db.Decimal(5, 2)
+  tallaCm            Decimal?        @db.Decimal(5, 2)
+  imcInicial         Decimal?        @db.Decimal(4, 1)
+  fum                DateTime?       // fecha última menstruación
+  fpp                DateTime?       // fecha probable de parto
+  edConfiablePorFUM  Boolean?
+  edConfiablePorEco  Boolean?
+
+  // Factores y hábitos del embarazo actual (banderas por trimestre)
+  // { "fumaActiva": {"1tri": false, ...}, "fumaPasiva": {...},
+  //   "drogas": {...}, "alcohol": {...}, "violencia": {...} }
+  habitosRiesgo      Json?
+
+  // Inmunizaciones y profilaxis
+  antirrubeola       String?         // previa, no_sabe, vigente, embarazo, mes_gestacion
+  antitetanica       String?         // vigente, dosis, fechas
+  examenOdontologico Boolean?
+  examenMamas        Boolean?
+  cervixInspeccion   String?         // normal, anormal, no_se_hizo
+
+  // ============ 2.1 EXÁMENES DE LABORATORIO ============
+  // Grupo sanguíneo, Rh, toxoplasmosis, Hb (<20 y >20 sem), VIH, sífilis,
+  // chagas, paludismo, bacteriuria, glucemia, estreptococo, etc.
+  // { "grupo": "O", "rh": "+", "inmunizada": true,
+  //   "toxoplasmosis": {...}, "hb20menos": 12.5, "hb20mas": 11.8,
+  //   "vih": { "solicitada": true, "realizada": true, "resultado": "neg" },
+  //   "sifilis": {...}, "chagas": {...}, "paludismo": {...},
+  //   "estreptococoBeta": {...}, "glucemia": {...} }
+  laboratorios       Json?
+
+  // ============ 3. PARTO / ABORTO ============
+  esParto            Boolean?        // true = parto, false = aborto
+  fechaIngreso       DateTime?
+  consultasPrenatalesTotal Int?
+  carnetPrenatal     Boolean?
+  embarazoHospitalizado Boolean?
+  corticoideAntenatal String?        // completo, incompleto, ninguna, no_corresponde
+  inicioParto        String?         // espontaneo, inducido, cesarea_electiva
+  roturaMembranasAnteparto Boolean?
+  roturaMembranasFecha DateTime?
+  edadGestacionalParto String?       // semanas + días, < 37, > 12h, etc.
+  presentacionSituacion String?      // cefalica, pelviana, transversa
+  tamanoFetalAcorde   Boolean?
+  acompananteParto    String?        // pareja, familiar, otro, ninguno
+
+  // Trabajo de parto y partograma (detalle horario)
+  // [ { "hora": "10:30", "pa": "120/80", "pulso": 80, "contracciones": 3,
+  //     "dilatacion": 5, "fcf": 140, ... }, ... ]
+  partograma         Json?
+
+  // Enfermedades del embarazo/parto (HTA, preeclampsia, eclampsia, RCIU,
+  // cardiopatía, diabetes, hemorragia, infecciones, etc.)
+  // { "htaPrevia": false, "preeclampsia": false, "eclampsia": false,
+  //   "rciu": false, "diabetes": false, "hemorragia": {...}, ... }
+  enfermedades       Json?
+
+  terminacion        String?         // espontanea, cesarea, forceps, vacuum, otra
+  indicacionPrincipalInduccion String?
+  medicacionRecibida Json?           // oxitócicos, antibióticos, analgesia, anestesia
+  posicionParto      String?         // sentada, acostada, cuclillas
+  episiotomia        Boolean?
+  desgarroGrado      Int?            // 1 a 4
+  alumbramientoActivo Boolean?
+  ligaduraCordon     String?         // precoz, oportuna
+  placentaCompleta   Boolean?
+  placentaRetenida   Boolean?
+
+  // ============ 4. RECIÉN NACIDO ============
+  // Bloque del RN (un embarazo puede ser múltiple → datos en Json array)
+  // Para parto único, el primer elemento; para múltiples, varios.
+  // [ { "sexo": "F", "pesoGramos": 3200, "longitudCm": 49,
+  //     "perimetroCefalico": 34, "apgar1min": 8, "apgar5min": 9,
+  //     "edadGestacional": {...}, "reanimacion": {...},
+  //     "defectosCongenitos": {...}, "vihExpuesto": false,
+  //     "tamizajeNeonatal": {...}, "fallece": false }, ... ]
+  recienNacidos      Json?
+  partoMultiple      Boolean?
+  partoMultipleOrden Int?
+
+  // ============ 5. PUERPERIO ============
+  // Controles del puerperio (temperatura, PA, pulso, involución uterina, loquios)
+  // [ { "dia": 1, "hora": "08:00", "temperatura": 36.8, "pa": "110/70",
+  //     "pulso": 72, "involucionUterina": "normal", "loquios": "normal" }, ... ]
+  puerperioControles Json?
+  lactanciaInmediata Boolean?
+  apegoPrecoz        Boolean?
+  hbPostparto        Decimal?        @db.Decimal(4, 1)
+
+  // ============ 6. EGRESO RECIÉN NACIDO ============
+  rnEgresoEstado     String?         // vivo, fallece
+  rnEgresoFecha      DateTime?
+  rnDiasCompletos    Int?
+  rnAlimentoAlAlta   String?         // lactancia_exclusiva, parcial, artificial
+  rnBCG              Boolean?
+  rnPesoEgresoGramos Int?
+  rnTraslado         Boolean?
+  rnTrasladoLugar    String?
+
+  // ============ 7. EGRESO DE LA MUJER ============
+  mujerEgresoEstado  String?         // viva, fallece_durante, fallece_en_hospital_referencia
+  mujerEgresoFecha   DateTime?
+  mujerTraslado      Boolean?
+  mujerTrasladoLugar String?
+  mujerDiasCompletosDesdeParto Int?
+  anticoncepcionMetodoElegido String? // DIU_postevento, DIU, ligadura, natural, barrera, hormonal, otro, ninguno
+  anticoncepcionOrientacion   Boolean?
+
+  // Observaciones generales y profesional responsable
+  observaciones      String?
+  responsable        String?
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime?       @updatedAt
+
+  // Controles prenatales (1 perinatal → N visitas de control)
+  controles          HcPerinatalControl[]
+
+  @@schema("consultorio")
+}
+
+// -----------------------------------------------------------------------------
+// HC PERINATAL CONTROL — Cada control/consulta prenatal (sección "CONSULTAS
+// ANTENATALES" del formulario CLAP). Es repetitivo (una fila por visita), por
+// eso se modela como tabla hija en vez de Json, para poder ordenar/graficar la
+// evolución (curva de altura uterina, presión arterial, peso, etc.).
+// -----------------------------------------------------------------------------
+model HcPerinatalControl {
+  id              String      @id @default(cuid())
+  perinatalId     String
+  perinatal       HcPerinatal @relation(fields: [perinatalId], references: [id], onDelete: Cascade)
+
+  fecha           DateTime
+  edadGestacional String?     // semanas + días en este control
+  pesoKg          Decimal?    @db.Decimal(5, 2)
+  imc             Decimal?    @db.Decimal(4, 1)
+  presionArterial String?     // PA
+  alturaUterinaCm Decimal?    @db.Decimal(4, 1)
+  presentacion    String?     // cefálica, pelviana, transversa
+  fcfLpm          Int?        // frecuencia cardíaca fetal (latidos/min)
+  movimientosFetales String?  // presentes, ausentes
+  proteinuria     String?     // negativo, +, ++, ...
+  tablasFerroso   Boolean?    // recibió sulfato ferroso
+  senalesPeligro  String?
+  examenes        String?
+  tratamientos    String?
+  responsable     String?
+  proximaCita     DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?   @updatedAt
+
+  @@index([perinatalId, fecha])
+  @@schema("consultorio")
+}
+
+model AdjuntoClinico {
+  id          String          @id @default(cuid())
+  historiaId  String
+  historia    HistoriaClinica @relation(fields: [historiaId], references: [id], onDelete: Cascade)
+  tipo        String          // IMAGEN, LABORATORIO, RADIOGRAFIA, OTRO
+  url         String
+  nombreArchivo String
+  subidoEn    DateTime        @default(now())
+  @@schema("consultorio")
+}
+
+model Vacunacion {
+  id           String    @id @default(cuid())
+  pacienteId   String
+  paciente     Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  vacuna       String
+  dosis        String?
+  fechaAplicacion DateTime @default(now())
+  proximaDosis DateTime?
+  medicoId     String?
+  lote         String?
+  createdAt    DateTime  @default(now())
+
+  @@index([pacienteId])
+  @@schema("consultorio")
+}
+
+model AtencionMedica {
+  id              String         @id @default(cuid())
+  consultorioId  String
+  consultorio     Consultorio    @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+
+  // Paciente atendido
+  pacienteId      String
+  paciente        Paciente       @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  // Snapshot del paciente al momento de la atención (persiste si se edita el perfil)
+  pacienteNombre  String
+  pacienteApellido String
+  pacienteTelefono String?
+
+  // Médico que realizó la atención (obligatorio)
+  medicoId        String
+  medico          Medico         @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+  // Snapshot del médico (nombre + especialidad al momento del registro)
+  medicoNombre    String
+  medicoEspecialidad String
+
+  // Cita de origen (null = atención sin cita previa / urgencia)
+  citaId          String?        @unique
+  cita            Cita?          @relation(fields: [citaId], references: [id], onDelete: SetNull)
+
+  // Fecha y hora de inicio real de la atención
+  fechaAtencion   DateTime       @default(now())
+
+  // Totales calculados a partir del detalle
+  totalServicios  Int            @default(0)    // cantidad de líneas de detalle
+  totalCantidad   Int            @default(0)    // suma de unidades entregadas
+  subtotal        Decimal        @default(0)    @db.Decimal(10, 2)
+  descuento       Decimal        @default(0)    @db.Decimal(10, 2)
+  total           Decimal        @default(0)    @db.Decimal(10, 2)
+
+  // Cobro
+  tipoPago        TipoPagoMedico @default(EFECTIVO)
+  estadoPago      EstadoPagoMedico @default(PENDIENTE)
+  // Notas clínicas/administrativas adicionales
+  observaciones   String?
+
+  estado          EstadoAtencion @default(EN_CURSO)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime?      @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  detalle   AtencionDetalle[]
+  pagos     AtencionPago[]
+  recetas   RecetaMedica[]
+
+  @@index([consultorioId, medicoId, fechaAtencion])
+  @@index([consultorioId, pacienteId])
+  @@schema("consultorio")
+}
+
+model AtencionDetalle {
+  id               String         @id @default(cuid())
+  atencionId       String
+  atencion         AtencionMedica @relation(fields: [atencionId], references: [id], onDelete: Cascade)
+
+  // Servicio del catálogo (ServicioMedico)
+  servicioId       String
+  servicio         ServicioMedico @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  // Snapshot del servicio al momento de la atención
+  servicioNombre   String
+  especialidad     String         // snapshot de la especialidad del servicio
+
+  // Tipo de tratamiento aplicado al paciente en esta línea
+  // Ejemplos: CONSULTA, OBTURACION, EXTRACCION, RADIOGRAFIA, VACUNACION,
+  //           CONTROL_CRECIMIENTO, RECETA, PROCEDIMIENTO_MENOR, OTRO
+  tipoTratamiento  TipoTratamiento
+
+  // Descripción libre del tratamiento (permite al médico detallar sin restricciones)
+  descripcionTratamiento String?
+
+  // Diente / zona anatómica / vacuna / etc. (contexto clínico de la línea)
+  referenciaClin   String?   // ej: "Diente 21", "Brazo derecho", "Control 3 meses"
+
+  cantidad         Int            @default(1)
+  precioUnitario   Decimal        @default(0) @db.Decimal(10, 2)
+  descuento        Decimal        @default(0) @db.Decimal(10, 2)
+  subtotal         Decimal        @default(0) @db.Decimal(10, 2)
+  nota             String?
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime?      @updatedAt
+
+  // Un servicio puede aparecer una sola vez por atención a menos que tenga
+  // diferente tipo de tratamiento (ej: dos obturaciones en la misma visita)
+  @@unique([atencionId, servicioId, tipoTratamiento])
+  @@index([atencionId])
+  @@schema("consultorio")
+}
+
+model AtencionPago {
+  id          String         @id @default(cuid())
+  atencionId  String
+  atencion    AtencionMedica @relation(fields: [atencionId], references: [id], onDelete: Cascade)
+  monto       Decimal        @db.Decimal(10, 2)
+  metodo      TipoPagoMedico
+  referencia  String?        // número de transferencia, código QR, etc.
+  nota        String?
+  pagadoEn    DateTime       @default(now())
+  registradoPor String?      // nombre del recepcionista que registró el pago
+  @@schema("consultorio")
+}
+
+model RecetaMedica {
+  id             String         @id @default(cuid())
+  consultorioId  String
+  consultorio    Consultorio    @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+
+  // Atención clínica de origen (1 atención → N recetas posibles)
+  atencionId     String
+  atencion       AtencionMedica @relation(fields: [atencionId], references: [id], onDelete: Cascade)
+
+  pacienteId     String
+  paciente       Paciente       @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId       String
+  medico         Medico         @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+
+  // Snapshots para que la receta sea legible aunque cambien los perfiles
+  pacienteNombre   String
+  pacienteApellido String
+  medicoNombre     String
+  medicoEspecialidad String
+  medicoRegistro   String?      // matrícula profesional al momento de emitir
+
+  // Identificador único legible (ej: "REC-2026-00045")
+  numeroReceta   String
+
+  // Indicaciones generales para todas las líneas (modo de uso, advertencias)
+  indicacionesGenerales String?
+  diagnosticoCie10 String?      // opcional, código diagnóstico CIE-10
+
+  // Vigencia de la receta
+  fechaEmision   DateTime       @default(now())
+  fechaVencimiento DateTime?    // típicamente 30/60/90 días
+
+  estado         EstadoReceta   @default(EMITIDA)
+  observaciones  String?
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime?      @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  detalle    RecetaMedicaDetalle[]
+
+  @@unique([consultorioId, numeroReceta])
+  @@index([pacienteId, fechaEmision])
+  @@index([medicoId, fechaEmision])
+  @@schema("consultorio")
+}
+
+model RecetaMedicaDetalle {
+  id           String       @id @default(cuid())
+  recetaId     String
+  receta       RecetaMedica @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+
+  // Producto del catálogo (null = medicamento no está en la farmacia del tenant)
+  // Cuando productoId es null, el paciente debe comprar en farmacia externa.
+  productoId   String?
+  producto     Producto?    @relation(fields: [productoId], references: [id], onDelete: SetNull)
+
+  // Snapshot del medicamento prescrito (siempre presente, aunque productoId sea null)
+  // Permite imprimir la receta y rastrear lo prescrito aunque el producto se elimine.
+  medicamento  String       // ej: "Paracetamol 500mg comprimidos"
+  principioActivo String?   // ej: "Paracetamol"
+  concentracion String?     // ej: "500mg"
+  presentacion String?      // ej: "Caja x 20 comprimidos"
+
+  // Posología
+  dosis        String       // ej: "1 comprimido"
+  frecuencia   String       // ej: "Cada 8 horas"
+  duracion     String       // ej: "Por 5 días"
+  via          ViaAdministracion @default(ORAL)
+  cantidadPrescrita Int     @default(1)   // cuántas unidades del producto debe adquirir
+
+  // Indicaciones específicas para esta línea (ej: "Tomar con alimentos")
+  indicaciones String?
+  // Permite sustitución por genéricos
+  permiteSustitucion Boolean @default(true)
+
+  estado       EstadoRecetaDetalle @default(PENDIENTE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime?    @updatedAt
+
+  @@index([recetaId])
+  @@index([productoId])
+  @@schema("consultorio")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "consultorio"
+// -----------------------------------------------------------------------------
+
+enum EstadoAtencion {
+  EN_CURSO      // médico aún atendiendo
+  COMPLETADA    // atención finalizada, pago pendiente o parcial
+  PAGADA        // cobro total recibido
+  ANULADA       // cancelada por error o devolución
+  @@schema("consultorio")
+}
+
+enum EstadoPagoMedico {
+  PENDIENTE     // sin ningún pago registrado
+  PARCIAL       // al menos un AtencionPago, pero no cubre el total
+  PAGADO        // suma de pagos == total de la atención
+  @@schema("consultorio")
+}
+
+enum TipoPagoMedico {
+  EFECTIVO
+  QR
+  TARJETA_CREDITO
+  TARJETA_DEBITO
+  TRANSFERENCIA
+  SEGURO_MEDICO  // cobertura por seguro / obra social
+  CONVENIO       // empresa u organización con convenio
+  OTRO
+  @@schema("consultorio")
+}
+
+enum TipoTratamiento {
+  // ---- General ----
+  CONSULTA               // consulta médica estándar
+  CONTROL               // control de seguimiento
+  EMERGENCIA            // atención de urgencia/emergencia
+
+  // ---- Odontología ----
+  LIMPIEZA_DENTAL
+  OBTURACION            // empaste / amalgama / resina
+  EXTRACCION
+  ENDODONCIA            // tratamiento de conducto
+  CORONA
+  PROTESIS
+  ORTODONCIA
+  BLANQUEAMIENTO
+  RADIOGRAFIA_DENTAL
+  CIRUGIA_ORAL
+
+  // ---- Pediatría ----
+  CONTROL_CRECIMIENTO
+  VACUNACION
+  EVALUACION_DESARROLLO
+  DESPARASITACION
+
+  // ---- Medicina General ----
+  RECETA_MEDICA
+  SOLICITUD_EXAMENES
+  INTERPRETACION_EXAMENES
+  CURACION              // curación / limpieza de herida
+  INYECTABLE
+  NEBULIZACION
+  SUTURA
+  RETIRO_SUTURA
+
+  // ---- Otros ----
+  PROCEDIMIENTO_MENOR
+  OTRO
+  @@schema("consultorio")
+}
+
+enum EstadoReceta {
+  EMITIDA       // recién creada
+  PARCIAL       // algunos ítems entregados, otros pendientes
+  DESPACHADA    // todos los ítems fueron entregados
+  VENCIDA       // pasó la fecha de vencimiento sin completar
+  ANULADA       // anulada por el médico (ej: error o cambio de tratamiento)
+  @@schema("consultorio")
+}
+
+enum EstadoRecetaDetalle {
+  PENDIENTE     // aún no se ha entregado este ítem
+  PARCIAL       // se entregó menos cantidad de la prescrita
+  DESPACHADO    // entregado en su totalidad
+  CANCELADO     // ítem cancelado por el médico
+  @@schema("consultorio")
+}
+
+enum ViaAdministracion {
+  ORAL
+  SUBLINGUAL
+  INTRAVENOSA
+  INTRAMUSCULAR
+  SUBCUTANEA
+  TOPICA
+  OFTALMICA
+  OTICA
+  NASAL
+  RECTAL
+  VAGINAL
+  INHALATORIA
+  OTRO
+  @@schema("consultorio")
+}
+

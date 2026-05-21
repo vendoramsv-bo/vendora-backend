@@ -1,0 +1,289 @@
+// =============================================================================
+// 40-almacen.prisma — Inventario y almacén de insumos
+//
+// Schema PostgreSQL: `almacen`
+// Modelos: 14   Enums: 2
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "almacen"
+// -----------------------------------------------------------------------------
+
+model MovimientoInventario {
+  id               String            @id @default(cuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String?
+  variante         ProductoVariante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante String?
+  tipo             TipoMovimiento
+  cantidad         Int
+  motivo           String?
+  referenciaId     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime?
+
+  @@unique([tenantId, productoId, varianteId, tipo, referenciaId])
+  @@schema("almacen")
+}
+
+model AjusteInventario {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantMemberId String?
+  tenantMember   TenantMember? @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  fecha          DateTime      @default(now())
+  estado         Estado
+  motivo         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  detalles       AjusteDetalle[]
+  @@schema("almacen")
+}
+
+model AjusteDetalle {
+  id               String            @id @default(cuid())
+  ajusteId         String
+  ajuste           AjusteInventario  @relation(fields: [ajusteId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String?
+  variante         ProductoVariante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante String?
+  stockAnterior    Int               @default(0)
+  cantidadAjuste   Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime?
+
+  @@unique([ajusteId, productoId, varianteId])
+  @@schema("almacen")
+}
+
+model RecuentoInventario {
+  id             String            @id @default(cuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantMemberId String?
+  tenantMember   TenantMember?     @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  fecha          DateTime          @default(now())
+  estado         Estado            @default(PENDIENTE)
+  observacion    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  detalles       RecuentoDetalle[]
+  @@schema("almacen")
+}
+
+model RecuentoDetalle {
+  id               String             @id @default(cuid())
+  recuentoId       String
+  recuento         RecuentoInventario @relation(fields: [recuentoId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto           @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String?
+  variante         ProductoVariante?  @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante String?
+  stockSistema     Int
+  stockFisico      Int
+  diferencia       Int
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime?
+
+  @@unique([recuentoId, productoId, varianteId])
+  @@schema("almacen")
+}
+
+model Insumo {
+  id                      String                   @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                  String
+  unidadMedidaId          String
+  unidadMedida            UnidadMedida             @relation(fields: [unidadMedidaId], references: [id], onDelete: Cascade)
+  cantidadStock           Int                      @default(0)
+  stockMinimo             Int                      @default(0)
+  costoUnitario           Decimal                  @default(0) @db.Decimal(10, 2)
+  fechaVencimiento        DateTime?
+  estado                  Estado                   @default(ACTIVO)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime?                @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  movimientosAlmacen      MovimientoAlmacen[]
+  productosInsumo         ProductoInsumo[]
+  ingresosDetalle         IngresoDetalle[]
+  salidasDetalle          SalidaDetalle[]
+  recuentosAlmacenDetalle RecuentoAlmacenDetalle[]
+  @@schema("almacen")
+}
+
+model MovimientoAlmacen {
+  id           String                @id @default(cuid())
+  tenantId     String
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  insumoId     String
+  insumo       Insumo                @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  tipo         TipoMovimientoAlmacen
+  cantidad     Int
+  motivo       String?
+  referenciaId String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime?
+
+  @@unique([tenantId, insumoId, tipo, referenciaId])
+  @@schema("almacen")
+}
+
+model ProductoInsumo {
+  id         String    @id @default(cuid())
+  productoId String
+  producto   Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  insumoId   String
+  insumo     Insumo    @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  cantidad   Int
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime?
+
+  @@unique([productoId, insumoId])
+  @@schema("almacen")
+}
+
+model IngresoAlmacen {
+  id             String         @id @default(cuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fecha          DateTime       @default(now())
+  descripcion    String?
+  proveedorId    String
+  proveedor      Proveedor      @relation(fields: [proveedorId], references: [id])
+  tenantMemberId String?
+  tenantMember   TenantMember?  @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  totalCantidad  Int            @default(0)
+  totalIngreso   Decimal        @default(0) @db.Decimal(10, 2)
+  estado         Estado         @default(PENDIENTE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  detalles       IngresoDetalle[]
+  @@schema("almacen")
+}
+
+model IngresoDetalle {
+  id               String         @id @default(cuid())
+  ingresoId        String
+  ingreso          IngresoAlmacen @relation(fields: [ingresoId], references: [id], onDelete: Cascade)
+  insumoId         String
+  insumo           Insumo         @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  cantidad         Int
+  costoUnitario    Decimal        @default(0) @db.Decimal(10, 2)
+  costoTotal       Decimal        @default(0) @db.Decimal(10, 2)
+  lote             String?
+  fechaVencimiento DateTime?
+  observaciones    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime?
+
+  @@unique([ingresoId, insumoId])
+  @@schema("almacen")
+}
+
+model SalidaAlmacen {
+  id             String         @id @default(cuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantMemberId String?
+  tenantMember   TenantMember?  @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  fecha          DateTime       @default(now())
+  descripcion    String?
+  estado         Estado         @default(PENDIENTE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  detalles       SalidaDetalle[]
+  @@schema("almacen")
+}
+
+model SalidaDetalle {
+  id        String        @id @default(cuid())
+  salidaId  String
+  salida    SalidaAlmacen @relation(fields: [salidaId], references: [id], onDelete: Cascade)
+  insumoId  String
+  insumo    Insumo        @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  cantidad  Int
+  createdAt DateTime      @default(now())
+  updatedAt DateTime?
+
+  @@unique([salidaId, insumoId])
+  @@schema("almacen")
+}
+
+model RecuentoAlmacen {
+  id                      String                   @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantMemberId          String?
+  tenantMember            TenantMember?            @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  fecha                   DateTime                 @default(now())
+  estado                  Estado                   @default(PENDIENTE)
+  observacion             String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  recuentosAlmacenDetalle RecuentoAlmacenDetalle[]
+  @@schema("almacen")
+}
+
+model RecuentoAlmacenDetalle {
+  id           String          @id @default(cuid())
+  recuentoId   String
+  recuento     RecuentoAlmacen @relation(fields: [recuentoId], references: [id], onDelete: Cascade)
+  insumoId     String
+  insumo       Insumo          @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  stockSistema Int
+  stockFisico  Int
+  diferencia   Int
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime?
+
+  @@unique([recuentoId, insumoId])
+  @@schema("almacen")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "almacen"
+// -----------------------------------------------------------------------------
+
+enum TipoMovimiento {
+  CREACION
+  ENTRADA
+  SALIDA
+  AJUSTE
+  RECUENTO
+  @@schema("almacen")
+}
+
+enum TipoMovimientoAlmacen {
+  CREACION
+  INGRESO
+  SALIDA
+  AJUSTE
+  RECUENTO
+  @@schema("almacen")
+}
+

@@ -1,0 +1,431 @@
+// =============================================================================
+// 80-social.prisma — Interacciones sociales (reacciones, comentarios, publicaciones)
+//
+// Schema PostgreSQL: `social`
+// Modelos: 21   Enums: 6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "social"
+// -----------------------------------------------------------------------------
+
+model ProductoReaccion {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji      String
+  createdAt  DateTime @default(now())
+
+  @@unique([productoId, userId, emoji])
+  @@index([productoId])
+  @@index([tenantId])
+  @@schema("social")
+}
+
+model ProductoComentario {
+  id         String                       @id @default(cuid())
+  tenantId   String
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto                     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contenido  String
+  editado    Boolean                      @default(false)
+  estado     Estado                       @default(ACTIVO)
+  padreId    String?
+  padre      ProductoComentario?          @relation("ComentarioRespuestas", fields: [padreId], references: [id])
+  respuestas ProductoComentario[]         @relation("ComentarioRespuestas")
+  reacciones ProductoComentarioReaccion[]
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime?                    @updatedAt
+
+  @@index([productoId])
+  @@index([userId])
+  @@index([padreId])
+  @@schema("social")
+}
+
+model ProductoComentarioReaccion {
+  id           String             @id @default(cuid())
+  comentarioId String
+  comentario   ProductoComentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji        String
+  createdAt    DateTime           @default(now())
+
+  @@unique([comentarioId, userId, emoji])
+  @@index([comentarioId])
+  @@schema("social")
+}
+
+model ProductoValoracion {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  puntuacion Int
+  resena     String?
+  estado     Estado    @default(ACTIVO)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@unique([productoId, userId])
+  @@index([productoId])
+  @@index([tenantId])
+  @@schema("social")
+}
+
+model ProductoPregunta {
+  id         String              @id @default(cuid())
+  tenantId   String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto            @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pregunta   String
+  estado     Estado              @default(PENDIENTE)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime?           @updatedAt
+  respuestas ProductoRespuesta[]
+
+  @@index([productoId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model ProductoRespuesta {
+  id         String           @id @default(cuid())
+  preguntaId String
+  pregunta   ProductoPregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  respuesta  String
+  estado     Estado           @default(ACTIVO)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime?        @updatedAt
+
+  @@index([preguntaId])
+  @@schema("social")
+}
+
+model ProductoFavorito {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([productoId, userId])
+  @@index([tenantId, userId])
+  @@schema("social")
+}
+
+model Publicacion {
+  id          String                  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId     String
+  autor       User                    @relation("publicacionesAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  titulo      String?
+  contenido   String?
+  tipo        TipoPublicacion         @default(TEXTO)
+  estado      EstadoPublicacion       @default(BORRADOR)
+  etiquetas   String[]
+  publicadoEn DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime?               @updatedAt
+  medios      PublicacionMedia[]
+  reacciones  PublicacionReaccion[]
+  comentarios PublicacionComentario[]
+  compartidos PublicacionCompartido[]
+
+  @@index([tenantId, estado])
+  @@index([tenantId, autorId])
+  @@schema("social")
+}
+
+model PublicacionMedia {
+  id            String               @id @default(cuid())
+  publicacionId String
+  publicacion   Publicacion          @relation(fields: [publicacionId], references: [id], onDelete: Cascade)
+  tipo          TipoMediaPublicacion
+  url           String?
+  embedUrl      String?
+  thumbnailUrl  String?
+  plataforma    PlataformaMedia?
+  titulo        String?
+  orden         Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime?            @updatedAt
+
+  @@index([publicacionId])
+  @@schema("social")
+}
+
+model PublicacionReaccion {
+  id            String       @id @default(cuid())
+  publicacionId String
+  publicacion   Publicacion  @relation(fields: [publicacionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User         @relation("reaccionesPublicacion", fields: [userId], references: [id], onDelete: Cascade)
+  tipo          TipoReaccion
+  createdAt     DateTime     @default(now())
+
+  @@unique([publicacionId, userId])
+  @@index([publicacionId])
+  @@schema("social")
+}
+
+model PublicacionComentario {
+  id            String                          @id @default(cuid())
+  publicacionId String
+  publicacion   Publicacion                     @relation(fields: [publicacionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User                            @relation("comentariosPublicacion", fields: [userId], references: [id], onDelete: Cascade)
+  contenido     String
+  editado       Boolean                         @default(false)
+  estado        Estado                          @default(ACTIVO)
+  padreId       String?
+  padre         PublicacionComentario?          @relation("ComentarioPublicacionRespuestas", fields: [padreId], references: [id])
+  respuestas    PublicacionComentario[]         @relation("ComentarioPublicacionRespuestas")
+  reacciones    PublicacionComentarioReaccion[]
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime?                       @updatedAt
+
+  @@index([publicacionId])
+  @@index([userId])
+  @@index([padreId])
+  @@schema("social")
+}
+
+model PublicacionComentarioReaccion {
+  id           String                @id @default(cuid())
+  comentarioId String
+  comentario   PublicacionComentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                  @relation("reaccionesComentarioPublicacion", fields: [userId], references: [id], onDelete: Cascade)
+  tipo         TipoReaccion
+  createdAt    DateTime              @default(now())
+
+  @@unique([comentarioId, userId])
+  @@index([comentarioId])
+  @@schema("social")
+}
+
+model PublicacionCompartido {
+  id            String               @id @default(cuid())
+  publicacionId String
+  publicacion   Publicacion          @relation(fields: [publicacionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User                 @relation("compartidosPublicacion", fields: [userId], references: [id], onDelete: Cascade)
+  plataforma    PlataformaCompartido
+  createdAt     DateTime             @default(now())
+
+  @@index([publicacionId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model TiendaReaccion {
+  id        String       @id @default(cuid())
+  tiendaId  String
+  tienda    Tienda       @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation("reaccionesTienda", fields: [userId], references: [id], onDelete: Cascade)
+  tipo      TipoReaccion
+  createdAt DateTime     @default(now())
+
+  @@unique([tiendaId, userId])
+  @@index([tiendaId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model TiendaComentario {
+  id         String                      @id @default(cuid())
+  tiendaId   String
+  tienda     Tienda                      @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                        @relation("comentariosTienda", fields: [userId], references: [id], onDelete: Cascade)
+  contenido  String
+  editado    Boolean                     @default(false)
+  estado     Estado                      @default(ACTIVO)
+  padreId    String?
+  padre      TiendaComentario?           @relation("ComentarioTiendaRespuestas", fields: [padreId], references: [id])
+  respuestas TiendaComentario[]          @relation("ComentarioTiendaRespuestas")
+  reacciones TiendaComentarioReaccion[]
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime?                   @updatedAt
+
+  @@index([tiendaId])
+  @@index([userId])
+  @@index([padreId])
+  @@schema("social")
+}
+
+model TiendaComentarioReaccion {
+  id           String           @id @default(cuid())
+  comentarioId String
+  comentario   TiendaComentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User             @relation("reaccionesComentarioTienda", fields: [userId], references: [id], onDelete: Cascade)
+  tipo         TipoReaccion
+  createdAt    DateTime         @default(now())
+
+  @@unique([comentarioId, userId])
+  @@index([comentarioId])
+  @@schema("social")
+}
+
+model TiendaValoracion {
+  id         String    @id @default(cuid())
+  tiendaId   String
+  tienda     Tienda    @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation("valoracionesTienda", fields: [userId], references: [id], onDelete: Cascade)
+  puntuacion Int
+  resena     String?
+  estado     Estado    @default(ACTIVO)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@unique([tiendaId, userId])
+  @@index([tiendaId])
+  @@schema("social")
+}
+
+model TiendaPregunta {
+  id         String            @id @default(cuid())
+  tiendaId   String
+  tienda     Tienda            @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User              @relation("preguntasTienda", fields: [userId], references: [id], onDelete: Cascade)
+  pregunta   String
+  estado     Estado            @default(PENDIENTE)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime?         @updatedAt
+  respuestas TiendaRespuesta[]
+
+  @@index([tiendaId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model TiendaRespuesta {
+  id         String         @id @default(cuid())
+  preguntaId String
+  pregunta   TiendaPregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User           @relation("respuestasTienda", fields: [userId], references: [id], onDelete: Cascade)
+  respuesta  String
+  estado     Estado         @default(ACTIVO)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime?      @updatedAt
+
+  @@index([preguntaId])
+  @@schema("social")
+}
+
+model TiendaFavorito {
+  id        String   @id @default(cuid())
+  tiendaId  String
+  tienda    Tienda   @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("favoritosTienda", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([tiendaId, userId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model TiendaSeguidor {
+  id        String   @id @default(cuid())
+  tiendaId  String
+  tienda    Tienda   @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("seguidoresTienda", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([tiendaId, userId])
+  @@index([tiendaId])
+  @@index([userId])
+  @@schema("social")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "social"
+// -----------------------------------------------------------------------------
+
+enum TipoPublicacion {
+  TEXTO
+  IMAGEN
+  VIDEO
+  VIDEO_EXTERNO
+  MIXTO
+  @@schema("social")
+}
+
+enum EstadoPublicacion {
+  BORRADOR
+  PUBLICADO
+  ARCHIVADO
+  @@schema("social")
+}
+
+enum TipoMediaPublicacion {
+  IMAGEN
+  VIDEO
+  VIDEO_YOUTUBE
+  VIDEO_TIKTOK
+  VIDEO_FACEBOOK
+  VIDEO_INSTAGRAM
+  VIDEO_OTRO
+  @@schema("social")
+}
+
+enum PlataformaMedia {
+  YOUTUBE
+  TIKTOK
+  FACEBOOK
+  INSTAGRAM
+  OTRO
+  @@schema("social")
+}
+
+enum TipoReaccion {
+  ME_GUSTA
+  ME_ENCANTA
+  ME_IMPORTA
+  ME_DIVIERTE
+  ME_ASOMBRA
+  ME_ENTRISTECE
+  ME_ENOJA
+  @@schema("social")
+}
+
+enum PlataformaCompartido {
+  WHATSAPP
+  FACEBOOK
+  TWITTER_X
+  INSTAGRAM
+  TIKTOK
+  TELEGRAM
+  COPIAR_ENLACE
+  OTRO
+  @@schema("social")
+}
+

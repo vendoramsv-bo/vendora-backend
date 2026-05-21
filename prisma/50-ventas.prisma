@@ -1,0 +1,386 @@
+// =============================================================================
+// 50-ventas.prisma — Operación comercial: caja, ventas, compras, pedidos
+//
+// Schema PostgreSQL: `ventas`
+// Modelos: 15   Enums: 6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// MODELOS — schema "ventas"
+// -----------------------------------------------------------------------------
+
+model Cliente {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre        String
+  direccion     String?
+  email         String?
+  telefono      String?
+  diaNacimiento Int?
+  mesNacimiento Int?
+  estado        Estado    @default(ACTIVO)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+
+  // Reservas en restaurante (si el tenant también tiene esRestaurante=true)
+  reservas      Reserva[]
+
+  @@unique([tenantId, nombre])
+  @@unique([tenantId, email])
+  @@schema("ventas")
+}
+
+model TurnosDeAtencion {
+  id                     String                 @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turno                  String
+  descripcion            String?
+  estado                 Estado                 @default(ACTIVO)
+  claTurnoId             String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime?              @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  ventas                 Venta[]
+  aperturasCierresDeCaja AperturaCierreDeCaja[]
+
+  @@unique([tenantId, turno])
+  @@schema("ventas")
+}
+
+model PuntosDeVenta {
+  id                     String                 @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                 String
+  direccion              String?
+  telefono               String?
+  sucursal               String?
+  tipo                   TipoPuntoDeVenta       @default(CAJA)
+  estado                 Estado                 @default(ACTIVO)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime?              @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  ventas                 Venta[]
+  aperturasCierresDeCaja AperturaCierreDeCaja[]
+
+  @@unique([tenantId, nombre])
+  @@schema("ventas")
+}
+
+model AperturaCierreDeCaja {
+  id                String           @id @default(cuid())
+  tenantId          String
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  puntoVentaId      String
+  puntoVenta        PuntosDeVenta    @relation(fields: [puntoVentaId], references: [id], onDelete: Cascade)
+  turnoId           String
+  turno             TurnosDeAtencion @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  tenantMemberId    String
+  tenantMember      TenantMember     @relation(fields: [tenantMemberId], references: [id], onDelete: Cascade)
+  fecha             DateTime
+  montoIngresos     Decimal          @default(0) @db.Decimal(10, 2)
+  montoEgresos      Decimal          @default(0) @db.Decimal(10, 2)
+  montoVentas       Decimal          @default(0) @db.Decimal(10, 2)
+  montoDescuentos   Decimal          @default(0) @db.Decimal(10, 2)
+  montoArqueoCaja   Decimal          @default(0) @db.Decimal(10, 2)
+  estadoCaja        EstadoDeCaja     @default(APERTURADA)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime?        @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  ventas            Venta[]
+  ingresosDeCaja    IngresosCaja[]
+  egresosDeCaja     EgresosCaja[]
+
+  @@unique([tenantId, puntoVentaId, turnoId, tenantMemberId, fecha])
+  @@schema("ventas")
+}
+
+model IngresosCaja {
+  id                   String               @id @default(cuid())
+  aperturaCierreCajaId String
+  aperturaCierreCaja   AperturaCierreDeCaja @relation(fields: [aperturaCierreCajaId], references: [id], onDelete: Cascade)
+  motivo               String
+  montoIngreso         Decimal              @default(0) @db.Decimal(10, 2)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime?            @updatedAt
+  @@schema("ventas")
+}
+
+model EgresosCaja {
+  id                   String               @id @default(cuid())
+  aperturaCierreCajaId String
+  aperturaCierreCaja   AperturaCierreDeCaja @relation(fields: [aperturaCierreCajaId], references: [id], onDelete: Cascade)
+  motivo               String
+  montoEgreso          Decimal              @default(0) @db.Decimal(10, 2)
+  createdAt            DateTime?
+  updatedAt            DateTime?            @updatedAt
+  @@schema("ventas")
+}
+
+model Venta {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  puntoVentaId         String
+  puntoDeVenta         PuntosDeVenta        @relation(fields: [puntoVentaId], references: [id], onDelete: Cascade)
+  turnoId              String
+  turno                TurnosDeAtencion     @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  tenantMemberId       String
+  tenantMember         TenantMember         @relation(fields: [tenantMemberId], references: [id], onDelete: Cascade)
+  aperturaCierreCajaId String
+  aperturaCierreDeCaja AperturaCierreDeCaja @relation(fields: [aperturaCierreCajaId], references: [id], onDelete: Cascade)
+  fecha                DateTime             @default(now())
+  clienteTipoDocumento String?
+  clienteNroDocumento  String?
+  clienteNombre        String?
+  clienteEmail         String?
+  clienteId            String?
+  totalCantidad        Int                  @default(0)
+  totalVenta           Decimal              @default(0) @db.Decimal(10, 2)
+  totalDescuento       Decimal              @default(0) @db.Decimal(10, 2)
+  efectivo             Decimal              @default(0) @db.Decimal(10, 2)
+  diferencia           Decimal              @default(0) @db.Decimal(10, 2)
+  tipoPago             TipoDePago           @default(EFECTIVO)
+  estadoPago           EstadoDePago         @default(PAGADO)
+  referenciaId         String?
+  referenciaTipo       ReferenciaTipoVenta? @default(PUNTO_DE_VENTA)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  ventasDetalle        VentaDetalle[]
+  @@schema("ventas")
+}
+
+model VentaDetalle {
+  id               String                 @id @default(cuid())
+  ventaId          String
+  venta            Venta                  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String?
+  variante         ProductoVariante?      @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante String?
+  precioVolumenId  String?
+  precioVolumen    ProductoPrecioVolumen? @relation(fields: [precioVolumenId], references: [id], onDelete: SetNull)
+  etiquetaVolumen  String?
+  notaVenta        String?
+  precio           Decimal                @default(0) @db.Decimal(10, 2)
+  cantidad         Int                    @default(0)
+  total            Decimal                @default(0) @db.Decimal(10, 2)
+  descuento        Decimal                @default(0) @db.Decimal(10, 2)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime?              @updatedAt
+
+  @@unique([ventaId, productoId, varianteId])
+  @@schema("ventas")
+}
+
+model Proveedor {
+  id              String           @id @default(cuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claProveedorId  String?
+  nombre          String
+  direccion       String?
+  telefono        String?
+  nit             String?
+  departamento    String?
+  productosOfrece String?
+  sitioWeb        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime?        @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  compras         Compra[]
+  ingresosAlmacen IngresoAlmacen[]
+
+  @@unique([tenantId, nombre])
+  @@unique([tenantId, nit])
+  @@schema("ventas")
+}
+
+model Compra {
+  id                    String                 @id @default(cuid())
+  tenantId              String
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fecha                 DateTime               @default(now())
+  descripcion           String?
+  proveedorId           String
+  proveedor             Proveedor              @relation(fields: [proveedorId], references: [id])
+  tenantMemberId        String?
+  tenantMember          TenantMember?          @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  totalCantidad         Int                    @default(0)
+  totalCompra           Decimal                @default(0) @db.Decimal(10, 2)
+  totalCostoAdicional   Decimal                @default(0) @db.Decimal(10, 2)
+  estado                Estado                 @default(PENDIENTE)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime?              @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  comprasDetalle        CompraDetalle[]
+  comprasCostoAdicional CompraCostoAdicional[]
+  @@schema("ventas")
+}
+
+model CompraDetalle {
+  id                  String            @id @default(cuid())
+  compraId            String
+  compra              Compra            @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId          String
+  producto            Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId          String?
+  variante            ProductoVariante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante    String?
+  cantidad            Int
+  precio              Decimal           @default(0) @db.Decimal(10, 2)
+  total               Decimal           @default(0) @db.Decimal(10, 2)
+  precioEstimadoVenta Decimal           @default(0) @db.Decimal(10, 2)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime?         @updatedAt
+
+  @@unique([compraId, productoId, varianteId])
+  @@schema("ventas")
+}
+
+model CompraCostoAdicional {
+  id        String    @id @default(cuid())
+  compraId  String
+  compra    Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  motivo    String
+  costo     Decimal   @default(0) @db.Decimal(10, 2)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@unique([compraId, motivo])
+  @@schema("ventas")
+}
+
+model Gastos {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantMemberId String?
+  tenantMember   TenantMember? @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
+  fecha          DateTime      @default(now())
+  motivo         String
+  totalGasto     Decimal       @default(0) @db.Decimal(10, 2)
+  estado         Estado        @default(ACTIVO)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime?     @updatedAt
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  @@schema("ventas")
+}
+
+model Pedido {
+  id             String          @id @default(cuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User            @relation(fields: [userId], references: [id])
+  fecha          DateTime        @default(now())
+  totalCantidad  Int             @default(0)
+  totalPedido    Decimal         @default(0) @db.Decimal(10, 2)
+  respuesta      String?
+  estado         Estado          @default(PENDIENTE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime?
+  // Auditoría — quién creó y quién modificó el registro
+  createdById  String?
+  updatedById  String?
+  pedidosDetalle PedidoDetalle[]
+  @@schema("ventas")
+}
+
+model PedidoDetalle {
+  id               String                 @id @default(cuid())
+  pedidoId         String
+  pedido           Pedido                 @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String?
+  variante         ProductoVariante?      @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  etiquetaVariante String?
+  precioVolumenId  String?
+  precioVolumen    ProductoPrecioVolumen? @relation(fields: [precioVolumenId], references: [id], onDelete: SetNull)
+  etiquetaVolumen  String?
+  precio           Decimal                @default(0) @db.Decimal(10, 2)
+  cantidad         Int                    @default(0)
+  total            Decimal                @default(0) @db.Decimal(10, 2)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime?              @updatedAt
+
+  @@unique([pedidoId, productoId, varianteId])
+  @@schema("ventas")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS — schema "ventas"
+// -----------------------------------------------------------------------------
+
+enum TipoPuntoDeVenta {
+  CAJA
+  SUCURSAL
+  @@schema("ventas")
+}
+
+enum TipoEfectivo {
+  BILLETE_200
+  BILLETE_100
+  BILLETE_50
+  BILLETE_20
+  BILLETE_10
+  MONEDA_5
+  MONEDA_2
+  MONEDA_1
+  CENTAVOS_50
+  CENTAVOS_20
+  CENTAVOS_10
+  @@schema("ventas")
+}
+
+enum TipoDePago {
+  EFECTIVO
+  QR
+  TARJETA_CREDITO
+  TARJETA_DEBITO
+  OTRO
+  @@schema("ventas")
+}
+
+enum EstadoDePago {
+  PAGADO
+  EN_ESPERA
+  @@schema("ventas")
+}
+
+enum EstadoDeCaja {
+  APERTURADA
+  CERRADA
+  @@schema("ventas")
+}
+
+enum ReferenciaTipoVenta {
+  PUNTO_DE_VENTA
+  PEDIDO
+  VENTA_DIARIA
+  OTRO
+  @@schema("ventas")
+}
+
