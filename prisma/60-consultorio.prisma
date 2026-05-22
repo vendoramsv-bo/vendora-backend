@@ -101,7 +101,6 @@ model ServicioMedico {
   updatedById  String?
 
   citas             Cita[]
-  atencionesMedicas AtencionMedica[]
   atencionesDetalle AtencionDetalle[]
 
   @@unique([consultorioId, nombre])
