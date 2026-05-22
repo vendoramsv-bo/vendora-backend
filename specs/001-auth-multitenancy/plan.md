@@ -135,7 +135,36 @@ dos módulos para este feature: `autenticacion` (thin adapter sobre BA) y `tenan
 
 ## Complexity Tracking
 
-> No hay violaciones constitucionales que justificar.
+### Excepción constitucional registrada: Artículo VI.2 — Eventos desde hooks de BA
+
+**Principio afectado:** Artículo VI.2 — "Los eventos se emiten DENTRO del caso de uso
+(vía el puerto `Notificador`), NO en el adaptador."
+
+**Desviación:** Los hooks `onOrganizationCreated`, `onOrganizationUpdated`,
+`onOrganizationDeleted`, `onMemberCreated` y `onMemberDeleted` viven en
+`src/modules/autenticacion/infrastructure/better-auth.setup.ts` — capa de
+infraestructura, no en `application/`.
+
+**Justificación:**
+Better-Auth controla el ciclo de vida de las mutaciones de organización y membresía.
+Sus hooks son el **único punto de extensión** que la librería expone para ejecutar
+lógica de dominio después de que una mutación persiste en la base de datos. No existe
+una capa de aplicación independiente para estos flujos porque BA no permite inyectar
+casos de uso propios en el flujo de escritura — solo permite registrar hooks.
+
+En este contexto, los hooks de BA son el **equivalente funcional de un caso de uso**:
+se ejecutan exactamente cuando el dominio cambia de estado, reciben los datos del
+cambio, y tienen acceso completo al puerto `ITenantNotificador` para emitir eventos.
+La alternativa (crear use cases en `application/` y llamarlos desde los hooks)
+añadiría una capa de indirección sin valor: el hook seguiría siendo el punto de
+entrada real.
+
+**Scope de la excepción:** Solo aplica al módulo `autenticacion` y únicamente para
+los hooks de BA Organization/Member. En el módulo `tenant` (endpoints propios) los
+eventos se emiten desde los use cases en `application/`, alineados con VI.2.
+
+**Referencia:** Confirmado en `research.md` Decisión 5. Registrado también en
+la Constitución v1.5.2 como excepción explícita de VI.2.
 
 ---
 

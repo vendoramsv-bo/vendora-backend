@@ -217,6 +217,14 @@ NO se reimplementa paginación ad-hoc.
 - **VI.2 — Eventos desde la capa de aplicación:** Los eventos se emiten DENTRO del caso de
   uso (vía el puerto `Notificador`), NO en el adaptador. Una mutación vía REST también notifica
   a los usuarios web. Una sola fuente de verdad para los eventos.
+
+  **Excepción — Hooks de librería de autenticación:** Cuando un caso de uso es disparado por
+  el ciclo de vida de una librería de auth (ej. Better-Auth Organization hooks), el hook es
+  el equivalente funcional del caso de uso. Los hooks `onOrganizationCreated/Updated/Deleted`
+  y `onMemberCreated/Deleted` residen en `infrastructure/` porque la librería controla el punto
+  de extensión y no permite inyectar capas de aplicación propias en su flujo de escritura.
+  Esta excepción aplica exclusivamente al módulo `autenticacion`; en módulos propios los eventos
+  siempre se emiten desde `application/`.
 - **VI.3 — Eventos tipados:** Existe un contrato `ServerToClientEvents` compartido (paquete de
   tipos) que tipa los sockets tanto en backend como en frontend.
 - **VI.4 — Salas por módulo opcionales:** Además de `tenant:${id}`, se pueden usar sub-salas
@@ -282,6 +290,10 @@ NO-NEGOCIABLE SOLO pueden modificarse mediante enmienda explícita de este docum
    explícita en la sección Complexity Tracking del plan.
 
 **Registro de Enmiendas:**
+- **1.5.2** — Artículo VI.2: excepción formal registrada para hooks de librería de auth.
+  Cuando un hook de BA actúa como punto de extensión post-mutación, es el equivalente
+  funcional de un caso de uso y puede residir en `infrastructure/`. Scope: módulo
+  `autenticacion` únicamente.
 - **1.5.1** — Artículo I y V.1: versión de Prisma actualizada de `6+` a `7`.
 - **1.5.0** — Artículo I: tRPC eliminado del stack. La API tipada se reemplaza por
   REST puro con Hono + `@hono/zod-openapi` (genera spec OpenAPI desde schemas Zod).
@@ -301,4 +313,4 @@ NO-NEGOCIABLE SOLO pueden modificarse mediante enmienda explícita de este docum
   Prohibición explícita de serverless edge para el backend.
 - **1.0.0** — Versión inicial consolidando los 9 artículos.
 
-**Version**: 1.5.1 | **Ratified**: TODO(RATIFICATION_DATE): fecha de adopción formal no registrada en el documento fuente | **Last Amended**: 2026-05-21
+**Version**: 1.5.2 | **Ratified**: TODO(RATIFICATION_DATE): fecha de adopción formal no registrada en el documento fuente | **Last Amended**: 2026-05-21

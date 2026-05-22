@@ -223,6 +223,11 @@ Remueve a un miembro del tenant. Requiere rol admin u owner.
 
 **Request body:** `{ "memberIdOrEmail": "..." }`
 **Response 200:** `{ "success": true }`
+**Response 400:** El miembro a remover es el único propietario del tenant.
+
+> **Guard custom (código propio):** BA **no bloquea** nativamente que se elimine al único
+> propietario. El hook `beforeRemoveMember` en `better-auth.setup.ts` lanza `APIError` si
+> el miembro tiene rol owner/PROPIETARIO y es el único con ese rol (FR-026, H2).
 
 ---
 
@@ -231,7 +236,11 @@ Remueve a un miembro del tenant. Requiere rol admin u owner.
 El usuario activo sale voluntariamente del tenant.
 
 **Response 200:** `{ "success": true }`
-**Response 400:** No puede salir si es el único owner.
+**Response 400:** El usuario es el único propietario del tenant.
+
+> **Guard custom (código propio):** BA **no expone** hook `beforeLeaveOrganization`. El guard
+> se aplica en `beforeRemoveMember` si BA enruta `leave` por esa vía, o como middleware Hono
+> previo al handler de BA si no lo enruta (verificar durante implementación de T034a, FR-027).
 
 ---
 
@@ -242,3 +251,36 @@ Cambia el tenant activo en la sesión del usuario.
 **Request body:** `{ "organizationId": "tenant_id" }`
 **Response 200:** `{ "session": { ...updatedSession } }`
 **Response 403:** El usuario no pertenece al tenant solicitado.
+
+---
+
+## Eliminación de Cuenta (Endpoint Custom)
+
+> Este endpoint **no es provisto por BA**. Es un handler Hono custom en el módulo
+> `autenticacion` que combina lógica de dominio con la BA admin API server-side.
+
+### DELETE /api/user
+
+Elimina la cuenta del usuario autenticado. Si es el único propietario de uno o más tenants,
+los elimina en cascada antes de borrar la cuenta (FR-031).
+
+**Headers requeridos:** `Authorization: Bearer <token>`
+
+**Flujo interno:**
+1. `requireAuth` — verificar sesión activa.
+2. Consultar `TenantMember` via Prisma: todos los tenants donde el usuario tiene rol `owner`/`PROPIETARIO`.
+3. Para cada uno: verificar si hay **otro** miembro con rol owner. Si no → eliminar tenant con `auth.api.deleteOrganization` server-side (el usuario es owner → autorizado; cascade de TenantMember, Invitacion, Propietario vía `onDelete: Cascade` Prisma).
+4. Eliminar la cuenta en una transacción Prisma (`$transaction`): borrar en orden de FK todas las filas que referencian al usuario (`Invitacion`, `Propietario`, `TenantMember`, `Session`, `Account`) y finalmente la fila `User`.
+5. Retornar 204.
+
+**Response 204:** Cuenta eliminada correctamente.
+**Response 401:** Sin sesión activa.
+
+> **Por qué no `auth.api.removeUser`**: el endpoint `removeUser` pertenece al **admin plugin**
+> de Better-Auth y exige que el llamador tenga rol admin. Un usuario eliminando su propia
+> cuenta no es admin, por lo que esa vía sería rechazada con 403. El borrado directo vía
+> Prisma en transacción es determinista y no depende de un cascade hacia `User` (el schema
+> sólo garantiza cascade hacia `Tenant`).
+
+> **Nota**: La eliminación de tenants en paso 3 dispara los hooks `onOrganizationDeleted`
+> → `notificador.tenantEliminado()` → evento Socket.IO `tenant:eliminado` a los miembros conectados.

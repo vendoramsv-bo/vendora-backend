@@ -152,6 +152,12 @@ tenant correspondiente.
 3. **Given** un usuario con tenant activo establecido, **When** cierra y reabre
    sesión, **Then** su tenant activo se restaura al que tenía al cerrar sesión.
 
+   > **Nota de implementación**: Better-Auth inicializa `activeOrganizationId` en
+   > `null` en cada sesión nueva — no persiste el tenant activo entre sesiones
+   > (confirmado en la documentación del plugin Organization). Para cumplir este
+   > escenario, el sistema implementa un hook `databaseHooks.session.create.before`
+   > que pobla `activeOrganizationId` con el `TenantMember` más reciente del usuario.
+
 ---
 
 ### User Story 5 — Actualizaciones en Tiempo Real (Priority: P3)
@@ -208,8 +214,8 @@ tenant en una sesión y verificar que la otra lo refleja en menos de 2 segundos.
 - **FR-007**: El sistema DEBE permitir recuperar el acceso mediante un enlace de restablecimiento de contraseña enviado al email.
 - **FR-008**: El sistema DEBE permitir cerrar sesión, invalidando el token activo.
 - **FR-029**: Las sesiones DEBEN expirar automáticamente 7 días después del inicio de sesión; al expirar, el usuario debe volver a autenticarse.
-- **FR-030**: El sistema DEBE aplicar una espera creciente entre intentos de inicio de sesión fallidos consecutivos (ej. 5 s, 15 s, 60 s), sin bloquear permanentemente la cuenta.
-- **FR-031**: Un usuario DEBE poder eliminar su propia cuenta; si es el único propietario de uno o más tenants, dichos tenants y todos sus datos se eliminan en cascada.
+- **FR-030**: Tras intentos de inicio de sesión fallidos consecutivos, el sistema DEBE responder con `429 Too Many Requests` incluyendo el header `Retry-After`. El cliente DEBE respetar ese header aplicando la espera indicada antes del siguiente intento. La cuenta NO se bloquea permanentemente. (Better-Auth `rateLimit` provee el `429` + `Retry-After`; el backoff creciente es responsabilidad del cliente que consume la API.)
+- **FR-031**: Un usuario DEBE poder eliminar su propia cuenta mediante el endpoint custom `DELETE /api/user`. El sistema DEBE: (a) identificar todos los tenants donde el usuario es el **único propietario** (`TenantMember.role IN ['owner','PROPIETARIO']` sin otro miembro con ese rol); (b) eliminar esos tenants en cascada (TenantMember, Invitacion, Propietario) ANTES de eliminar la cuenta; (c) delegar la eliminación definitiva de la cuenta a la BA admin API server-side (`auth.api.removeUser`). BA **no implementa** esta lógica condicional nativamente — es código custom en el módulo `autenticacion`.
 
 **Gestión de Tenants:**
 - **FR-009**: Un usuario autenticado DEBE poder crear un tenant con nombre, slug, descripción y logo.
@@ -217,7 +223,7 @@ tenant en una sesión y verificar que la otra lo refleja en menos de 2 segundos.
 - **FR-011**: El slug del tenant DEBE ser único en toda la plataforma y contener solo caracteres válidos para URLs.
 - **FR-012**: Un tenant DEBE poder activar o desactivar cada flag de capacidad (esTienda, esConsultorio, esRestaurante) de forma independiente.
 - **FR-013**: Un propietario o administrador DEBE poder actualizar los datos del tenant (nombre, descripción, logo, slug, flags).
-- **FR-028**: Solo el propietario DEBE poder eliminar permanentemente un tenant; al hacerlo, todos los miembros quedan desvinculados y los datos del tenant se eliminan en cascada.
+- **FR-028**: Solo el propietario DEBE poder eliminar permanentemente un tenant; al hacerlo, todos los miembros quedan desvinculados y los datos del tenant se eliminan en cascada. BA aplica el guard de rol `owner` nativamente (solo el owner puede llamar `DELETE /api/auth/organization/delete`). El cascade completo (TenantMember, Invitacion, Propietario) depende de las relaciones `onDelete: Cascade` del schema Prisma.
 
 **Invitaciones y Membresía:**
 - **FR-014**: Un propietario o administrador DEBE poder invitar usuarios por email con un rol específico.
@@ -226,8 +232,8 @@ tenant en una sesión y verificar que la otra lo refleja en menos de 2 segundos.
 - **FR-017**: Un usuario DEBE poder pertenecer a múltiples tenants con roles diferentes en cada uno.
 - **FR-018**: El sistema DEBE rechazar invitaciones duplicadas a usuarios que ya son miembros del tenant.
 - **FR-019**: Las invitaciones expiradas DEBEN comunicarlo al usuario y no ejecutar ningún cambio de membresía.
-- **FR-026**: Un propietario o administrador DEBE poder eliminar a cualquier miembro del tenant (excepto a sí mismo si es el único propietario).
-- **FR-027**: Un miembro DEBE poder salir voluntariamente de un tenant, siempre que no sea el único propietario activo.
+- **FR-026**: Un propietario o administrador DEBE poder eliminar a cualquier miembro del tenant (excepto a sí mismo si es el único propietario). BA **no bloquea nativamente** esta restricción; el guard se implementa en el hook `beforeRemoveMember` de BA, lanzando un `APIError` si el miembro a remover es el único con rol owner.
+- **FR-027**: Un miembro DEBE poder salir voluntariamente de un tenant, siempre que no sea el único propietario activo. BA **no expone** un hook `beforeLeaveOrganization`; el guard se implementa en `beforeRemoveMember` si BA enruta `leave` por esa vía, o como middleware Hono previo al handler de BA en el endpoint `POST /api/auth/organization/leave` si no lo enruta.
 
 **Contexto y Aislamiento de Tenant:**
 - **FR-020**: La sesión del usuario DEBE mantener un tenant activo.
@@ -239,7 +245,7 @@ tenant en una sesión y verificar que la otra lo refleja en menos de 2 segundos.
 - **FR-024**: Los registros principales del tenant DEBEN almacenar el identificador del usuario que los creó y el del último que los modificó.
 
 **Tiempo Real:**
-- **FR-025**: Los usuarios conectados a un tenant DEBEN recibir una notificación automática cuando el tenant es creado, actualizado o eliminado.
+- **FR-025**: Los usuarios conectados a un tenant DEBEN recibir una notificación automática cuando el tenant es creado, actualizado o eliminado, y cuando un miembro se une o es removido del tenant (eventos `tenant:miembro:unido` y `tenant:miembro:removido`).
 
 ### Key Entities
 
@@ -265,8 +271,9 @@ tenant en una sesión y verificar que la otra lo refleja en menos de 2 segundos.
 
 ### Measurable Outcomes
 
-- **SC-001**: Un usuario nuevo completa registro, verificación de email e inicio
-  de sesión en menos de 5 minutos desde el primer clic.
+- **SC-001**: Un usuario nuevo completa el registro e inicio de sesión (excluida la
+  espera de entrega del email de verificación) en menos de 1 minuto; el flujo completo
+  incluyendo la verificación de email se completa típicamente en menos de 5 minutos.
 - **SC-002**: El inicio de sesión (email/contraseña o Google) se completa en
   menos de 3 segundos en condiciones normales de red.
 - **SC-003**: La creación de un tenant con todos sus datos se completa en menos
