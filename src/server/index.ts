@@ -8,6 +8,9 @@ import { authRouter } from "../modules/autenticacion/adapters/auth.rest.js"
 import { tenantRouter } from "../modules/tenant/adapters/tenant.rest.js"
 import { auth, prisma } from "../modules/autenticacion/infrastructure/better-auth.setup.js"
 import { TenantSocketNotificador } from "../modules/tenant/infrastructure/tenant.socket.notificador.js"
+import { ConsultorioSocketNotificador } from "../modules/consultorio/infrastructure/consultorio.socket.notificador.js"
+import { setConsultorioNotificador } from "../modules/consultorio/infrastructure/consultorio.notificador.provider.js"
+import "../workers/recordatorio-cita.worker.js"
 import pino from "pino"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -53,6 +56,10 @@ pubClient.on("connect", () => {
 
 // T047 — TenantSocketNotificador (reemplaza NullTenantNotificador de US2-US4)
 export const socketNotificador = new TenantSocketNotificador(io)
+
+// ConsultorioSocketNotificador — emite eventos consultorio:* al room tenant:{id}
+export const consultorioNotificador = new ConsultorioSocketNotificador(io)
+setConsultorioNotificador(consultorioNotificador)
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {

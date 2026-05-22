@@ -65,6 +65,33 @@ export const requireTenantActivo: MiddlewareHandler<HonoEnv> = async (c, next) =
 
 // ─── Factory requireRol ───────────────────────────────────────────────────────
 
+// ─── Guard requireConsultorio ─────────────────────────────────────────────────
+
+export const requireConsultorio: MiddlewareHandler<HonoEnv> = async (c, next) => {
+  const session = c.get("session")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenantId = (session as any)?.session?.activeOrganizationId
+
+  if (!tenantId) {
+    return c.json({ error: "SIN_TENANT_ACTIVO", message: "No hay un tenant activo en la sesión" }, 403)
+  }
+
+  const { prisma } = await import("../modules/autenticacion/infrastructure/better-auth.setup.js")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenant = await (prisma as any).tenant.findUnique({
+    where: { id: tenantId },
+    select: { esConsultorio: true },
+  })
+
+  if (!tenant?.esConsultorio) {
+    return c.json({ error: "CONSULTORIO_NO_HABILITADO", message: "El módulo de consultorio no está habilitado para este tenant" }, 403)
+  }
+
+  await next()
+}
+
+// ─── Factory requireRol ───────────────────────────────────────────────────────
+
 export function requireRol(roles: string[]): MiddlewareHandler<HonoEnv> {
   const rolesNormalizados = roles.flatMap((r) =>
     r === "PROPIETARIO" ? ["PROPIETARIO", "owner"] : [r],

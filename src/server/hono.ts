@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
 import pino from "pino"
 import type { Variables } from "../core/hono-context.js"
+import { consultorioApp } from "../modules/consultorio/adapters/consultorio-router.js"
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
@@ -31,6 +32,9 @@ export function crearApp() {
   app.notFound((c) =>
     c.json({ error: "NOT_FOUND", message: "Ruta no encontrada" }, 404),
   )
+
+  // Módulo consultorio
+  app.route("/api/consultorio", consultorioApp)
 
   // Spec OpenAPI (T049)
   app.doc("/api/openapi.json", {
