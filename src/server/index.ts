@@ -10,6 +10,8 @@ import { auth, prisma } from "../modules/autenticacion/infrastructure/better-aut
 import { TenantSocketNotificador } from "../modules/tenant/infrastructure/tenant.socket.notificador.js"
 import { ConsultorioSocketNotificador } from "../modules/consultorio/infrastructure/consultorio.socket.notificador.js"
 import { setConsultorioNotificador } from "../modules/consultorio/infrastructure/consultorio.notificador.provider.js"
+import { CatalogoSocketNotificador } from "../modules/catalogo/infrastructure/catalogo.socket.notificador.js"
+import { setCatalogoNotificador } from "../modules/catalogo/infrastructure/catalogo.notificador.provider.js"
 import "../workers/recordatorio-cita.worker.js"
 import pino from "pino"
 
@@ -60,6 +62,10 @@ export const socketNotificador = new TenantSocketNotificador(io)
 // ConsultorioSocketNotificador — emite eventos consultorio:* al room tenant:{id}
 export const consultorioNotificador = new ConsultorioSocketNotificador(io)
 setConsultorioNotificador(consultorioNotificador)
+
+// CatalogoSocketNotificador — emite eventos catalogo:* al room tenant:{id}
+export const catalogoNotificador = new CatalogoSocketNotificador(io)
+setCatalogoNotificador(catalogoNotificador)
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {
