@@ -10,7 +10,8 @@ import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   // Apunta al directorio donde vive la entrada (schema.prisma) y los modelos
-  schema: "prisma",
+  // El config está dentro de prisma/, así que "." apunta al mismo directorio
+  schema: ".",
 
   // Carpeta de migraciones
   migrations: {

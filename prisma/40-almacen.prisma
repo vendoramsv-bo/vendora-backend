@@ -22,6 +22,9 @@ model MovimientoInventario {
   cantidad         Int
   motivo           String?
   referenciaId     String?
+  stockAntes       Int               @default(0)
+  stockDespues     Int               @default(0)
+  createdById      String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime?
 
@@ -58,6 +61,7 @@ model AjusteDetalle {
   etiquetaVariante String?
   stockAnterior    Int               @default(0)
   cantidadAjuste   Int               @default(0)
+  stockDespues     Int               @default(0)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime?
 
@@ -109,7 +113,7 @@ model Insumo {
   nombre                  String
   unidadMedidaId          String
   unidadMedida            UnidadMedida             @relation(fields: [unidadMedidaId], references: [id], onDelete: Cascade)
-  cantidadStock           Int                      @default(0)
+  cantidadStock           Decimal                  @default(0) @db.Decimal(10, 4)
   stockMinimo             Int                      @default(0)
   costoUnitario           Decimal                  @default(0) @db.Decimal(10, 2)
   fechaVencimiento        DateTime?
@@ -134,9 +138,12 @@ model MovimientoAlmacen {
   insumoId     String
   insumo       Insumo                @relation(fields: [insumoId], references: [id], onDelete: Cascade)
   tipo         TipoMovimientoAlmacen
-  cantidad     Int
+  cantidad     Decimal               @db.Decimal(10, 4)
   motivo       String?
   referenciaId String?
+  stockAntes   Int                   @default(0)
+  stockDespues Int                   @default(0)
+  createdById  String?
   createdAt    DateTime              @default(now())
   updatedAt    DateTime?
 
@@ -145,16 +152,18 @@ model MovimientoAlmacen {
 }
 
 model ProductoInsumo {
-  id         String    @id @default(cuid())
+  id         String            @id @default(cuid())
   productoId String
-  producto   Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto   Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId String?
+  variante   ProductoVariante? @relation("VarianteReceta", fields: [varianteId], references: [id], onDelete: SetNull)
   insumoId   String
-  insumo     Insumo    @relation(fields: [insumoId], references: [id], onDelete: Cascade)
-  cantidad   Int
-  createdAt  DateTime  @default(now())
+  insumo     Insumo            @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  cantidad   Decimal           @db.Decimal(10, 4)
+  createdAt  DateTime          @default(now())
   updatedAt  DateTime?
 
-  @@unique([productoId, insumoId])
+  @@unique([productoId, varianteId, insumoId])
   @@schema("almacen")
 }
 
@@ -186,7 +195,7 @@ model IngresoDetalle {
   ingreso          IngresoAlmacen @relation(fields: [ingresoId], references: [id], onDelete: Cascade)
   insumoId         String
   insumo           Insumo         @relation(fields: [insumoId], references: [id], onDelete: Cascade)
-  cantidad         Int
+  cantidad         Decimal        @db.Decimal(10, 4)
   costoUnitario    Decimal        @default(0) @db.Decimal(10, 2)
   costoTotal       Decimal        @default(0) @db.Decimal(10, 2)
   lote             String?
@@ -223,7 +232,7 @@ model SalidaDetalle {
   salida    SalidaAlmacen @relation(fields: [salidaId], references: [id], onDelete: Cascade)
   insumoId  String
   insumo    Insumo        @relation(fields: [insumoId], references: [id], onDelete: Cascade)
-  cantidad  Int
+  cantidad  Decimal       @db.Decimal(10, 4)
   createdAt DateTime      @default(now())
   updatedAt DateTime?
 
@@ -255,9 +264,9 @@ model RecuentoAlmacenDetalle {
   recuento     RecuentoAlmacen @relation(fields: [recuentoId], references: [id], onDelete: Cascade)
   insumoId     String
   insumo       Insumo          @relation(fields: [insumoId], references: [id], onDelete: Cascade)
-  stockSistema Int
-  stockFisico  Int
-  diferencia   Int
+  stockSistema Decimal         @db.Decimal(10, 4)
+  stockFisico  Decimal         @db.Decimal(10, 4)
+  diferencia   Decimal         @db.Decimal(10, 4)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime?
 

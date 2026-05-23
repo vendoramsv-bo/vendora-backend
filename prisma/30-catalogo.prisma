@@ -243,15 +243,17 @@ model ProductoVariante {
   estado        Estado                     @default(ACTIVO)
   createdAt     DateTime                   @default(now())
   updatedAt     DateTime?                  @updatedAt
-  atributos             ProductoVarianteAtributo[]
-  preciosVolumen        ProductoPrecioVolumen[]
-  ofertas               ProductoOfertas[]
-  ventasDetalle         VentaDetalle[]
-  pedidosDetalle        PedidoDetalle[]
-  comprasDetalle        CompraDetalle[]
-  movimientosInventario MovimientoInventario[]
-  ajustesDetalle        AjusteDetalle[]
-  recuentosDetalle      RecuentoDetalle[]
+  inventarioActivado      Boolean                    @default(false)
+  atributos               ProductoVarianteAtributo[]
+  preciosVolumen          ProductoPrecioVolumen[]
+  ofertas                 ProductoOfertas[]
+  ventasDetalle           VentaDetalle[]
+  pedidosDetalle          PedidoDetalle[]
+  comprasDetalle          CompraDetalle[]
+  movimientosInventario   MovimientoInventario[]
+  ajustesDetalle          AjusteDetalle[]
+  recuentosDetalle        RecuentoDetalle[]
+  productosInsumoVariante ProductoInsumo[]           @relation("VarianteReceta")
 
   @@unique([productoId, sku])
   @@schema("catalogo")
