@@ -1,5 +1,5 @@
 import type { Server } from "socket.io"
-import type { IConsultorioNotificador, CitaEventoPayload, CitaEstadoPayload, AtencionEstadoPayload, RecetaEmitidaPayload } from "../domain/ports/IConsultorioNotificador.js"
+import type { IConsultorioNotificador, CitaEventoPayload, CitaEstadoPayload, AtencionEstadoPayload, RecetaEmitidaPayload, HistoriaCreadePayload } from "../domain/ports/IConsultorioNotificador.js"
 import pino from "pino"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -25,5 +25,10 @@ export class ConsultorioSocketNotificador implements IConsultorioNotificador {
   recetaEmitida(tenantId: string, payload: RecetaEmitidaPayload): void {
     logger.info({ tenantId, recetaId: payload.recetaId, numeroReceta: payload.numeroReceta }, "[socket] emit:consultorio:receta:emitida")
     this.io.to(`tenant:${tenantId}`).emit("consultorio:receta:emitida", { type: "consultorio:receta:emitida", ...payload })
+  }
+
+  async historiaCreada(payload: HistoriaCreadePayload): Promise<void> {
+    logger.info({ tenantId: payload.tenantId, historiaId: payload.historiaId }, "[socket] emit:consultorio:historia:created")
+    this.io.to(`tenant:${payload.tenantId}`).emit("consultorio:historia:created", { type: "consultorio:historia:created", ...payload })
   }
 }

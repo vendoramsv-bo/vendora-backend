@@ -1,6 +1,7 @@
 export interface PacienteRaw {
   id: string
   consultorioId: string
+  dni: string | null
   nombre: string
   apellido: string
   fechaNacimiento: Date | null
@@ -12,6 +13,7 @@ export interface PacienteRaw {
   alergias: string | null
   seguroNombre: string | null
   seguroNumero: string | null
+  canalNotificacion: string | null
   estado: string
   createdAt: Date
   updatedAt: Date | null
@@ -22,6 +24,7 @@ export interface PacienteRaw {
 export class PacienteEntity {
   readonly id: string
   readonly consultorioId: string
+  readonly dni: string | null
   readonly nombre: string
   readonly apellido: string
   readonly fechaNacimiento: Date | null
@@ -33,6 +36,7 @@ export class PacienteEntity {
   readonly alergias: string | null
   readonly seguroNombre: string | null
   readonly seguroNumero: string | null
+  readonly canalNotificacion: string | null
   readonly estado: string
   readonly createdAt: Date
   readonly updatedAt: Date | null
@@ -40,6 +44,7 @@ export class PacienteEntity {
   constructor(raw: PacienteRaw) {
     this.id = raw.id
     this.consultorioId = raw.consultorioId
+    this.dni = raw.dni
     this.nombre = raw.nombre
     this.apellido = raw.apellido
     this.fechaNacimiento = raw.fechaNacimiento
@@ -51,6 +56,7 @@ export class PacienteEntity {
     this.alergias = raw.alergias
     this.seguroNombre = raw.seguroNombre
     this.seguroNumero = raw.seguroNumero
+    this.canalNotificacion = raw.canalNotificacion
     this.estado = raw.estado
     this.createdAt = raw.createdAt
     this.updatedAt = raw.updatedAt
@@ -73,6 +79,7 @@ export class PacienteEntity {
     return {
       id: this.id,
       consultorioId: this.consultorioId,
+      dni: this.dni,
       nombre: this.nombre,
       apellido: this.apellido,
       fechaNacimiento: this.fechaNacimiento?.toISOString() ?? null,
@@ -84,6 +91,7 @@ export class PacienteEntity {
       alergias: this.alergias,
       seguroNombre: this.seguroNombre,
       seguroNumero: this.seguroNumero,
+      canalNotificacion: this.canalNotificacion,
       edad: this.edad(),
       estado: this.estado,
       createdAt: this.createdAt.toISOString(),

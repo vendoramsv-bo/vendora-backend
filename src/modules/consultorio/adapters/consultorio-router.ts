@@ -8,6 +8,7 @@ import { citaRouter } from "./cita.rest.js"
 import { historiaClinicaRouter } from "./historia-clinica.rest.js"
 import { atencionMedicaRouter } from "./atencion-medica.rest.js"
 import { recetaMedicaRouter } from "./receta-medica.rest.js"
+import { vacunacionRouter } from "./vacunacion.rest.js"
 
 const consultorioApp = new Hono<HonoEnv>()
 
@@ -21,5 +22,6 @@ consultorioApp.route("/", citaRouter)
 consultorioApp.route("/", historiaClinicaRouter)
 consultorioApp.route("/", atencionMedicaRouter)
 consultorioApp.route("/", recetaMedicaRouter)
+consultorioApp.route("/", vacunacionRouter)
 
 export { consultorioApp }

@@ -35,9 +35,18 @@ export interface RecetaEmitidaPayload {
   tenantId: string
 }
 
+export interface HistoriaCreadePayload {
+  historiaId: string
+  pacienteId: string
+  medicoId: string
+  especialidad: string
+  tenantId: string
+}
+
 export interface IConsultorioNotificador {
   citaCreada(tenantId: string, payload: CitaEventoPayload): void
   citaCambiada(tenantId: string, payload: CitaEstadoPayload): void
   atencionCambiada(tenantId: string, payload: AtencionEstadoPayload): void
   recetaEmitida(tenantId: string, payload: RecetaEmitidaPayload): void
+  historiaCreada(payload: HistoriaCreadePayload): Promise<void>
 }

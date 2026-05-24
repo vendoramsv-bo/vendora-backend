@@ -3,12 +3,13 @@ import type { HonoEnv } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { AtencionMedicaPrismaRepository } from "../infrastructure/atencion-medica.prisma.repository.js"
 import { getConsultorioNotificador } from "../infrastructure/consultorio.notificador.provider.js"
+import { VentaServiceAdapter } from "../infrastructure/venta.service.adapter.js"
 import { CrearAtencionUseCase } from "../application/atencion-medica/crear-atencion.usecase.js"
 import { ListarAtencionesUseCase } from "../application/atencion-medica/listar-atenciones.usecase.js"
 import { ObtenerAtencionUseCase } from "../application/atencion-medica/obtener-atencion.usecase.js"
 import { RegistrarPagoUseCase } from "../application/atencion-medica/registrar-pago.usecase.js"
 import { AnularAtencionUseCase } from "../application/atencion-medica/anular-atencion.usecase.js"
-import { AtencionCreateSchema, PagoSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
+import { AtencionCreateSchema, PagoAtencionBodySchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
 import { AtencionNoEncontrada, PagoExcedeTotalError, AtencionYaPagada } from "../domain/consultorio.errors.js"
 import { paginate } from "../../../core/query-params.js"
 
@@ -34,12 +35,13 @@ atencionMedicaRouter.get("/atenciones", async (c) => {
 
 atencionMedicaRouter.post("/atenciones", async (c) => {
   const session = c.get("session")
-  const cId = await getConsultorioId(c.get("tenantId"))
+  const tenantId = c.get("tenantId")
+  const cId = await getConsultorioId(tenantId)
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
   const parsed = AtencionCreateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-  const atencion = await new CrearAtencionUseCase(makeRepo()).ejecutar(parsed.data, cId, session.user.id)
+  const atencion = await new CrearAtencionUseCase(makeRepo(), getConsultorioNotificador()).ejecutar(parsed.data, cId, session.user.id, tenantId)
   return c.json(atencion.toJSON(), 201)
 })
 
@@ -77,10 +79,11 @@ atencionMedicaRouter.post("/atenciones/:id/pagos", async (c) => {
   const cId = await getConsultorioId(tenantId)
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
-  const parsed = PagoSchema.safeParse(body)
+  const parsed = PagoAtencionBodySchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
-    const a = await new RegistrarPagoUseCase(makeRepo(), getConsultorioNotificador()).ejecutar(
+    const ventaService = new VentaServiceAdapter(db)
+    const a = await new RegistrarPagoUseCase(makeRepo(), getConsultorioNotificador(), ventaService).ejecutar(
       c.req.param("id"), parsed.data, session.user.id, cId, tenantId,
     )
     return c.json(a.toJSON())

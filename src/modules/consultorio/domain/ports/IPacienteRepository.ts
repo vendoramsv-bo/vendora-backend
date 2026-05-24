@@ -5,6 +5,7 @@ import type { ListResult } from "./IMedicoRepository.js"
 export interface PacienteCreateDTO {
   nombre: string
   apellido: string
+  dni?: string
   fechaNacimiento?: string
   genero?: string
   telefono?: string
@@ -14,6 +15,7 @@ export interface PacienteCreateDTO {
   alergias?: string
   seguroNombre?: string
   seguroNumero?: string
+  canalNotificacion?: string | null
 }
 
 export interface VacunacionDTO {
@@ -42,6 +44,7 @@ export interface IPacienteRepository {
   obtener(id: string, consultorioId: string): Promise<PacienteEntity>
   listar(consultorioId: string, params: QueryParams): Promise<ListResult<PacienteEntity>>
   actualizar(id: string, data: Partial<PacienteRaw>, userId: string): Promise<PacienteEntity>
+  existeDni(consultorioId: string, dni: string, excludeId?: string): Promise<boolean>
   registrarVacunacion(pacienteId: string, data: VacunacionDTO): Promise<Vacunacion>
   listarVacunaciones(pacienteId: string): Promise<Vacunacion[]>
 }

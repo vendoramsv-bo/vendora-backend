@@ -9,8 +9,8 @@ import { ObtenerCitaUseCase } from "../application/cita/obtener-cita.usecase.js"
 import { ConfirmarCitaUseCase } from "../application/cita/confirmar-cita.usecase.js"
 import { CancelarCitaUseCase } from "../application/cita/cancelar-cita.usecase.js"
 import { MarcarNoAsistioUseCase } from "../application/cita/marcar-no-asistio.usecase.js"
-import { CitaCreateSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
-import { CitaNoEncontrada, CitaSolapada, CitaNoConfirmable, CitaYaAtendida } from "../domain/consultorio.errors.js"
+import { CitaCreateSchema, ConfirmarCitaBodySchema, CancelarCitaBodySchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
+import { CitaNoEncontrada, CitaSolapada, CitaNoConfirmable, CitaYaAtendida, ConflictoVersionError } from "../domain/consultorio.errors.js"
 import { paginate } from "../../../core/query-params.js"
 
 export const citaRouter = new Hono<HonoEnv>()
@@ -72,14 +72,18 @@ citaRouter.post("/citas/:id/confirmar", async (c) => {
   const tenantId = c.get("tenantId")
   const cId = await getConsultorioId(tenantId)
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = ConfirmarCitaBodySchema.safeParse(body)
+  const expectedUpdatedAt = parsed.success && parsed.data.expectedUpdatedAt ? new Date(parsed.data.expectedUpdatedAt) : undefined
   try {
     const cita = await new ConfirmarCitaUseCase(makeRepo(), getConsultorioNotificador()).ejecutar(
-      c.req.param("id"), cId, session.user.id, tenantId,
+      c.req.param("id"), cId, session.user.id, tenantId, expectedUpdatedAt,
     )
     return c.json(cita.toJSON())
   } catch (err) {
     if (err instanceof CitaNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
     if (err instanceof CitaNoConfirmable) return c.json({ error: err.code, message: err.message }, 409)
+    if (err instanceof ConflictoVersionError) return c.json({ error: err.code, message: err.message, statusCode: 409 }, 409)
     throw err
   }
 })
@@ -89,14 +93,18 @@ citaRouter.post("/citas/:id/cancelar", async (c) => {
   const tenantId = c.get("tenantId")
   const cId = await getConsultorioId(tenantId)
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = CancelarCitaBodySchema.safeParse(body)
+  const expectedUpdatedAt = parsed.success && parsed.data.expectedUpdatedAt ? new Date(parsed.data.expectedUpdatedAt) : undefined
   try {
     const cita = await new CancelarCitaUseCase(makeRepo(), getConsultorioNotificador()).ejecutar(
-      c.req.param("id"), cId, session.user.id, tenantId,
+      c.req.param("id"), cId, session.user.id, tenantId, expectedUpdatedAt,
     )
     return c.json(cita.toJSON())
   } catch (err) {
     if (err instanceof CitaNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
     if (err instanceof CitaYaAtendida) return c.json({ error: err.code, message: err.message }, 409)
+    if (err instanceof ConflictoVersionError) return c.json({ error: err.code, message: err.message, statusCode: 409 }, 409)
     throw err
   }
 })

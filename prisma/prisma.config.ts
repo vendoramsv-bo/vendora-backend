@@ -1,27 +1,34 @@
 // =============================================================================
-// prisma.config.ts — Configuración moderna de Prisma 7
+// prisma.config.ts — Configuración del CLI de Prisma 7
 //
-// Este archivo reemplaza la configuración via `package.json#prisma`. Es la
-// forma recomendada en Prisma 7 y soporta type-safety en la config.
+// Provee el DATABASE_URL al CLI (migrate, studio, generate) cargando .env
+// desde la raíz del proyecto con ruta absoluta, independientemente del CWD.
+//
+// Nota: el adapter (@prisma/adapter-pg) se usa en PrismaClient en runtime
+// (ver better-auth.setup.ts y prisma-scoped.ts), no aquí.
 // =============================================================================
 
-import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { config } from "dotenv";
+import { resolve } from "path";
+import { fileURLToPath } from "url";
+import { defineConfig } from "prisma/config";
+
+// Carga .env desde la raíz del proyecto (un nivel arriba de prisma/)
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+config({ path: resolve(__dirname, "../.env") });
 
 export default defineConfig({
-  // Apunta al directorio donde vive la entrada (schema.prisma) y los modelos
-  // El config está dentro de prisma/, así que "." apunta al mismo directorio
+  // Directorio donde viven schema.prisma y los archivos de modelos
   schema: ".",
 
-  // Carpeta de migraciones
+  // Migraciones y seed
   migrations: {
     path: "prisma/migrations",
-    // Comando que ejecuta `prisma migrate dev` para seedear datos
     seed: "tsx prisma/seed.ts",
   },
 
-  // Conexión a la base de datos (variable de entorno)
+  // URL de conexión para el CLI (migrate dev, studio, generate)
   datasource: {
-    url: env("DATABASE_URL"),
+    url: process.env.DATABASE_URL!,
   },
 });

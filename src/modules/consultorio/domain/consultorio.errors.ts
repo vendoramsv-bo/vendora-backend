@@ -165,3 +165,27 @@ export class PermisoDenegado extends Error {
     this.name = "PermisoDenegado"
   }
 }
+
+export class DNIYaRegistrado extends Error {
+  readonly code = "DNI_YA_REGISTRADO"
+  constructor() {
+    super("Ya existe un paciente con ese DNI en el consultorio")
+    this.name = "DNIYaRegistrado"
+  }
+}
+
+export class ConflictoVersionError extends Error {
+  readonly code = "CONFLICTO_VERSION"
+  constructor() {
+    super("El registro fue modificado por otro usuario. Recargue antes de reintentar.")
+    this.name = "ConflictoVersionError"
+  }
+}
+
+export class VacunacionNoEncontrada extends Error {
+  readonly code = "VACUNACION_NO_ENCONTRADA"
+  constructor(id: string) {
+    super(`Vacunación no encontrada: ${id}`)
+    this.name = "VacunacionNoEncontrada"
+  }
+}

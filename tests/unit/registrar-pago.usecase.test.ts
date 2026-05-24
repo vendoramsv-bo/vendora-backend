@@ -1,6 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { RegistrarPagoUseCase } from "../../src/modules/consultorio/application/atencion-medica/registrar-pago.usecase.js"
 import { PagoExcedeTotalError } from "../../src/modules/consultorio/domain/consultorio.errors.js"
+import type { IVentaService, CrearDesdeAtencionInput } from "../../src/modules/consultorio/domain/ports/IVentaService.js"
+
+class FakeVentaService implements IVentaService {
+  llamadas: CrearDesdeAtencionInput[] = []
+  async crearDesdeAtencion(data: CrearDesdeAtencionInput): Promise<{ ventaId: string }> {
+    this.llamadas.push(data)
+    return { ventaId: "venta-fake-1" }
+  }
+}
 import { AtencionMedicaEntity, type AtencionMedicaRaw } from "../../src/modules/consultorio/domain/atencion-medica.entity.js"
 import type { IAtencionMedicaRepository, PagoDTO } from "../../src/modules/consultorio/domain/ports/IAtencionMedicaRepository.js"
 import type { ListResult } from "../../src/modules/consultorio/domain/ports/IMedicoRepository.js"
@@ -116,6 +125,51 @@ describe("RegistrarPagoUseCase", () => {
   it("pago parcial seguido de pago total → PAGADO", async () => {
     await useCase.ejecutar("at-1", { monto: 60, metodo: "EFECTIVO" }, USER, CONSULTORIO, TENANT)
     const result = await useCase.ejecutar("at-1", { monto: 40, metodo: "EFECTIVO" }, USER, CONSULTORIO, TENANT)
+    expect(result.estadoPago).toBe("PAGADO")
+  })
+})
+
+describe("RegistrarPagoUseCase — integración con IVentaService", () => {
+  it("pago total llama crearDesdeAtencion cuando se provee ventaService con contexto caja", async () => {
+    const repo = new FakeAtencionRepository()
+    const notificador = new FakeConsultorioNotificador()
+    const ventaService = new FakeVentaService()
+    const useCase = new RegistrarPagoUseCase(repo, notificador, ventaService)
+    repo.seed(makeAtencionRaw())
+
+    await useCase.ejecutar(
+      "at-1",
+      { monto: 100, metodo: "EFECTIVO", aperturaCierreCajaId: "caja-1", puntoVentaId: "pv-1", turnoId: "turno-1" },
+      USER, CONSULTORIO, TENANT,
+    )
+
+    expect(ventaService.llamadas).toHaveLength(1)
+    expect(ventaService.llamadas[0]!.atencionId).toBe("at-1")
+  })
+
+  it("pago parcial NO llama crearDesdeAtencion", async () => {
+    const repo = new FakeAtencionRepository()
+    const notificador = new FakeConsultorioNotificador()
+    const ventaService = new FakeVentaService()
+    const useCase = new RegistrarPagoUseCase(repo, notificador, ventaService)
+    repo.seed(makeAtencionRaw())
+
+    await useCase.ejecutar(
+      "at-1",
+      { monto: 60, metodo: "EFECTIVO", aperturaCierreCajaId: "caja-1", puntoVentaId: "pv-1", turnoId: "turno-1" },
+      USER, CONSULTORIO, TENANT,
+    )
+
+    expect(ventaService.llamadas).toHaveLength(0)
+  })
+
+  it("pago total sin ventaService no falla", async () => {
+    const repo = new FakeAtencionRepository()
+    const notificador = new FakeConsultorioNotificador()
+    const useCase = new RegistrarPagoUseCase(repo, notificador)
+    repo.seed(makeAtencionRaw())
+
+    const result = await useCase.ejecutar("at-1", { monto: 100, metodo: "EFECTIVO" }, USER, CONSULTORIO, TENANT)
     expect(result.estadoPago).toBe("PAGADO")
   })
 })

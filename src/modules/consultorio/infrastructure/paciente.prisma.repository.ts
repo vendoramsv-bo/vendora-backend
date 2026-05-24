@@ -5,10 +5,14 @@ import { PacienteNoEncontrado, PacienteEmailDuplicado } from "../domain/consulto
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 import { withAudit } from "../../../core/prisma-scoped.js"
+import type { AuditoriaAccesoPrismaRepository } from "./auditoria-acceso.prisma.repository.js"
 
 export class PacientePrismaRepository implements IPacienteRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(private readonly db: any) {}
+  constructor(
+    private readonly db: any,
+    private readonly auditoriaRepo?: AuditoriaAccesoPrismaRepository,
+  ) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private get client(): any {
@@ -29,9 +33,19 @@ export class PacientePrismaRepository implements IPacienteRepository {
     }
   }
 
-  async obtener(id: string, consultorioId: string): Promise<PacienteEntity> {
+  async obtener(id: string, consultorioId: string, userId?: string, tenantId?: string): Promise<PacienteEntity> {
     const raw = await this.client.paciente.findFirst({ where: { id, consultorioId } })
     if (!raw) throw new PacienteNoEncontrado(id)
+    if (this.auditoriaRepo && userId && tenantId) {
+      void this.auditoriaRepo.registrar({
+        tenantId,
+        consultorioId,
+        userId,
+        accion: "LEER_PACIENTE",
+        recursoTipo: "PACIENTE",
+        recursoId: id,
+      })
+    }
     return PacienteEntity.fromPrisma(raw as PacienteRaw)
   }
 
@@ -51,6 +65,14 @@ export class PacientePrismaRepository implements IPacienteRepository {
       data: { ...data, updatedById: userId },
     })
     return PacienteEntity.fromPrisma(raw as PacienteRaw)
+  }
+
+  async existeDni(consultorioId: string, dni: string, excludeId?: string): Promise<boolean> {
+    const row = await this.client.paciente.findFirst({
+      where: { consultorioId, dni, ...(excludeId ? { NOT: { id: excludeId } } : {}) },
+      select: { id: true },
+    })
+    return row !== null
   }
 
   async registrarVacunacion(pacienteId: string, data: VacunacionDTO): Promise<Vacunacion> {

@@ -142,4 +142,32 @@ export const RecetaCreateSchema = z.object({
   detalle: z.array(RecetaDetalleSchema).min(1),
 })
 
+export const ConfirmarCitaBodySchema = z.object({
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+export const CancelarCitaBodySchema = z.object({
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+export const HistoriaUpdateWithLockSchema = HistoriaUpdateSchema.extend({
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+export const PacienteCreateSchema = PacienteBaseSchema.extend({
+  dni: z.string().max(20).optional(),
+  canalNotificacion: z.enum(["EMAIL", "SMS", "WHATSAPP"]).nullable().optional(),
+})
+
+export const PacienteUpdateWithDniSchema = PacienteUpdateSchema.extend({
+  dni: z.string().max(20).optional(),
+  canalNotificacion: z.enum(["EMAIL", "SMS", "WHATSAPP"]).nullable().optional(),
+})
+
+export const PagoAtencionBodySchema = PagoSchema.extend({
+  aperturaCierreCajaId: z.string().optional(),
+  puntoVentaId: z.string().optional(),
+  turnoId: z.string().optional(),
+})
+
 export const QueryParamsConsultorioSchema = makeQueryParamsSchema(["createdAt", "nombre", "apellido", "fechaHora", "estado"])

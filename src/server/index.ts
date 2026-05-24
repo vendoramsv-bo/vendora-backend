@@ -17,6 +17,8 @@ import { setAlmacenNotificador } from "../modules/almacen/infrastructure/almacen
 import { VentasSocketNotificador } from "../modules/ventas/infrastructure/ventas.socket.notificador.js"
 import { setVentasNotificador } from "../modules/ventas/infrastructure/ventas.notificador.provider.js"
 import "../workers/recordatorio-cita.worker.js"
+import "../workers/expirar-recetas.worker.js"
+import { expirarRecetasQueue } from "../core/recordatorios.queue.js"
 import pino from "pino"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -39,6 +41,11 @@ const port = Number(process.env.PORT ?? 3000)
 export const httpServer = serve({ fetch: app.fetch, port }, (info) => {
   logger.info({ port: info.port }, "[server] Vendora Backend corriendo")
 })
+
+// Schedule daily job to expire recetas at 02:00 AM
+expirarRecetasQueue
+  .add("expirar", {}, { repeat: { pattern: "0 2 * * *" }, jobId: "expirar-recetas-diario" })
+  .catch((err) => logger.warn({ err }, "[expirar-recetas] No se pudo registrar job repetible"))
 
 // ─── Socket.IO ────────────────────────────────────────────────────────────────
 

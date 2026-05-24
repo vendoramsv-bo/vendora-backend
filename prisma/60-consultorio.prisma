@@ -54,6 +54,7 @@ model Paciente {
   id              String      @id @default(cuid())
   consultorioId  String
   consultorio     Consultorio @relation(fields: [consultorioId], references: [id], onDelete: Cascade)
+  dni             String?     @db.VarChar(20)
   nombre          String
   apellido        String
   fechaNacimiento DateTime?
@@ -66,6 +67,7 @@ model Paciente {
   // Datos del seguro / obra social
   seguroNombre    String?
   seguroNumero    String?
+  canalNotificacion String?   // EMAIL | SMS | WHATSAPP
   estado          Estado      @default(ACTIVO)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime?   @updatedAt
@@ -80,6 +82,7 @@ model Paciente {
   recetasMedicas     RecetaMedica[]
 
   @@unique([consultorioId, email])
+  @@unique([consultorioId, dni])
   @@index([consultorioId, apellido])
   @@schema("consultorio")
 }
@@ -656,6 +659,22 @@ model RecetaMedicaDetalle {
 
   @@index([recetaId])
   @@index([productoId])
+  @@schema("consultorio")
+}
+
+model AuditoriaAcceso {
+  id            String   @id @default(cuid())
+  tenantId      String
+  consultorioId String
+  userId        String
+  accion        String
+  recursoTipo   String
+  recursoId     String
+  ip            String?
+  timestamp     DateTime @default(now())
+
+  @@index([consultorioId, recursoId])
+  @@index([userId, timestamp])
   @@schema("consultorio")
 }
 

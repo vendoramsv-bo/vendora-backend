@@ -5,6 +5,7 @@ import { HistoriaNoEncontrada } from "../domain/consultorio.errors.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 import { withAudit } from "../../../core/prisma-scoped.js"
+import type { AuditoriaAccesoPrismaRepository } from "./auditoria-acceso.prisma.repository.js"
 
 const EXTENSION_INCLUDE = {
   hcOdontologia: true,
@@ -16,7 +17,10 @@ const EXTENSION_INCLUDE = {
 
 export class HistoriaClinicaPrismaRepository implements IHistoriaClinicaRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(private readonly db: any) {}
+  constructor(
+    private readonly db: any,
+    private readonly auditoriaRepo?: AuditoriaAccesoPrismaRepository,
+  ) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private get client(): any {
@@ -31,12 +35,22 @@ export class HistoriaClinicaPrismaRepository implements IHistoriaClinicaReposito
     return HistoriaClinicaEntity.fromPrisma(raw as HistoriaClinicaRaw)
   }
 
-  async obtener(id: string, consultorioId: string): Promise<HistoriaClinicaEntity> {
+  async obtener(id: string, consultorioId: string, userId?: string, tenantId?: string): Promise<HistoriaClinicaEntity> {
     const raw = await this.client.historiaClinica.findFirst({
       where: { id, consultorioId },
       include: EXTENSION_INCLUDE,
     })
     if (!raw) throw new HistoriaNoEncontrada(id)
+    if (this.auditoriaRepo && userId && tenantId) {
+      void this.auditoriaRepo.registrar({
+        tenantId,
+        consultorioId,
+        userId,
+        accion: "LEER_HISTORIA",
+        recursoTipo: "HISTORIA_CLINICA",
+        recursoId: id,
+      })
+    }
     return HistoriaClinicaEntity.fromPrisma(raw as HistoriaClinicaRaw)
   }
 

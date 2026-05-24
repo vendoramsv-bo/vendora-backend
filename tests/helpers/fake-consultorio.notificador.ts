@@ -4,6 +4,7 @@ import type {
   CitaEstadoPayload,
   AtencionEstadoPayload,
   RecetaEmitidaPayload,
+  HistoriaCreadePayload,
 } from "../../src/modules/consultorio/domain/ports/IConsultorioNotificador.js"
 
 export class FakeConsultorioNotificador implements IConsultorioNotificador {
@@ -23,6 +24,10 @@ export class FakeConsultorioNotificador implements IConsultorioNotificador {
 
   recetaEmitida(_tenantId: string, payload: RecetaEmitidaPayload): void {
     this.eventos.push({ tipo: "consultorio:receta:emitida", payload })
+  }
+
+  async historiaCreada(payload: HistoriaCreadePayload): Promise<void> {
+    this.eventos.push({ tipo: "consultorio:historia:created", payload })
   }
 
   limpiar(): void {

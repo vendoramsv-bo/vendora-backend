@@ -9,8 +9,9 @@ import { ObtenerHistoriaUseCase } from "../application/historia-clinica/obtener-
 import { ActualizarHistoriaUseCase } from "../application/historia-clinica/actualizar-historia.usecase.js"
 import { UpsertExtensionUseCase } from "../application/historia-clinica/upsert-extension.usecase.js"
 import { AdjuntarArchivoUseCase } from "../application/historia-clinica/adjuntar-archivo.usecase.js"
-import { HistoriaCreateSchema, HistoriaUpdateSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
-import { HistoriaNoEncontrada } from "../domain/consultorio.errors.js"
+import { getConsultorioNotificador } from "../infrastructure/consultorio.notificador.provider.js"
+import { HistoriaCreateSchema, HistoriaUpdateWithLockSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
+import { HistoriaNoEncontrada, ConflictoVersionError } from "../domain/consultorio.errors.js"
 import { paginate } from "../../../core/query-params.js"
 import type { ExtensionTipo } from "../domain/ports/IHistoriaClinicaRepository.js"
 
@@ -36,14 +37,15 @@ historiaClinicaRouter.get("/historias", async (c) => {
 
 historiaClinicaRouter.post("/historias", async (c) => {
   const session = c.get("session")
-  const cId = await getConsultorioId(c.get("tenantId"))
+  const tenantId = c.get("tenantId")
+  const cId = await getConsultorioId(tenantId)
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
   const parsed = HistoriaCreateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   const { fecha, ...restData } = parsed.data
-  const historia = await new CrearHistoriaUseCase(makeRepo()).ejecutar(
-    { ...restData, ...(fecha ? { fecha: new Date(fecha) } : {}) }, cId, session.user.id,
+  const historia = await new CrearHistoriaUseCase(makeRepo(), getConsultorioNotificador()).ejecutar(
+    { ...restData, ...(fecha ? { fecha: new Date(fecha) } : {}) }, cId, session.user.id, tenantId,
   )
   return c.json(historia.toJSON(), 201)
 })
@@ -65,15 +67,17 @@ historiaClinicaRouter.put("/historias/:id", async (c) => {
   const cId = await getConsultorioId(c.get("tenantId"))
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
-  const parsed = HistoriaUpdateSchema.safeParse(body)
+  const parsed = HistoriaUpdateWithLockSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
-    const { fecha: fechaStr, ...restUpdate } = parsed.data
+    const { fecha: fechaStr, expectedUpdatedAt: expectedStr, ...restUpdate } = parsed.data
     const updateData = { ...restUpdate, ...(fechaStr ? { fecha: new Date(fechaStr) } : {}) }
-    const h = await new ActualizarHistoriaUseCase(makeRepo()).ejecutar(c.req.param("id"), updateData, session.user.id, cId)
+    const expectedUpdatedAt = expectedStr ? new Date(expectedStr) : undefined
+    const h = await new ActualizarHistoriaUseCase(makeRepo()).ejecutar(c.req.param("id"), updateData, session.user.id, cId, expectedUpdatedAt)
     return c.json(h.toJSON())
   } catch (err) {
     if (err instanceof HistoriaNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
+    if (err instanceof ConflictoVersionError) return c.json({ error: err.code, message: err.message, statusCode: 409 }, 409)
     throw err
   }
 })

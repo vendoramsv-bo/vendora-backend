@@ -10,7 +10,7 @@ const db = prisma as any
 export const recordatorioCitaWorker = new Worker(
   "recordatorios",
   async (job) => {
-    const { citaId, canal } = job.data as { citaId: string; canal: string }
+    const { citaId } = job.data as { citaId: string; canal?: string }
 
     const cita = await db.cita.findUnique({
       where: { id: citaId },
@@ -27,11 +27,16 @@ export const recordatorioCitaWorker = new Worker(
       return
     }
 
+    const canal: string | null = cita.paciente?.canalNotificacion ?? null
+    if (!canal) {
+      logger.info({ citaId }, "[recordatorio] Paciente sin canalNotificacion configurado, omitiendo recordatorio")
+      return
+    }
+
     if (canal === "EMAIL") {
       const emailPaciente = cita.paciente?.email
       const emailMedico = cita.medico?.member?.user?.email
 
-      // Stub: log instead of sending via Resend (Resend integration pending)
       logger.info(
         { citaId, emailPaciente, emailMedico, fechaHora: cita.fechaHora },
         "[recordatorio] Enviando recordatorio EMAIL (stub)",
@@ -41,7 +46,6 @@ export const recordatorioCitaWorker = new Worker(
         data: { citaId, canal, estadoEnvio: "ENVIADO" },
       })
     } else {
-      // SMS / WHATSAPP — stub pendiente de integración
       logger.info({ citaId, canal }, "[recordatorio] Recordatorio SMS/WHATSAPP pendiente de integración")
       await db.recordatorioCita.create({
         data: { citaId, canal, estadoEnvio: "PENDIENTE" },

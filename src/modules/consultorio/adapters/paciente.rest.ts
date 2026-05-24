@@ -6,8 +6,8 @@ import { CrearPacienteUseCase } from "../application/paciente/crear-paciente.use
 import { ListarPacientesUseCase } from "../application/paciente/listar-pacientes.usecase.js"
 import { ObtenerPacienteUseCase } from "../application/paciente/obtener-paciente.usecase.js"
 import { ActualizarPacienteUseCase } from "../application/paciente/actualizar-paciente.usecase.js"
-import { PacienteBaseSchema, PacienteUpdateSchema, VacunacionSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
-import { PacienteNoEncontrado, PacienteEmailDuplicado } from "../domain/consultorio.errors.js"
+import { PacienteCreateSchema, PacienteUpdateWithDniSchema, VacunacionSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
+import { PacienteNoEncontrado, PacienteEmailDuplicado, DNIYaRegistrado } from "../domain/consultorio.errors.js"
 import { paginate } from "../../../core/query-params.js"
 
 export const pacienteRouter = new Hono<HonoEnv>()
@@ -35,13 +35,14 @@ pacienteRouter.post("/pacientes", async (c) => {
   const cId = await getConsultorioId(c.get("tenantId"))
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
-  const parsed = PacienteBaseSchema.safeParse(body)
+  const parsed = PacienteCreateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
     const paciente = await new CrearPacienteUseCase(makeRepo()).ejecutar(parsed.data, cId, session.user.id)
     return c.json(paciente.toJSON(), 201)
   } catch (err) {
     if (err instanceof PacienteEmailDuplicado) return c.json({ error: err.code, message: err.message }, 409)
+    if (err instanceof DNIYaRegistrado) return c.json({ error: err.code, message: err.message, statusCode: 409 }, 409)
     throw err
   }
 })
@@ -63,7 +64,7 @@ pacienteRouter.put("/pacientes/:id", async (c) => {
   const cId = await getConsultorioId(c.get("tenantId"))
   if (!cId) return c.json({ error: "CONSULTORIO_NO_ENCONTRADO" }, 404)
   const body = await c.req.json()
-  const parsed = PacienteUpdateSchema.safeParse(body)
+  const parsed = PacienteUpdateWithDniSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
     const { fechaNacimiento, ...rest } = parsed.data
@@ -72,6 +73,7 @@ pacienteRouter.put("/pacientes/:id", async (c) => {
     return c.json(p.toJSON())
   } catch (err) {
     if (err instanceof PacienteNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
+    if (err instanceof DNIYaRegistrado) return c.json({ error: err.code, message: err.message, statusCode: 409 }, 409)
     throw err
   }
 })

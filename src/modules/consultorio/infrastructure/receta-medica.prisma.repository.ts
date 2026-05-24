@@ -5,12 +5,16 @@ import { RecetaNoEncontrada } from "../domain/consultorio.errors.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 import { withAudit } from "../../../core/prisma-scoped.js"
+import type { AuditoriaAccesoPrismaRepository } from "./auditoria-acceso.prisma.repository.js"
 
 const INCLUDE_FULL = { detalle: true }
 
 export class RecetaMedicaPrismaRepository implements IRecetaMedicaRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(private readonly db: any) {}
+  constructor(
+    private readonly db: any,
+    private readonly auditoriaRepo?: AuditoriaAccesoPrismaRepository,
+  ) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private get client(): any {
@@ -92,9 +96,19 @@ export class RecetaMedicaPrismaRepository implements IRecetaMedicaRepository {
     return RecetaMedicaEntity.fromPrisma(raw as RecetaMedicaRaw)
   }
 
-  async obtener(id: string, consultorioId: string): Promise<RecetaMedicaEntity> {
+  async obtener(id: string, consultorioId: string, userId?: string, tenantId?: string): Promise<RecetaMedicaEntity> {
     const raw = await this.client.recetaMedica.findFirst({ where: { id, consultorioId }, include: INCLUDE_FULL })
     if (!raw) throw new RecetaNoEncontrada(id)
+    if (this.auditoriaRepo && userId && tenantId) {
+      void this.auditoriaRepo.registrar({
+        tenantId,
+        consultorioId,
+        userId,
+        accion: "LEER_RECETA",
+        recursoTipo: "RECETA_MEDICA",
+        recursoId: id,
+      })
+    }
     return RecetaMedicaEntity.fromPrisma(raw as RecetaMedicaRaw)
   }
 
