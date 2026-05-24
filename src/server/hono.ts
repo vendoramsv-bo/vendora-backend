@@ -4,6 +4,7 @@ import type { Variables } from "../core/hono-context.js"
 import { consultorioApp } from "../modules/consultorio/adapters/consultorio-router.js"
 import { catalogoApp } from "../modules/catalogo/adapters/catalogo-router.js"
 import { almacenApp } from "../modules/almacen/adapters/almacen-router.js"
+import { ventasApp } from "../modules/ventas/adapters/ventas-router.js"
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
@@ -43,6 +44,9 @@ export function crearApp() {
 
   // Módulo almacén e inventario
   app.route("/api/almacen", almacenApp)
+
+  // Módulo ventas (clientes, proveedores, compras)
+  app.route("/api/ventas", ventasApp)
 
   // Spec OpenAPI (T049)
   app.doc("/api/openapi.json", {

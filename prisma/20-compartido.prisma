@@ -197,6 +197,7 @@ enum Estado {
   PUBLICADO
   ELABORADO
   VENDIDO
+  CONFIRMADA
   @@schema("compartido")
 }
 

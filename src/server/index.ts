@@ -14,6 +14,8 @@ import { CatalogoSocketNotificador } from "../modules/catalogo/infrastructure/ca
 import { setCatalogoNotificador } from "../modules/catalogo/infrastructure/catalogo.notificador.provider.js"
 import { AlmacenSocketNotificador } from "../modules/almacen/infrastructure/almacen.socket.notificador.js"
 import { setAlmacenNotificador } from "../modules/almacen/infrastructure/almacen.notificador.provider.js"
+import { VentasSocketNotificador } from "../modules/ventas/infrastructure/ventas.socket.notificador.js"
+import { setVentasNotificador } from "../modules/ventas/infrastructure/ventas.notificador.provider.js"
 import "../workers/recordatorio-cita.worker.js"
 import pino from "pino"
 
@@ -72,6 +74,10 @@ setCatalogoNotificador(catalogoNotificador)
 // AlmacenSocketNotificador — emite eventos almacen:* al room tenant:{id}
 export const almacenNotificador = new AlmacenSocketNotificador(io)
 setAlmacenNotificador(almacenNotificador)
+
+// VentasSocketNotificador — emite eventos ventas:* al room tenant:{id}
+export const ventasNotificador = new VentasSocketNotificador(io)
+setVentasNotificador(ventasNotificador)
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {
