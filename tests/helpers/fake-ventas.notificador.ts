@@ -7,6 +7,10 @@ import type {
   CompraCreadaPayload,
   CompraActualizadaPayload,
   CompraConfirmadaPayload,
+  VentaCreadaPayload,
+  CajaAbiertaPayload,
+  CajaCerradaPayload,
+  PedidoActualizadoPayload,
 } from "../../src/modules/ventas/domain/ports/IVentasNotificador.js"
 
 export class FakeVentasNotificador implements IVentasNotificador {
@@ -38,5 +42,21 @@ export class FakeVentasNotificador implements IVentasNotificador {
 
   compraConfirmada(tenantId: string, payload: CompraConfirmadaPayload): void {
     this.events.push({ event: "compraConfirmada", tenantId, payload })
+  }
+
+  ventaCreada(tenantId: string, payload: VentaCreadaPayload): void {
+    this.events.push({ event: "ventaCreada", tenantId, payload })
+  }
+
+  cajaAbierta(tenantId: string, payload: CajaAbiertaPayload): void {
+    this.events.push({ event: "cajaAbierta", tenantId, payload })
+  }
+
+  cajaCerrada(tenantId: string, payload: CajaCerradaPayload): void {
+    this.events.push({ event: "cajaCerrada", tenantId, payload })
+  }
+
+  pedidoActualizado(tenantId: string, payload: PedidoActualizadoPayload): void {
+    this.events.push({ event: "pedidoActualizado", tenantId, payload })
   }
 }

@@ -42,6 +42,33 @@ export interface CompraConfirmadaPayload {
   tenantId: string
 }
 
+export interface VentaCreadaPayload {
+  ventaId: string
+  tenantId: string
+  aperturaCierreCajaId: string
+  totalVenta: number
+}
+
+export interface CajaAbiertaPayload {
+  cajaId: string
+  tenantId: string
+  puntoVentaId: string
+  turnoId: string
+  tenantMemberId: string
+}
+
+export interface CajaCerradaPayload {
+  cajaId: string
+  tenantId: string
+  montoArqueoCaja: number
+}
+
+export interface PedidoActualizadoPayload {
+  pedidoId: string
+  tenantId: string
+  estado: string
+}
+
 export interface IVentasNotificador {
   clienteCreado(tenantId: string, payload: ClienteCreadoPayload): void
   clienteActualizado(tenantId: string, payload: ClienteActualizadoPayload): void
@@ -50,4 +77,8 @@ export interface IVentasNotificador {
   compraCreada(tenantId: string, payload: CompraCreadaPayload): void
   compraActualizada(tenantId: string, payload: CompraActualizadaPayload): void
   compraConfirmada(tenantId: string, payload: CompraConfirmadaPayload): void
+  ventaCreada(tenantId: string, payload: VentaCreadaPayload): void
+  cajaAbierta(tenantId: string, payload: CajaAbiertaPayload): void
+  cajaCerrada(tenantId: string, payload: CajaCerradaPayload): void
+  pedidoActualizado(tenantId: string, payload: PedidoActualizadoPayload): void
 }

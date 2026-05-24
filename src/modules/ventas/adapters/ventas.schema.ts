@@ -94,3 +94,145 @@ export const ActualizarDetalleSchema = z.object({
 export const ActualizarCostoSchema = z.object({
   costo: z.number().min(0),
 })
+
+// ─── PuntoVenta ───────────────────────────────────────────────────────────────
+
+export const QueryParamsPuntoVentaSchema = makeQueryParamsSchema(["nombre", "tipo", "createdAt"])
+
+export const CrearPuntoVentaSchema = z.object({
+  nombre: z.string().min(1),
+  tipo: z.enum(["CAJA", "SUCURSAL"]).default("CAJA"),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  sucursal: z.string().optional().nullable(),
+})
+
+export const ActualizarPuntoVentaSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  tipo: z.enum(["CAJA", "SUCURSAL"]).optional(),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  sucursal: z.string().optional().nullable(),
+})
+
+// ─── TurnoAtencion ────────────────────────────────────────────────────────────
+
+export const QueryParamsTurnoSchema = makeQueryParamsSchema(["turno", "createdAt"])
+
+export const CrearTurnoAtencionSchema = z.object({
+  turno: z.string().min(1),
+  descripcion: z.string().optional().nullable(),
+})
+
+export const ActualizarTurnoAtencionSchema = z.object({
+  turno: z.string().min(1).optional(),
+  descripcion: z.string().optional().nullable(),
+})
+
+// ─── Caja ─────────────────────────────────────────────────────────────────────
+
+export const QueryParamsCajaSchema = makeQueryParamsSchema(["fecha", "estadoCaja", "createdAt"])
+
+export const AbrirCajaSchema = z.object({
+  puntoVentaId: z.string().min(1),
+  turnoId: z.string().min(1),
+  montoInicial: z.number().min(0).default(0),
+})
+
+export const CerrarCajaSchema = z.object({
+  montoArqueoCaja: z.number().min(0),
+})
+
+export const RegistrarIngresoCajaSchema = z.object({
+  motivo: z.string().min(1),
+  montoIngreso: z.number().min(0),
+})
+
+export const RegistrarEgresoCajaSchema = z.object({
+  motivo: z.string().min(1),
+  montoEgreso: z.number().min(0),
+})
+
+// ─── Venta ────────────────────────────────────────────────────────────────────
+
+export const QueryParamsVentaSchema = makeQueryParamsSchema(["fecha", "estadoPago", "tipoPago", "createdAt"])
+
+export const VentaDetalleSchema = z.object({
+  productoId: z.string().min(1),
+  varianteId: z.string().optional().nullable(),
+  etiquetaVariante: z.string().optional().nullable(),
+  precioVolumenId: z.string().optional().nullable(),
+  etiquetaVolumen: z.string().optional().nullable(),
+  precio: z.number().min(0),
+  cantidad: z.number().int().min(1),
+  descuento: z.number().min(0).default(0),
+  notaVenta: z.string().optional().nullable(),
+})
+
+export const CrearVentaSchema = z.object({
+  aperturaCierreCajaId: z.string().min(1),
+  puntoVentaId: z.string().min(1),
+  turnoId: z.string().min(1),
+  clienteId: z.string().optional().nullable(),
+  clienteNombre: z.string().optional().nullable(),
+  clienteTipoDocumento: z.string().optional().nullable(),
+  clienteNroDocumento: z.string().optional().nullable(),
+  clienteEmail: z.string().optional().nullable(),
+  tipoPago: z.enum(["EFECTIVO", "QR", "TARJETA_CREDITO", "TARJETA_DEBITO", "OTRO"]),
+  estadoPago: z.enum(["PAGADO", "EN_ESPERA"]).default("PAGADO"),
+  efectivo: z.number().min(0).default(0),
+  referenciaTipo: z.enum(["PUNTO_DE_VENTA", "PEDIDO", "VENTA_DIARIA", "OTRO"]).default("PUNTO_DE_VENTA"),
+  referenciaId: z.string().optional().nullable(),
+  detalles: z.array(VentaDetalleSchema).min(1),
+})
+
+export const QueryParamsReporteSchema = makeQueryParamsSchema(["fecha", "fuente", "createdAt"])
+
+// ─── Pedido ───────────────────────────────────────────────────────────────────
+
+export const QueryParamsPedidoSchema = makeQueryParamsSchema(["fecha", "estado", "createdAt"])
+
+export const PedidoDetalleSchema = z.object({
+  productoId: z.string().min(1),
+  varianteId: z.string().optional().nullable(),
+  etiquetaVariante: z.string().optional().nullable(),
+  precioVolumenId: z.string().optional().nullable(),
+  etiquetaVolumen: z.string().optional().nullable(),
+  precio: z.number().min(0),
+  cantidad: z.number().int().min(1),
+})
+
+export const CrearPedidoSchema = z.object({
+  detalles: z.array(PedidoDetalleSchema).min(1),
+  respuesta: z.string().optional().nullable(),
+})
+
+export const ActualizarEstadoPedidoSchema = z.object({
+  estado: z.enum(["PENDIENTE", "ELABORADO", "FINALIZADO", "RECHAZADO"]),
+  respuesta: z.string().optional().nullable(),
+})
+
+export const ConvertirPedidoEnVentaSchema = z.object({
+  aperturaCierreCajaId: z.string().min(1),
+  puntoVentaId: z.string().min(1),
+  turnoId: z.string().min(1),
+  tipoPago: z.enum(["EFECTIVO", "QR", "TARJETA_CREDITO", "TARJETA_DEBITO", "OTRO"]),
+  estadoPago: z.enum(["PAGADO", "EN_ESPERA"]).default("PAGADO"),
+  efectivo: z.number().min(0).default(0),
+})
+
+// ─── Gastos ───────────────────────────────────────────────────────────────────
+
+export const QueryParamsGastosSchema = makeQueryParamsSchema(["fecha", "estado", "createdAt"])
+
+export const CrearGastoSchema = z.object({
+  fecha: z.string().datetime(),
+  motivo: z.string().min(1),
+  totalGasto: z.number().min(0),
+})
+
+export const ActualizarGastoSchema = z.object({
+  fecha: z.string().datetime().optional(),
+  motivo: z.string().min(1).optional(),
+  totalGasto: z.number().min(0).optional(),
+})
