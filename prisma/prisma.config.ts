@@ -21,9 +21,9 @@ export default defineConfig({
   // Directorio donde viven schema.prisma y los archivos de modelos
   schema: ".",
 
-  // Migraciones y seed
+  // Migraciones y seed — ruta absoluta para evitar ambigüedad con el CWD
   migrations: {
-    path: "prisma/migrations",
+    path: resolve(__dirname, "migrations"),
     seed: "tsx prisma/seed.ts",
   },
 
