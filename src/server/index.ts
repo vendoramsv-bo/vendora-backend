@@ -16,8 +16,13 @@ import { AlmacenSocketNotificador } from "../modules/almacen/infrastructure/alma
 import { setAlmacenNotificador } from "../modules/almacen/infrastructure/almacen.notificador.provider.js"
 import { VentasSocketNotificador } from "../modules/ventas/infrastructure/ventas.socket.notificador.js"
 import { setVentasNotificador } from "../modules/ventas/infrastructure/ventas.notificador.provider.js"
+import { RestauranteSocketNotificador } from "../modules/restaurante/infrastructure/restaurante.socket.notificador.js"
+import { setRestauranteNotificador } from "../modules/restaurante/infrastructure/restaurante.notificador.provider.js"
+import { SocialSocketNotificador } from "../modules/social/infrastructure/social.socket.notificador.js"
+import { setSocialNotificador } from "../modules/social/infrastructure/social.notificador.provider.js"
 import "../workers/recordatorio-cita.worker.js"
 import "../workers/expirar-recetas.worker.js"
+import "../modules/restaurante/infrastructure/publicacion-rrss.bullmq.worker.js"
 import { expirarRecetasQueue } from "../core/recordatorios.queue.js"
 import pino from "pino"
 
@@ -85,6 +90,14 @@ setAlmacenNotificador(almacenNotificador)
 // VentasSocketNotificador — emite eventos ventas:* al room tenant:{id}
 export const ventasNotificador = new VentasSocketNotificador(io)
 setVentasNotificador(ventasNotificador)
+
+// RestauranteSocketNotificador — emite eventos restaurante:* al room tenant:{id}
+export const restauranteNotificador = new RestauranteSocketNotificador(io)
+setRestauranteNotificador(restauranteNotificador)
+
+// SocialSocketNotificador — emite eventos social:* al room tenant:{id} y sub-salas
+export const socialNotificador = new SocialSocketNotificador(io)
+setSocialNotificador(socialNotificador)
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {

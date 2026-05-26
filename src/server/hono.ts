@@ -5,6 +5,8 @@ import { consultorioApp } from "../modules/consultorio/adapters/consultorio-rout
 import { catalogoApp } from "../modules/catalogo/adapters/catalogo-router.js"
 import { almacenApp } from "../modules/almacen/adapters/almacen-router.js"
 import { ventasApp } from "../modules/ventas/adapters/ventas-router.js"
+import { restauranteApp, publicRestauranteApp } from "../modules/restaurante/adapters/restaurante.router.js"
+import { socialApp, publicSocialApp } from "../modules/social/adapters/social.router.js"
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
@@ -47,6 +49,14 @@ export function crearApp() {
 
   // Módulo ventas (clientes, proveedores, compras)
   app.route("/api/ventas", ventasApp)
+
+  // Módulo restaurante (staff + endpoints públicos)
+  app.route("/api/restaurante", restauranteApp)
+  app.route("/api/public/restaurante", publicRestauranteApp)
+
+  // Módulo social (interacciones + publicaciones)
+  app.route("/api/social", socialApp)
+  app.route("/api/public/social", publicSocialApp)
 
   // Spec OpenAPI (T049)
   app.doc("/api/openapi.json", {

@@ -90,6 +90,31 @@ export const requireConsultorio: MiddlewareHandler<HonoEnv> = async (c, next) =>
   await next()
 }
 
+// ─── Guard requireRestaurante ─────────────────────────────────────────────────
+
+export const requireRestaurante: MiddlewareHandler<HonoEnv> = async (c, next) => {
+  const session = c.get("session")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenantId = (session as any)?.session?.activeOrganizationId
+
+  if (!tenantId) {
+    return c.json({ error: "SIN_TENANT_ACTIVO", message: "No hay un tenant activo en la sesión" }, 403)
+  }
+
+  const { prisma } = await import("../modules/autenticacion/infrastructure/better-auth.setup.js")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenant = await (prisma as any).tenant.findUnique({
+    where: { id: tenantId },
+    select: { esRestaurante: true },
+  })
+
+  if (!tenant?.esRestaurante) {
+    return c.json({ error: "CAPACIDAD_NO_ACTIVADA", message: "El módulo de restaurante no está habilitado para este tenant" }, 403)
+  }
+
+  await next()
+}
+
 // ─── Factory requireRol ───────────────────────────────────────────────────────
 
 export function requireRol(roles: string[]): MiddlewareHandler<HonoEnv> {
