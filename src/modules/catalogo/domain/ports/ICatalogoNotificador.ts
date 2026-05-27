@@ -55,6 +55,25 @@ export interface OfertaActualizadaPayload {
   estado: string
 }
 
+export interface ProductoEliminadoPayload {
+  tenantId: string
+  productoId: string
+  nombre: string
+}
+
+export interface VariantesGeneradasPayload {
+  tenantId: string
+  productoId: string
+  cantidadVariantes: number
+}
+
+export interface AltaMasivaCompletadaPayload {
+  tenantId: string
+  productosCreados: number
+  categoriasCreadas: number
+  unidadesMedidaCreadas: number
+}
+
 export interface ICatalogoNotificador {
   actividadCreada(tenantId: string, payload: ActividadCreadaPayload): void
   categoriaCreada(tenantId: string, payload: CategoriaCreadaPayload): void
@@ -62,6 +81,9 @@ export interface ICatalogoNotificador {
   productoCreado(tenantId: string, payload: ProductoCreadoPayload): void
   productoActualizado(tenantId: string, payload: ProductoActualizadoPayload): void
   productoEstadoCambiado(tenantId: string, payload: ProductoEstadoCambiadoPayload): void
+  productoEliminado(tenantId: string, payload: ProductoEliminadoPayload): void
   ofertaCreada(tenantId: string, payload: OfertaCreadaPayload): void
   ofertaActualizada(tenantId: string, payload: OfertaActualizadaPayload): void
+  variantesGeneradas(tenantId: string, payload: VariantesGeneradasPayload): void
+  altaMasivaCompletada(tenantId: string, payload: AltaMasivaCompletadaPayload): void
 }

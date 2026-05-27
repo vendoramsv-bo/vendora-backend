@@ -12,6 +12,9 @@ import type {
   OfertaCreateDTO,
   OfertaUpdateDTO,
   ListResult,
+  ConfirmarVarianteItemDTO,
+  PropuestaVarianteItem,
+  AltaMasivaResult,
 } from "../domain/ports/IProductoRepository.js"
 import { ProductoEntity, type ProductoRaw } from "../domain/producto.entity.js"
 import type { QueryParams } from "../../../core/query-params.js"
@@ -24,6 +27,9 @@ import {
   OfertaSolapada,
   PrecioVolumenCantidadDuplicada,
   OpcionNombreDuplicada,
+  ProductoConMovimientos,
+  SinAtributos,
+  ClaProductoNoEncontrado,
 } from "../domain/catalogo.errors.js"
 
 const PRODUCTO_INCLUDE = {
@@ -324,5 +330,219 @@ export class ProductoPrismaRepository implements IProductoRepository {
     if (data.precioOferta !== undefined) updateData["precioOferta"] = data.precioOferta
     if (data.estado) updateData["estado"] = data.estado
     return this.db.productoOfertas.update({ where: { id }, data: updateData })
+  }
+
+  // ─── Verificación y eliminación ───────────────────────────────────────────────
+
+  async verificarCodigo(tenantId: string, codigo: string): Promise<{ existe: boolean; producto?: { id: string; nombre: string; codigo: string } }> {
+    const producto = await this.db.producto.findFirst({
+      where: { tenantId, codigo: codigo.trim() },
+      select: { id: true, nombre: true, codigo: true },
+    })
+    if (!producto) return { existe: false }
+    return { existe: true, producto }
+  }
+
+  async eliminar(id: string, tenantId: string): Promise<void> {
+    await this.db.producto.delete({ where: { id, tenantId } })
+  }
+
+  // ─── Integración con inventario (cross-schema almacen) ───────────────────────
+
+  async registrarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number, userId: string): Promise<void> {
+    await this.db.movimientoInventario.create({
+      data: {
+        tenantId,
+        productoId,
+        tipo: "CREACION",
+        cantidad: cantidadStock,
+        stockAntes: 0,
+        stockDespues: cantidadStock,
+        createdById: userId,
+      },
+    })
+  }
+
+  async eliminarMovimientoCreacion(productoId: string, tenantId: string): Promise<void> {
+    await this.db.movimientoInventario.deleteMany({
+      where: { productoId, tenantId, tipo: "CREACION" },
+    })
+  }
+
+  async actualizarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number): Promise<void> {
+    await this.db.movimientoInventario.updateMany({
+      where: { productoId, tenantId, tipo: "CREACION" },
+      data: { cantidad: cantidadStock, stockDespues: cantidadStock },
+    })
+  }
+
+  async tieneMovimientosReales(productoId: string): Promise<boolean> {
+    const count = await this.db.movimientoInventario.count({
+      where: { productoId, tipo: { not: "CREACION" } },
+    })
+    return count > 0
+  }
+
+  // ─── Variantes cartesianas ────────────────────────────────────────────────────
+
+  async generarPropuestaVariantes(productoId: string, tenantId: string): Promise<PropuestaVarianteItem[]> {
+    const producto = await this.db.producto.findFirst({
+      where: { id: productoId, tenantId },
+      include: {
+        atributos: {
+          include: { valores: { orderBy: { orden: "asc" } } },
+          orderBy: { orden: "asc" },
+        },
+      },
+    })
+    if (!producto) return []
+
+    const atributos: Array<{ nombre: string; valores: Array<{ id: string; valor: string }> }> = producto.atributos
+    if (atributos.length === 0) throw new SinAtributos()
+
+    const cartesiano = atributos.reduce<Array<Array<{ atributo: string; valor: string; atributoValorId: string }>>>(
+      (acc, attr) =>
+        acc.flatMap((combo) =>
+          attr.valores.map((v: { id: string; valor: string }) => [
+            ...combo,
+            { atributo: attr.nombre, valor: v.valor, atributoValorId: v.id },
+          ]),
+        ),
+      [[]],
+    )
+
+    return cartesiano.map((combo) => ({
+      etiqueta: combo.map((c) => `${c.atributo} ${c.valor}`).join(" / "),
+      combinacion: combo,
+      valoresIds: combo.map((c) => c.atributoValorId),
+    }))
+  }
+
+  async confirmarVariantes(productoId: string, variantes: ConfirmarVarianteItemDTO[]): Promise<unknown[]> {
+    return this.db.$transaction(async (tx: typeof this.db) => {
+      const creadas: unknown[] = []
+      for (const item of variantes) {
+        const { atributoValorIds, ...varianteData } = item
+        const sortedIds = [...atributoValorIds].sort()
+
+        const existentes = await tx.productoVariante.findMany({
+          where: { productoId },
+          include: { atributos: true },
+        })
+        for (const existente of existentes) {
+          const existenteIds = existente.atributos.map((a: { atributoValorId: string }) => a.atributoValorId).sort()
+          if (JSON.stringify(existenteIds) === JSON.stringify(sortedIds)) {
+            throw new VarianteAtributosDuplicados()
+          }
+        }
+
+        const variante = await tx.productoVariante.create({
+          data: { productoId, ...varianteData },
+        })
+        for (const atributoValorId of atributoValorIds) {
+          await tx.productoVarianteAtributo.create({
+            data: { varianteId: variante.id, atributoValorId },
+          })
+        }
+        const full = await tx.productoVariante.findUnique({
+          where: { id: variante.id },
+          include: { atributos: { include: { atributoValor: { include: { atributo: true } } } } },
+        })
+        creadas.push(full)
+      }
+      return creadas
+    })
+  }
+
+  // ─── Alta masiva desde catálogo maestro ──────────────────────────────────────
+
+  async altaMasiva(claProductoIds: string[], tenantId: string, userId: string): Promise<AltaMasivaResult> {
+    return this.db.$transaction(async (tx: typeof this.db) => {
+      const plantillas = await this.db.claProducto.findMany({
+        where: { id: { in: claProductoIds } },
+        include: { claActividadEconomica: true, claCategoria: true, claUnidadMedida: true },
+      })
+
+      const encontradosIds = new Set(plantillas.map((p: { id: string }) => p.id))
+      const noEncontrados = claProductoIds.filter((id) => !encontradosIds.has(id))
+      if (noEncontrados.length > 0) throw new ClaProductoNoEncontrado(noEncontrados)
+
+      let categoriasCreadas = 0
+      let unidadesMedidaCreadas = 0
+      const creados: ProductoEntity[] = []
+
+      for (const plantilla of plantillas) {
+        const actividadTenant = await tx.actividadEconomica.findFirst({
+          where: { tenantId, claActividadId: plantilla.claActividadId },
+        })
+        if (!actividadTenant) throw new Error(`Actividad económica no activada para el tenant: ${plantilla.claActividadEconomica.nombre}`)
+
+        let categoriaTenant = await tx.categoria.findFirst({
+          where: { tenantId, claCategoriaId: plantilla.claCategoriaId },
+        })
+        if (!categoriaTenant) {
+          categoriaTenant = await tx.categoria.create({
+            data: withAudit(
+              {
+                tenantId,
+                actividadId: actividadTenant.id,
+                nombre: plantilla.claCategoria.nombre,
+                claCategoriaId: plantilla.claCategoriaId,
+              },
+              userId,
+            ),
+          })
+          categoriasCreadas++
+        }
+
+        let unidadTenant = await tx.unidadMedida.findFirst({
+          where: { tenantId, claUnidadId: plantilla.claUnidadId },
+        })
+        if (!unidadTenant) {
+          unidadTenant = await tx.unidadMedida.create({
+            data: withAudit(
+              {
+                tenantId,
+                claUnidadId: plantilla.claUnidadId,
+                unidad: plantilla.claUnidadMedida.nombre,
+                sigla: plantilla.claUnidadMedida.sigla ?? plantilla.claUnidadMedida.nombre.slice(0, 3).toUpperCase(),
+                descripcion: plantilla.claUnidadMedida.descripcion ?? plantilla.claUnidadMedida.nombre,
+              },
+              userId,
+            ),
+          })
+          unidadesMedidaCreadas++
+        }
+
+        const raw = await tx.producto.create({
+          data: withAudit(
+            {
+              tenantId,
+              actividadId: actividadTenant.id,
+              categoriaId: categoriaTenant.id,
+              unidadId: unidadTenant.id,
+              codigo: plantilla.codigo,
+              nombre: plantilla.nombre,
+              descripcion: plantilla.descripcion ?? undefined,
+              imagenUrl: plantilla.imagenUrl ?? undefined,
+              tipoProducto: plantilla.tipoProducto,
+              precio: Number(plantilla.precio),
+              cantidadStock: 0,
+              stockMinimo: 0,
+              tipoDescuento: "SIN_DESCUENTO",
+            },
+            userId,
+          ),
+          include: {
+            ...PRODUCTO_INCLUDE,
+            productosOfertas: { where: ofertasVigentesWhere() },
+            preciosVolumen: { where: { estado: "ACTIVO" } },
+          },
+        })
+        creados.push(ProductoEntity.fromPrisma(raw as ProductoRaw))
+      }
+
+      return { creados, categoriasCreadas, unidadesMedidaCreadas }
+    })
   }
 }

@@ -8,6 +8,10 @@ import { ListarProductosUseCase } from "../application/producto/listar-productos
 import { ObtenerProductoUseCase } from "../application/producto/obtener-producto.usecase.js"
 import { ActualizarProductoUseCase } from "../application/producto/actualizar-producto.usecase.js"
 import { CambiarEstadoProductoUseCase } from "../application/producto/cambiar-estado-producto.usecase.js"
+import { VerificarCodigoUseCase } from "../application/producto/verificar-codigo.usecase.js"
+import { EliminarProductoUseCase } from "../application/producto/eliminar-producto.usecase.js"
+import { GenerarVariantesCartesianoUseCase } from "../application/producto/generar-variantes-cartesiano.usecase.js"
+import { AltaMasivaProductosUseCase } from "../application/producto/alta-masiva-productos.usecase.js"
 import { CrearAtributoUseCase } from "../application/producto/crear-atributo.usecase.js"
 import { AgregarValorAtributoUseCase } from "../application/producto/agregar-valor-atributo.usecase.js"
 import { EliminarValorAtributoUseCase } from "../application/producto/eliminar-valor-atributo.usecase.js"
@@ -32,6 +36,9 @@ import {
   OpcionUpdateSchema,
   OfertaCreateSchema,
   OfertaUpdateSchema,
+  VerificarCodigoQuerySchema,
+  ConfirmarVariantesBodySchema,
+  AltaMasivaBodySchema,
 } from "./catalogo.schema.js"
 import {
   ProductoCodigoDuplicado,
@@ -49,6 +56,10 @@ import {
   OfertaSolapada,
   OfertaNoEncontrada,
   PrecioVolumenCantidadDuplicada,
+  ProductoConMovimientos,
+  AltaMasivaVacia,
+  ClaProductoNoEncontrado,
+  SinAtributos,
 } from "../domain/catalogo.errors.js"
 import { getCatalogoNotificador } from "../infrastructure/catalogo.notificador.provider.js"
 import { paginate } from "../../../core/query-params.js"
@@ -69,6 +80,42 @@ productoRouter.get("/productos", async (c) => {
   const params = QueryParamsCatalogoSchema.parse(c.req.query())
   const resultado = await new ListarProductosUseCase(makeRepo()).ejecutar(tenantId, params)
   return c.json(paginate(resultado.data.map((p) => p.toJSON()), resultado.total, params))
+})
+
+productoRouter.get("/productos/verificar-codigo", async (c) => {
+  const tenantId = c.get("tenantId")
+  const queryResult = VerificarCodigoQuerySchema.safeParse(c.req.query())
+  if (!queryResult.success) return c.json({ code: "VALIDATION_ERROR", message: "codigo es requerido" }, 400)
+  const resultado = await new VerificarCodigoUseCase(makeRepo()).ejecutar(tenantId, queryResult.data.codigo)
+  return c.json(resultado)
+})
+
+productoRouter.post("/productos/alta-masiva", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
+  const tenantId = c.get("tenantId")
+  const session = c.get("session")
+  const body = await c.req.json()
+  const parsed = AltaMasivaBodySchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+  try {
+    const resultado = await new AltaMasivaProductosUseCase(makeRepo(), getCatalogoNotificador()).ejecutar(
+      parsed.data.claProductoIds,
+      tenantId,
+      session.user.id,
+    )
+    return c.json(
+      {
+        creados: resultado.creados.map((p) => p.toJSON()),
+        total: resultado.creados.length,
+        categoriasCreadas: resultado.categoriasCreadas,
+        unidadesMedidaCreadas: resultado.unidadesMedidaCreadas,
+      },
+      201,
+    )
+  } catch (err) {
+    if (err instanceof AltaMasivaVacia) return c.json({ code: err.code, message: err.message }, 400)
+    if (err instanceof ClaProductoNoEncontrado) return c.json({ code: err.code, message: err.message, ids: err.ids }, 404)
+    throw err
+  }
 })
 
 productoRouter.post("/productos", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
@@ -112,6 +159,19 @@ productoRouter.put("/productos/:id", requireRol(["PROPIETARIO", "ADMIN"]), async
       session.user.id,
     )
     return c.json(producto.toJSON())
+  } catch (err) {
+    if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
+    if (err instanceof ProductoConMovimientos) return c.json({ error: err.code, message: err.message }, 409)
+    throw err
+  }
+})
+
+productoRouter.delete("/productos/:id", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
+  const tenantId = c.get("tenantId")
+  const session = c.get("session")
+  try {
+    await new EliminarProductoUseCase(makeRepo(), getCatalogoNotificador()).ejecutar(c.req.param("id"), tenantId, session.user.id)
+    return c.json({ deleted: true })
   } catch (err) {
     if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
     throw err
@@ -232,6 +292,40 @@ productoRouter.put("/productos/:id/variantes/:varId", requireRol(["PROPIETARIO",
   } catch (err) {
     if (err instanceof VarianteNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
     if (err instanceof VarianteSkuDuplicado) return c.json({ error: err.code, message: err.message }, 409)
+    throw err
+  }
+})
+
+productoRouter.get("/productos/:id/variantes/propuesta", async (c) => {
+  const tenantId = c.get("tenantId")
+  try {
+    const propuesta = await new GenerarVariantesCartesianoUseCase(makeRepo(), getCatalogoNotificador()).generarPropuesta(
+      c.req.param("id"),
+      tenantId,
+    )
+    return c.json({ propuesta, total: propuesta.length })
+  } catch (err) {
+    if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
+    if (err instanceof SinAtributos) return c.json({ code: err.code, message: err.message }, 400)
+    throw err
+  }
+})
+
+productoRouter.post("/productos/:id/variantes/confirmar", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
+  const tenantId = c.get("tenantId")
+  const body = await c.req.json()
+  const parsed = ConfirmarVariantesBodySchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+  try {
+    const creadas = await new GenerarVariantesCartesianoUseCase(makeRepo(), getCatalogoNotificador()).confirmarVariantes(
+      c.req.param("id"),
+      parsed.data.variantes,
+      tenantId,
+    )
+    return c.json({ creadas, total: creadas.length }, 201)
+  } catch (err) {
+    if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
+    if (err instanceof VarianteAtributosDuplicados) return c.json({ code: "VARIANTE_DUPLICADA", message: err.message }, 409)
     throw err
   }
 })

@@ -7,8 +7,11 @@ import type {
   ProductoCreadoPayload,
   ProductoActualizadoPayload,
   ProductoEstadoCambiadoPayload,
+  ProductoEliminadoPayload,
   OfertaCreadaPayload,
   OfertaActualizadaPayload,
+  VariantesGeneradasPayload,
+  AltaMasivaCompletadaPayload,
 } from "../domain/ports/ICatalogoNotificador.js"
 import pino from "pino"
 
@@ -55,5 +58,20 @@ export class CatalogoSocketNotificador implements ICatalogoNotificador {
   ofertaActualizada(tenantId: string, payload: OfertaActualizadaPayload): void {
     logger.info({ tenantId, ofertaId: payload.ofertaId, estado: payload.estado }, "[socket] emit:catalogo:oferta:actualizada")
     this.io.to(`tenant:${tenantId}`).emit("catalogo:oferta:actualizada", payload)
+  }
+
+  productoEliminado(tenantId: string, payload: ProductoEliminadoPayload): void {
+    logger.info({ tenantId, productoId: payload.productoId }, "[socket] emit:catalogo:producto-eliminado")
+    this.io.to(`tenant:${tenantId}`).emit("catalogo:producto-eliminado", payload)
+  }
+
+  variantesGeneradas(tenantId: string, payload: VariantesGeneradasPayload): void {
+    logger.info({ tenantId, productoId: payload.productoId, cantidadVariantes: payload.cantidadVariantes }, "[socket] emit:catalogo:variantes-generadas")
+    this.io.to(`tenant:${tenantId}`).emit("catalogo:variantes-generadas", payload)
+  }
+
+  altaMasivaCompletada(tenantId: string, payload: AltaMasivaCompletadaPayload): void {
+    logger.info({ tenantId, productosCreados: payload.productosCreados }, "[socket] emit:catalogo:alta-masiva-completada")
+    this.io.to(`tenant:${tenantId}`).emit("catalogo:alta-masiva-completada", payload)
   }
 }

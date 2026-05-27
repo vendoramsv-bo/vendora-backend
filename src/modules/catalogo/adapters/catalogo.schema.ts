@@ -44,11 +44,13 @@ export const CategoriaUpdateSchema = z.object({
   imagenUrl: z.string().url().optional(),
 })
 
+export const TipoDescuentoSchema = z.enum(["SIN_DESCUENTO", "PORCENTAJE", "MONTO_FIJO"])
+
 export const ProductoCreateSchema = z.object({
   actividadId: z.string().min(1),
   categoriaId: z.string().min(1),
   unidadId: z.string().min(1),
-  codigo: z.string().min(1),
+  codigo: z.string().min(1).transform((v) => v.trim()),
   nombre: z.string().min(1),
   descripcion: z.string().optional(),
   imagenUrl: z.string().url().optional(),
@@ -56,6 +58,9 @@ export const ProductoCreateSchema = z.object({
   precio: z.number().min(0).default(0),
   cantidadStock: z.number().int().min(0).default(0),
   stockMinimo: z.number().int().min(0).default(0),
+  tipoDescuento: TipoDescuentoSchema,
+  porcentajeDescuento: z.number().min(0).max(100).optional(),
+  montoDescuento: z.number().min(0).optional(),
 })
 
 export const ProductoUpdateSchema = z.object({
@@ -68,6 +73,9 @@ export const ProductoUpdateSchema = z.object({
   stockMinimo: z.number().int().min(0).optional(),
   unidadId: z.string().optional(),
   categoriaId: z.string().optional(),
+  tipoDescuento: TipoDescuentoSchema.optional(),
+  porcentajeDescuento: z.number().min(0).max(100).optional(),
+  montoDescuento: z.number().min(0).optional(),
 })
 
 export const AtributoCreateSchema = z.object({
@@ -130,4 +138,23 @@ export const OfertaUpdateSchema = z.object({
   fechaFin: z.string().datetime().optional(),
   precioOferta: z.number().min(0).optional(),
   estado: z.enum(["ACTIVO", "INACTIVO"]).optional(),
+})
+
+export const VerificarCodigoQuerySchema = z.object({
+  codigo: z.string().min(1, "codigo es requerido"),
+})
+
+export const ConfirmarVarianteItemSchema = z.object({
+  atributoValorIds: z.array(z.string().min(1)).min(1),
+  precio: z.number().min(0).optional(),
+  cantidadStock: z.number().int().min(0).optional(),
+  imagenUrl: z.string().url().optional(),
+})
+
+export const ConfirmarVariantesBodySchema = z.object({
+  variantes: z.array(ConfirmarVarianteItemSchema).min(1, "Se requiere al menos una variante"),
+})
+
+export const AltaMasivaBodySchema = z.object({
+  claProductoIds: z.array(z.string().min(1)).min(1, "Se requiere al menos una plantilla del catálogo maestro"),
 })

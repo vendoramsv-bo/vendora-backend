@@ -181,3 +181,35 @@ export class PrecioVolumenCantidadDuplicada extends Error {
     this.name = "PrecioVolumenCantidadDuplicada"
   }
 }
+
+export class ProductoConMovimientos extends Error {
+  readonly code = "PRODUCTO_CON_MOVIMIENTOS"
+  constructor(id?: string) {
+    super(id ? `El producto ${id} ya tiene movimientos reales de inventario` : "El producto ya tiene movimientos reales de inventario")
+    this.name = "ProductoConMovimientos"
+  }
+}
+
+export class AltaMasivaVacia extends Error {
+  readonly code = "ALTA_MASIVA_VACIA"
+  constructor() {
+    super("Se requiere al menos una plantilla del catálogo maestro")
+    this.name = "AltaMasivaVacia"
+  }
+}
+
+export class ClaProductoNoEncontrado extends Error {
+  readonly code = "CLA_PRODUCTO_NO_ENCONTRADO"
+  constructor(public readonly ids: string[]) {
+    super(`Las siguientes plantillas no existen en el catálogo maestro: ${ids.join(", ")}`)
+    this.name = "ClaProductoNoEncontrado"
+  }
+}
+
+export class SinAtributos extends Error {
+  readonly code = "SIN_ATRIBUTOS"
+  constructor() {
+    super("El producto no tiene atributos definidos")
+    this.name = "SinAtributos"
+  }
+}

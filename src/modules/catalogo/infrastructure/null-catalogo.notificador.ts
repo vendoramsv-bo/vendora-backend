@@ -6,8 +6,11 @@ import type {
   ProductoCreadoPayload,
   ProductoActualizadoPayload,
   ProductoEstadoCambiadoPayload,
+  ProductoEliminadoPayload,
   OfertaCreadaPayload,
   OfertaActualizadaPayload,
+  VariantesGeneradasPayload,
+  AltaMasivaCompletadaPayload,
 } from "../domain/ports/ICatalogoNotificador.js"
 
 export class NullCatalogoNotificador implements ICatalogoNotificador {
@@ -17,6 +20,9 @@ export class NullCatalogoNotificador implements ICatalogoNotificador {
   productoCreado(_tenantId: string, _payload: ProductoCreadoPayload): void {}
   productoActualizado(_tenantId: string, _payload: ProductoActualizadoPayload): void {}
   productoEstadoCambiado(_tenantId: string, _payload: ProductoEstadoCambiadoPayload): void {}
+  productoEliminado(_tenantId: string, _payload: ProductoEliminadoPayload): void {}
   ofertaCreada(_tenantId: string, _payload: OfertaCreadaPayload): void {}
   ofertaActualizada(_tenantId: string, _payload: OfertaActualizadaPayload): void {}
+  variantesGeneradas(_tenantId: string, _payload: VariantesGeneradasPayload): void {}
+  altaMasivaCompletada(_tenantId: string, _payload: AltaMasivaCompletadaPayload): void {}
 }

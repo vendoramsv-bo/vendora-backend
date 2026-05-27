@@ -2,6 +2,7 @@ import type { IProductoRepository, ProductoCreateDTO } from "../../domain/ports/
 import type { ProductoEntity } from "../../domain/producto.entity.js"
 import type { ICatalogoNotificador } from "../../domain/ports/ICatalogoNotificador.js"
 import { ProductoCodigoDuplicado, ProductoNombreDuplicado } from "../../domain/catalogo.errors.js"
+import { RegistrarStockInicialUseCase } from "./registrar-stock-inicial.usecase.js"
 
 export class CrearProductoUseCase {
   constructor(
@@ -23,6 +24,14 @@ export class CrearProductoUseCase {
       }
       throw err
     }
+
+    await new RegistrarStockInicialUseCase(this.repo).ejecutar({
+      productoId: producto.id,
+      tenantId,
+      cantidadStock: data.cantidadStock ?? 0,
+      userId,
+      tipoProducto: data.tipoProducto ?? "COMERCIALIZACION",
+    })
 
     this.notificador.productoCreado(tenantId, {
       tenantId,

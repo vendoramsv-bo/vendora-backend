@@ -13,6 +13,9 @@ export interface ProductoCreateDTO {
   precio?: number
   cantidadStock?: number
   stockMinimo?: number
+  tipoDescuento: string
+  porcentajeDescuento?: number
+  montoDescuento?: number
 }
 
 export interface ProductoUpdateDTO {
@@ -25,6 +28,28 @@ export interface ProductoUpdateDTO {
   stockMinimo?: number
   unidadId?: string
   categoriaId?: string
+  tipoDescuento?: string
+  porcentajeDescuento?: number
+  montoDescuento?: number
+}
+
+export interface ConfirmarVarianteItemDTO {
+  atributoValorIds: string[]
+  precio?: number
+  cantidadStock?: number
+  imagenUrl?: string
+}
+
+export interface PropuestaVarianteItem {
+  etiqueta: string
+  combinacion: Array<{ atributo: string; valor: string; atributoValorId: string }>
+  valoresIds: string[]
+}
+
+export interface AltaMasivaResult {
+  creados: ProductoEntity[]
+  categoriasCreadas: number
+  unidadesMedidaCreadas: number
 }
 
 export interface AtributoCreateDTO {
@@ -108,6 +133,16 @@ export interface IProductoRepository {
   cambiarEstado(id: string, estado: string, userId: string): Promise<void>
   listarPrecioHistorico(id: string, tenantId: string, params: QueryParams): Promise<ListResult<unknown>>
 
+  // Verificación y eliminación
+  verificarCodigo(tenantId: string, codigo: string): Promise<{ existe: boolean; producto?: { id: string; nombre: string; codigo: string } }>
+  eliminar(id: string, tenantId: string): Promise<void>
+
+  // Integración con inventario (cross-schema almacen)
+  registrarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number, userId: string): Promise<void>
+  eliminarMovimientoCreacion(productoId: string, tenantId: string): Promise<void>
+  actualizarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number): Promise<void>
+  tieneMovimientosReales(productoId: string): Promise<boolean>
+
   // Atributos y variantes
   listarAtributos(productoId: string, tenantId: string): Promise<unknown[]>
   crearAtributo(productoId: string, data: AtributoCreateDTO): Promise<unknown>
@@ -117,6 +152,10 @@ export interface IProductoRepository {
   crearVariante(productoId: string, data: VarianteCreateDTO): Promise<unknown>
   actualizarVariante(id: string, productoId: string, data: VarianteUpdateDTO): Promise<unknown>
   cambiarEstadoVariante(id: string, productoId: string, estado: string, userId: string): Promise<void>
+
+  // Variantes cartesianas
+  generarPropuestaVariantes(productoId: string, tenantId: string): Promise<PropuestaVarianteItem[]>
+  confirmarVariantes(productoId: string, variantes: ConfirmarVarianteItemDTO[]): Promise<unknown[]>
 
   // Precios por volumen
   crearPrecioVolumen(productoId: string, data: PrecioVolumenCreateDTO): Promise<unknown>
@@ -131,4 +170,7 @@ export interface IProductoRepository {
   listarOfertas(productoId: string, soloVigentes: boolean): Promise<unknown[]>
   crearOferta(productoId: string, data: OfertaCreateDTO, tenantId: string): Promise<unknown>
   actualizarOferta(id: string, productoId: string, data: OfertaUpdateDTO): Promise<unknown>
+
+  // Alta masiva desde catálogo maestro
+  altaMasiva(claProductoIds: string[], tenantId: string, userId: string): Promise<AltaMasivaResult>
 }

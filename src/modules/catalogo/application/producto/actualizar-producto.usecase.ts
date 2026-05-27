@@ -1,7 +1,7 @@
 import type { IProductoRepository, ProductoUpdateDTO } from "../../domain/ports/IProductoRepository.js"
 import type { ProductoEntity } from "../../domain/producto.entity.js"
 import type { ICatalogoNotificador } from "../../domain/ports/ICatalogoNotificador.js"
-import { ProductoNoEncontrado } from "../../domain/catalogo.errors.js"
+import { ProductoNoEncontrado, ProductoConMovimientos } from "../../domain/catalogo.errors.js"
 
 export class ActualizarProductoUseCase {
   constructor(
@@ -12,6 +12,14 @@ export class ActualizarProductoUseCase {
   async ejecutar(id: string, data: ProductoUpdateDTO, tenantId: string, userId: string): Promise<ProductoEntity> {
     const actual = await this.repo.obtener(id, tenantId)
     if (!actual) throw new ProductoNoEncontrado(id)
+
+    if (data.cantidadStock !== undefined) {
+      const tieneMovimientos = await this.repo.tieneMovimientosReales(id)
+      if (tieneMovimientos) throw new ProductoConMovimientos(id)
+      if (actual.tipoProducto === "COMERCIALIZACION") {
+        await this.repo.actualizarMovimientoCreacion(id, tenantId, data.cantidadStock)
+      }
+    }
 
     let precioAnterior: string | undefined
     if (data.precio !== undefined && String(data.precio) !== actual.precio) {
