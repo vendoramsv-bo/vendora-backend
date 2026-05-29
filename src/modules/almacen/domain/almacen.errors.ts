@@ -110,3 +110,64 @@ export class MotivoRequeridoError extends Error {
     this.name = "MotivoRequeridoError"
   }
 }
+
+// HTTP 422 — la aprobación dejaría un producto/variante con stock negativo
+export class StockNegativoError extends Error {
+  readonly code = "STOCK_NEGATIVO"
+  readonly statusCode = 422
+  readonly productoId: string
+  readonly varianteId?: string
+  readonly stockResultante: number
+  constructor(productoId: string, stockResultante: number, varianteId?: string) {
+    super(`La operación dejaría el stock en ${stockResultante} (negativo)`)
+    this.name = "StockNegativoError"
+    this.productoId = productoId
+    this.varianteId = varianteId
+    this.stockResultante = stockResultante
+  }
+}
+
+// HTTP 422 — la aprobación dejaría un insumo con stock negativo
+export class StockNegativoInsumoError extends Error {
+  readonly code = "STOCK_NEGATIVO_INSUMO"
+  readonly statusCode = 422
+  readonly insumoId: string
+  readonly stockResultante: number
+  constructor(insumoId: string, stockResultante: number) {
+    super(`La operación dejaría el stock del insumo en ${stockResultante} (negativo)`)
+    this.name = "StockNegativoInsumoError"
+    this.insumoId = insumoId
+    this.stockResultante = stockResultante
+  }
+}
+
+// HTTP 409 — el documento fue modificado; la versión enviada es obsoleta
+export class ConflictoVersionError extends Error {
+  readonly code = "CONFLICTO_VERSION"
+  readonly statusCode = 409
+  constructor() {
+    super("El documento fue modificado por otra operación; refresque y reintente")
+    this.name = "ConflictoVersionError"
+  }
+}
+
+// HTTP 409 — el documento ya fue aprobado y es inmutable
+export class DocumentoYaAprobadoError extends Error {
+  readonly code = "DOCUMENTO_YA_APROBADO"
+  readonly statusCode = 409
+  constructor(tipo?: string) {
+    super(tipo ? `El ${tipo} ya fue aprobado y no puede modificarse` : "El documento ya fue aprobado y no puede modificarse")
+    this.name = "DocumentoYaAprobadoError"
+  }
+}
+
+// HTTP 404 — documento de inventario no encontrado
+export class DocumentoNoEncontradoError extends Error {
+  readonly code: string
+  readonly statusCode = 404
+  constructor(tipo: string, id?: string) {
+    super(id ? `${tipo} con id ${id} no encontrado` : `${tipo} no encontrado`)
+    this.name = "DocumentoNoEncontradoError"
+    this.code = `${tipo.toUpperCase().replace(/ /g, "_")}_NO_ENCONTRADO`
+  }
+}

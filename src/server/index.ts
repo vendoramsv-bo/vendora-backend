@@ -14,6 +14,9 @@ import { CatalogoSocketNotificador } from "../modules/catalogo/infrastructure/ca
 import { setCatalogoNotificador } from "../modules/catalogo/infrastructure/catalogo.notificador.provider.js"
 import { AlmacenSocketNotificador } from "../modules/almacen/infrastructure/almacen.socket.notificador.js"
 import { setAlmacenNotificador } from "../modules/almacen/infrastructure/almacen.notificador.provider.js"
+import { AlmacenInventarioPortAdapter } from "../modules/almacen/infrastructure/almacen-inventario.port.adapter.js"
+import { InventarioProductoPrismaRepository } from "../modules/almacen/infrastructure/inventario-producto.prisma.repository.js"
+import { setAlmacenInventarioPort } from "../modules/almacen/infrastructure/almacen-inventario.port.provider.js"
 import { VentasSocketNotificador } from "../modules/ventas/infrastructure/ventas.socket.notificador.js"
 import { setVentasNotificador } from "../modules/ventas/infrastructure/ventas.notificador.provider.js"
 import { RestauranteSocketNotificador } from "../modules/restaurante/infrastructure/restaurante.socket.notificador.js"
@@ -94,6 +97,9 @@ setCatalogoNotificador(catalogoNotificador)
 // AlmacenSocketNotificador — emite eventos almacen:* al room tenant:{id}
 export const almacenNotificador = new AlmacenSocketNotificador(io)
 setAlmacenNotificador(almacenNotificador)
+
+// AlmacenInventarioPortAdapter — integración ventas → almacén (FR-019)
+setAlmacenInventarioPort(new AlmacenInventarioPortAdapter(new InventarioProductoPrismaRepository(prisma as any)))
 
 // VentasSocketNotificador — emite eventos ventas:* al room tenant:{id}
 export const ventasNotificador = new VentasSocketNotificador(io)

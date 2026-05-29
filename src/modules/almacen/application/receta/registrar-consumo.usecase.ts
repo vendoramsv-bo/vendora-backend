@@ -2,7 +2,7 @@ import type { IRecetaProductoRepository } from "../../domain/ports/IRecetaProduc
 import type { ISalidaAlmacenRepository } from "../../domain/ports/ISalidaAlmacenRepository.js"
 import type { IInsumoRepository } from "../../domain/ports/IInsumoRepository.js"
 import type { IAlmacenNotificador } from "../../domain/ports/IAlmacenNotificador.js"
-import { InsumoNoEncontradoError, StockInsuficienteError } from "../../domain/almacen.errors.js"
+import { InsumoNoEncontradoError } from "../../domain/almacen.errors.js"
 import { evaluarStockCritico } from "../shared/evaluar-stock-critico.js"
 
 export interface RegistrarConsumoInput {
@@ -31,33 +31,28 @@ export class RegistrarConsumoUseCase {
 
     if (receta.length === 0) return { salidaId: null, detalles: [], advertencias: [] }
 
-    const insumosAntes: Array<{ id: string; stockAntes: number; stockMinimo: number; nombre: string }> = []
-
     for (const linea of receta) {
-      const cantidadRequerida = linea.cantidad * input.cantidad
       const insumo = await this.insumoRepo.findById(linea.insumoId, input.tenantId)
       if (!insumo) throw new InsumoNoEncontradoError(linea.insumoId)
-      if (!input.forzar && insumo.cantidadStock < cantidadRequerida) {
-        throw new StockInsuficienteError(
-          `Stock insuficiente para "${insumo.nombre}": disponible ${insumo.cantidadStock}, requerido ${cantidadRequerida}`
-        )
-      }
-      insumosAntes.push({ id: insumo.id, stockAntes: insumo.cantidadStock, stockMinimo: insumo.stockMinimo, nombre: insumo.nombre })
     }
 
-    const resultado = await this.salidaRepo.create({
+    const borrador = await this.salidaRepo.create({
       tenantId: input.tenantId,
       descripcion: input.motivo ?? `Consumo producto ${input.productoId}`,
       detalles: receta.map((l) => ({ insumoId: l.insumoId, cantidad: l.cantidad * input.cantidad })),
-      forzar: input.forzar,
       createdById: input.createdById,
       tenantMemberId: input.tenantMemberId,
     })
 
+    const resultado = await this.salidaRepo.aprobarSalida({
+      salidaId: borrador.salidaId,
+      tenantId: input.tenantId,
+      version: borrador.version,
+      aprobadoPorId: input.createdById,
+    })
+
     for (const d of resultado.detalles) {
-      const antes = insumosAntes.find((a) => a.id === d.insumoId)
-      if (!antes) continue
-      const evento = evaluarStockCritico(antes.stockAntes, d.stockDespues, d.stockMinimo)
+      const evento = evaluarStockCritico(d.stockAntes, d.stockDespues, d.stockMinimo)
       if (evento === "critico") {
         this.notificador.insumoStockCritico(input.tenantId, {
           insumoId: d.insumoId,
