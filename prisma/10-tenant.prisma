@@ -275,11 +275,31 @@ model Tienda {
   favoritosTienda        TiendaFavorito[]
   seguidoresTienda       TiendaSeguidor[]
 
+  // Vitrina de productos destacados
+  productosDestacados    ProductoDestacado[]
+
   createdAt              DateTime               @default(now())
   updatedAt              DateTime?              @updatedAt
   // Auditoría — quién creó y quién modificó el registro
   createdById            String?
   updatedById            String?
+  @@schema("tenant")
+}
+
+model ProductoDestacado {
+  id          String    @id @default(cuid())
+  tiendaId    String
+  tienda      Tienda    @relation(fields: [tiendaId], references: [id], onDelete: Cascade)
+  productoId  String
+  producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  orden       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([tiendaId, productoId])
+  @@index([tiendaId, orden])
   @@schema("tenant")
 }
 

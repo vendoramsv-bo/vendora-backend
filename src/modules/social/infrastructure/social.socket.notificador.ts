@@ -1,5 +1,5 @@
 import type { Server } from "socket.io"
-import type { ISocialNotificador, ReaccionPayload, ComentarioPayload, ValoracionPayload, PublicacionNuevaPayload } from "../domain/ports/ISocialNotificador.js"
+import type { ISocialNotificador, ReaccionPayload, ComentarioPayload, ValoracionPayload, PublicacionNuevaPayload, PreguntaTiendaPayload, SeguidorTiendaPayload } from "../domain/ports/ISocialNotificador.js"
 import pino from "pino"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -28,6 +28,16 @@ export class SocialSocketNotificador implements ISocialNotificador {
   publicacionNueva(tenantId: string, payload: PublicacionNuevaPayload): void {
     logger.info({ tenantId, publicacionId: payload.publicacionId }, "[socket] emit:social:publicacion-nueva")
     this.io.to(`tenant:${tenantId}`).emit("social:publicacion-nueva", payload)
+  }
+
+  preguntaTiendaNueva(tenantId: string, payload: PreguntaTiendaPayload): void {
+    logger.info({ tenantId, tiendaId: payload.tiendaId, preguntaId: payload.preguntaId }, "[socket] emit:tienda:nueva:pregunta")
+    this.io.to(`tenant:${tenantId}`).emit("tienda:nueva:pregunta", payload)
+  }
+
+  seguidorTiendaNuevo(tenantId: string, payload: SeguidorTiendaPayload): void {
+    logger.info({ tenantId, tiendaId: payload.tiendaId, userId: payload.userId }, "[socket] emit:tienda:nuevo:seguidor")
+    this.io.to(`tenant:${tenantId}`).emit("tienda:nuevo:seguidor", payload)
   }
 
   private subsala(elementoTipo: string, elementoId: string, tenantId: string): string {

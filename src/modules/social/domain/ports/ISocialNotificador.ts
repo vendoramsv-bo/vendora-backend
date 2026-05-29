@@ -40,9 +40,26 @@ export interface PublicacionNuevaPayload {
   fecha: string
 }
 
+export interface PreguntaTiendaPayload {
+  tiendaId: string
+  preguntaId: string
+  userId: string
+  tenantId: string
+  fecha: string
+}
+
+export interface SeguidorTiendaPayload {
+  tiendaId: string
+  userId: string
+  tenantId: string
+  fecha: string
+}
+
 export interface ISocialNotificador {
   reaccionCreada(tenantId: string, payload: ReaccionPayload): void
   comentarioCreado(tenantId: string, payload: ComentarioPayload): void
   valoracionCreada(tenantId: string, payload: ValoracionPayload): void
   publicacionNueva(tenantId: string, payload: PublicacionNuevaPayload): void
+  preguntaTiendaNueva(tenantId: string, payload: PreguntaTiendaPayload): void
+  seguidorTiendaNuevo(tenantId: string, payload: SeguidorTiendaPayload): void
 }
