@@ -1,6 +1,7 @@
 import type { IVentaRepository, VentaData, VentaDetalleInput } from "../../domain/ports/IVentaRepository.js"
 import type { ICajaRepository } from "../../domain/ports/ICajaRepository.js"
 import type { IVentasNotificador } from "../../domain/ports/IVentasNotificador.js"
+import type { IAlmacenInventarioPort } from "../../domain/ports/IAlmacenInventarioPort.js"
 import { CajaNoEncontradaError, CajaYaCerradaError } from "../../domain/ventas.errors.js"
 
 export interface CrearVentaInput {
@@ -29,6 +30,7 @@ export class CrearVentaUseCase {
     private readonly repo: IVentaRepository,
     private readonly cajaRepo: ICajaRepository,
     private readonly notificador: IVentasNotificador,
+    private readonly almacenPort?: IAlmacenInventarioPort,
   ) {}
 
   async execute(input: CrearVentaInput): Promise<VentaData> {
@@ -72,6 +74,15 @@ export class CrearVentaUseCase {
       aperturaCierreCajaId: venta.aperturaCierreCajaId,
       totalVenta: venta.totalVenta,
     })
+
+    if (this.almacenPort) {
+      const detallesAlmacen = input.detalles.map((d) => ({
+        productoId: d.productoId,
+        varianteId: d.varianteId ?? undefined,
+        cantidad: d.cantidad,
+      }))
+      this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen).catch(() => {})
+    }
 
     return venta
   }

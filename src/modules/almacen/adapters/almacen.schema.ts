@@ -36,6 +36,22 @@ export const AjusteInventarioSchema = z.object({
   detalles: z.array(AjusteDetalleSchema).min(1),
 })
 
+// ─── Nuevos schemas borrador-aprobación ─────────────────────────────────────
+
+export const CrearAjusteSchema = z.object({
+  motivo: z.string().min(1).optional(),
+  detalles: z.array(AjusteDetalleSchema).min(1),
+})
+
+export const ActualizarAjusteSchema = z.object({
+  motivo: z.string().min(1).optional(),
+  detalles: z.array(AjusteDetalleSchema).optional(),
+})
+
+export const AprobarDocumentoSchema = z.object({
+  version: z.number().int().min(0),
+})
+
 export const RecuentoDetalleSchema = z.object({
   productoId: z.string().min(1),
   varianteId: z.string().optional(),
@@ -45,6 +61,16 @@ export const RecuentoDetalleSchema = z.object({
 export const RecuentoInventarioSchema = z.object({
   observacion: z.string().optional(),
   detalles: z.array(RecuentoDetalleSchema).min(1),
+})
+
+export const CrearRecuentoSchema = z.object({
+  observacion: z.string().optional(),
+  detalles: z.array(RecuentoDetalleSchema).min(1),
+})
+
+export const ActualizarRecuentoSchema = z.object({
+  observacion: z.string().optional(),
+  detalles: z.array(RecuentoDetalleSchema).optional(),
 })
 
 // ─── Insumos ─────────────────────────────────────────────────────────────────
@@ -97,9 +123,22 @@ export const SalidaDetalleSchema = z.object({
 })
 
 export const CrearSalidaSchema = z.object({
+  motivo: z.string().min(1).optional(),
   descripcion: z.string().optional(),
   detalles: z.array(SalidaDetalleSchema).min(1),
   forzar: z.boolean().default(false),
+})
+
+export const ActualizarIngresoSchema = z.object({
+  proveedorId: z.string().min(1).optional(),
+  descripcion: z.string().optional(),
+  detalles: z.array(IngresoDetalleSchema).optional(),
+})
+
+export const ActualizarSalidaSchema = z.object({
+  motivo: z.string().min(1).optional(),
+  descripcion: z.string().optional(),
+  detalles: z.array(SalidaDetalleSchema).optional(),
 })
 
 export const RecuentoAlmacenDetalleSchema = z.object({
