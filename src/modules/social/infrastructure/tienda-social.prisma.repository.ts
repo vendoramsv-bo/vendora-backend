@@ -12,6 +12,12 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
     return tenant.tienda.id
   }
 
+  async resolveTiendaInfo(slug: string): Promise<{ tiendaId: string; tenantId: string }> {
+    const tenant = await db.tenant.findUnique({ where: { slug }, select: { id: true, esTienda: true, tienda: { select: { id: true } } } })
+    if (!tenant || !tenant.esTienda || !tenant.tienda) throw new TiendaNoEncontrada()
+    return { tiendaId: tenant.tienda.id, tenantId: tenant.id }
+  }
+
   // ─── Reacciones ───────────────────────────────────────────────────────────
 
   async upsertReaccionTienda(tiendaId: string, userId: string, tipo: string): Promise<{ reaccion: TiendaReaccionRaw | null; removed: boolean }> {
@@ -115,7 +121,7 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
   // ─── Preguntas ─────────────────────────────────────────────────────────────
 
   async crearPreguntaTienda(data: { tiendaId: string; userId: string; pregunta: string }): Promise<TiendaPreguntaRaw> {
-    return db.tiendaPregunta.create({ data: { tiendaId: data.tiendaId, userId: data.userId, pregunta: data.pregunta, estado: "PENDIENTE" } })
+    return db.tiendaPregunta.create({ data: { tiendaId: data.tiendaId, userId: data.userId, pregunta: data.pregunta } })
   }
 
   async findPreguntaTienda(preguntaId: string): Promise<TiendaPreguntaRaw | null> {
@@ -131,9 +137,9 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
   }
 
   async listarPreguntasTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>> {
-    const where = { tiendaId }
+    const where = { tiendaId, estado: "ACTIVO" }
     const [data, total] = await Promise.all([
-      db.tiendaPregunta.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: { respuestas: { orderBy: { createdAt: "asc" } } } }),
+      db.tiendaPregunta.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" } } } }),
       db.tiendaPregunta.count({ where }),
     ])
     return { data, total }
@@ -172,5 +178,24 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
       db.tiendaFavorito.count({ where }),
     ])
     return { data, total }
+  }
+
+  async ocultarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw> {
+    return db.tiendaPregunta.update({
+      where: { id: preguntaId, tiendaId },
+      data: { estado: "INACTIVO" },
+    })
+  }
+
+  async mostrarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw> {
+    return db.tiendaPregunta.update({
+      where: { id: preguntaId, tiendaId },
+      data: { estado: "ACTIVO" },
+    })
+  }
+
+  async esFavoritoTienda(tiendaId: string, userId: string): Promise<boolean> {
+    const fav = await db.tiendaFavorito.findUnique({ where: { tiendaId_userId: { tiendaId, userId } }, select: { id: true } })
+    return !!fav
   }
 }

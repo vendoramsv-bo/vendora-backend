@@ -126,6 +126,7 @@ model Producto {
   valoraciones          ProductoValoracion[]
   preguntas             ProductoPregunta[]
   favoritos             ProductoFavorito[]
+  productosDestacados   ProductoDestacado[]
   // Vínculo con módulo Consultorio (farmacia/medicamentos)
   recetasDetalle        RecetaMedicaDetalle[]
   // Vínculo con módulo Restaurante (un Producto con tipoProducto=PLATO/BEBIDA/POSTRE
