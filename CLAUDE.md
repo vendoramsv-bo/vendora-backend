@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/010-catalogo-comercial/plan.md
+at specs/011-inventario-almacen/plan.md
 <!-- SPECKIT END -->

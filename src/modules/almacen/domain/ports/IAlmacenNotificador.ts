@@ -1,8 +1,8 @@
 export interface StockCriticoPayload {
   productoId: string
   productoNombre: string
-  varianteId: string
-  varianteSku: string | null
+  varianteId?: string | null
+  varianteSku?: string | null
   stockActual: number
   stockMinimo: number
   tenantId: string
@@ -11,8 +11,8 @@ export interface StockCriticoPayload {
 export interface StockNormalizadoPayload {
   productoId: string
   productoNombre: string
-  varianteId: string
-  varianteSku: string | null
+  varianteId?: string | null
+  varianteSku?: string | null
   stockActual: number
   stockMinimo: number
   tenantId: string
