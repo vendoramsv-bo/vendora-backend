@@ -3,6 +3,7 @@ import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { ProductoPrismaRepository } from "../infrastructure/producto.prisma.repository.js"
+import { getAlmacenInventarioPort } from "../../almacen/infrastructure/almacen-inventario.port.provider.js"
 import { CrearProductoUseCase } from "../application/producto/crear-producto.usecase.js"
 import { ListarProductosUseCase } from "../application/producto/listar-productos.usecase.js"
 import { ObtenerProductoUseCase } from "../application/producto/obtener-producto.usecase.js"
@@ -126,6 +127,7 @@ productoRouter.post("/productos", requireRol(["PROPIETARIO", "ADMIN"]), async (c
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
     const producto = await new CrearProductoUseCase(makeRepo(), getCatalogoNotificador()).ejecutar(parsed.data, tenantId, session.user.id)
+    getAlmacenInventarioPort()?.inicializarProducto(tenantId, producto.id).catch(() => {})
     return c.json(producto.toJSON(), 201)
   } catch (err) {
     if (err instanceof ProductoCodigoDuplicado) return c.json({ error: err.code, message: err.message }, 409)
@@ -272,7 +274,8 @@ productoRouter.post("/productos/:id/variantes", requireRol(["PROPIETARIO", "ADMI
   const parsed = VarianteCreateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
-    const variante = await new CrearVarianteUseCase(makeRepo()).ejecutar(c.req.param("id"), parsed.data, tenantId)
+    const variante = await new CrearVarianteUseCase(makeRepo()).ejecutar(c.req.param("id"), parsed.data, tenantId) as { id: string }
+    getAlmacenInventarioPort()?.inicializarProducto(tenantId, c.req.param("id"), variante.id).catch(() => {})
     return c.json(variante, 201)
   } catch (err) {
     if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)

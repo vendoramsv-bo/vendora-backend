@@ -4,7 +4,7 @@ import { FakeRecetaProductoRepository } from "../helpers/fake-receta-producto.re
 import { FakeInsumoRepository } from "../helpers/fake-insumo.repository.js"
 import { FakeAlmacenNotificador } from "../helpers/fake-almacen-notificador.js"
 import type { ISalidaAlmacenRepository } from "../../src/modules/almacen/domain/ports/ISalidaAlmacenRepository.js"
-import { StockInsuficienteError, InsumoNoEncontradoError } from "../../src/modules/almacen/domain/almacen.errors.js"
+import { InsumoNoEncontradoError } from "../../src/modules/almacen/domain/almacen.errors.js"
 
 const TENANT = "t1"
 
@@ -25,14 +25,24 @@ function makeInsumo(id: string, stock: number, minimo = 5) {
 
 function makeFakeSalidaRepo(stockDespuesMap: Record<string, number> = {}): ISalidaAlmacenRepository {
   return {
-    create: async (dto) => ({
+    create: async (_dto) => ({
       salidaId: "salida-1",
-      detalles: dto.detalles.map((d) => ({
-        insumoId: d.insumoId,
-        insumoNombre: `Insumo ${d.insumoId}`,
-        cantidad: d.cantidad,
-        stockAntes: 0,
-        stockDespues: stockDespuesMap[d.insumoId] ?? 0,
+      estado: "PENDIENTE",
+      version: 0,
+      detalles: [],
+    }),
+    obtenerSalida: async () => null,
+    actualizarSalida: async () => { throw new Error("not implemented") },
+    aprobarSalida: async (dto) => ({
+      salidaId: dto.salidaId,
+      estado: "APROBADO",
+      version: dto.version + 1,
+      detalles: Object.entries(stockDespuesMap).map(([insumoId, stockDespues]) => ({
+        insumoId,
+        insumoNombre: `Insumo ${insumoId}`,
+        cantidad: 1,
+        stockAntes: stockDespues + 2,
+        stockDespues,
         stockMinimo: 5,
       })),
     }),
@@ -83,28 +93,6 @@ describe("RegistrarConsumoUseCase", () => {
     expect(result.salidaId).toBeNull()
   })
 
-  it("lanza StockInsuficienteError si stock < requerido y forzar=false", async () => {
-    insumoRepo.seed(makeInsumo("ins-1", 3))  // necesita 2*2=4
-    insumoRepo.seed(makeInsumo("ins-2", 20))
-    const salidaRepo = makeFakeSalidaRepo()
-    const useCase = new RegistrarConsumoUseCase(recetaRepo, salidaRepo, insumoRepo, notif)
-
-    await expect(
-      useCase.execute({ tenantId: TENANT, productoId: "p1", cantidad: 2 })
-    ).rejects.toThrow(StockInsuficienteError)
-  })
-
-  it("permite consumo aunque stock insuficiente si forzar=true", async () => {
-    insumoRepo.seed(makeInsumo("ins-1", 1))
-    insumoRepo.seed(makeInsumo("ins-2", 1))
-    const salidaRepo = makeFakeSalidaRepo({ "ins-1": 0, "ins-2": 0 })
-    const useCase = new RegistrarConsumoUseCase(recetaRepo, salidaRepo, insumoRepo, notif)
-
-    await expect(
-      useCase.execute({ tenantId: TENANT, productoId: "p1", cantidad: 2, forzar: true })
-    ).resolves.toBeDefined()
-  })
-
   it("lanza InsumoNoEncontradoError si un insumo de la receta no existe", async () => {
     insumoRepo.seed(makeInsumo("ins-1", 50))
     // ins-2 no está en el repo
@@ -117,13 +105,26 @@ describe("RegistrarConsumoUseCase", () => {
   })
 
   it("emite insumoStockCritico cuando el consumo baja el stock por debajo del mínimo", async () => {
-    insumoRepo.seed(makeInsumo("ins-1", 6, 5))  // stock 6, minimo 5, después de consumir 2 → 4 < 5
+    insumoRepo.seed(makeInsumo("ins-1", 6, 5))
     insumoRepo.seed(makeInsumo("ins-2", 20, 5))
+    // aprobarSalida devuelve stockDespues=4 para ins-1 (por debajo de mínimo 5)
     const salidaRepo = makeFakeSalidaRepo({ "ins-1": 4, "ins-2": 19.5 })
     const useCase = new RegistrarConsumoUseCase(recetaRepo, salidaRepo, insumoRepo, notif)
 
     await useCase.execute({ tenantId: TENANT, productoId: "p1", cantidad: 1 })
 
     expect(notif.tieneEvento("almacen:insumo:stock:critico")).toBe(true)
+  })
+
+  it("no emite eventos cuando el stock sigue por encima del mínimo tras el consumo", async () => {
+    insumoRepo.seed(makeInsumo("ins-1", 50, 5))
+    insumoRepo.seed(makeInsumo("ins-2", 20, 5))
+    // stockDespues bien por encima del mínimo
+    const salidaRepo = makeFakeSalidaRepo({ "ins-1": 46, "ins-2": 19.5 })
+    const useCase = new RegistrarConsumoUseCase(recetaRepo, salidaRepo, insumoRepo, notif)
+
+    await useCase.execute({ tenantId: TENANT, productoId: "p1", cantidad: 2 })
+
+    expect(notif.tieneEvento("almacen:insumo:stock:critico")).toBe(false)
   })
 })

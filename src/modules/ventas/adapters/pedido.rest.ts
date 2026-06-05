@@ -3,6 +3,7 @@ import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { PedidoPrismaRepository } from "../infrastructure/pedido.prisma.repository.js"
+import { getAlmacenInventarioPort } from "../../almacen/infrastructure/almacen-inventario.port.provider.js"
 import { CrearPedidoUseCase } from "../application/pedido/crear-pedido.usecase.js"
 import { ActualizarEstadoPedidoUseCase } from "../application/pedido/actualizar-estado-pedido.usecase.js"
 import { ConvertirPedidoEnVentaUseCase } from "../application/pedido/convertir-pedido-en-venta.usecase.js"
@@ -98,7 +99,7 @@ pedidoRouter.post("/:id/convertir-en-venta", requireRol(["PROPIETARIO", "ADMIN",
   const parsed = ConvertirPedidoEnVentaSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
-    const result = await new ConvertirPedidoEnVentaUseCase(makeRepo(), getVentasNotificador()).execute({
+    const result = await new ConvertirPedidoEnVentaUseCase(makeRepo(), getVentasNotificador(), getAlmacenInventarioPort() ?? undefined).execute({
       pedidoId: c.req.param("id"),
       tenantId,
       aperturaCierreCajaId: parsed.data.aperturaCierreCajaId,

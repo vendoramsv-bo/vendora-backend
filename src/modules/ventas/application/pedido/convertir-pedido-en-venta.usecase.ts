@@ -1,5 +1,6 @@
 import type { IPedidoRepository, ConvertirPedidoEnVentaDTO } from "../../domain/ports/IPedidoRepository.js"
 import type { IVentasNotificador } from "../../domain/ports/IVentasNotificador.js"
+import type { IAlmacenInventarioPort } from "../../domain/ports/IAlmacenInventarioPort.js"
 import { PedidoNoEncontradoError, PedidoTerminalError } from "../../domain/ventas.errors.js"
 
 const TERMINALES = ["FINALIZADO", "RECHAZADO"]
@@ -21,6 +22,7 @@ export class ConvertirPedidoEnVentaUseCase {
   constructor(
     private readonly repo: IPedidoRepository,
     private readonly notificador: IVentasNotificador,
+    private readonly almacenPort?: IAlmacenInventarioPort,
   ) {}
 
   async execute(input: ConvertirPedidoInput) {
@@ -48,6 +50,15 @@ export class ConvertirPedidoEnVentaUseCase {
       tenantId: input.tenantId,
       estado: pedidoFinalizado.estado,
     })
+
+    if (this.almacenPort && pedido.detalles && pedido.detalles.length > 0) {
+      const detallesAlmacen = pedido.detalles.map((d) => ({
+        productoId: d.productoId,
+        varianteId: d.varianteId ?? undefined,
+        cantidad: d.cantidad,
+      }))
+      this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen).catch(() => {})
+    }
 
     return { pedido: pedidoFinalizado, venta }
   }

@@ -6,6 +6,7 @@ import { VentaPrismaRepository } from "../infrastructure/venta.prisma.repository
 import { CajaPrismaRepository } from "../infrastructure/caja.prisma.repository.js"
 import { ReportePrismaRepository } from "../infrastructure/reporte.prisma.repository.js"
 import { CrearVentaUseCase } from "../application/venta/crear-venta.usecase.js"
+import { getAlmacenInventarioPort } from "../../almacen/infrastructure/almacen-inventario.port.provider.js"
 import { ConfirmarVentaUseCase } from "../application/venta/confirmar-venta.usecase.js"
 import { ObtenerVentaUseCase } from "../application/venta/obtener-venta.usecase.js"
 import { ListarVentasUseCase } from "../application/venta/listar-ventas.usecase.js"
@@ -81,7 +82,7 @@ ventaRouter.post("/", async (c) => {
   const parsed = CrearVentaSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
   try {
-    const result = await new CrearVentaUseCase(makeRepo(), makeCajaRepo(), getVentasNotificador()).execute({
+    const result = await new CrearVentaUseCase(makeRepo(), makeCajaRepo(), getVentasNotificador(), getAlmacenInventarioPort() ?? undefined).execute({
       tenantId,
       puntoVentaId: parsed.data.puntoVentaId,
       turnoId: parsed.data.turnoId,
