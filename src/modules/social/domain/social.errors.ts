@@ -77,3 +77,11 @@ export class SoloPropietarioAdmin extends Error {
     this.name = "SoloPropietarioAdmin"
   }
 }
+
+export class TiendaPreguntaNoEncontradaError extends Error {
+  readonly code = "PREGUNTA_TIENDA_NO_ENCONTRADA"
+  constructor(id: string) {
+    super(`Pregunta de tienda no encontrada: ${id}`)
+    this.name = "TiendaPreguntaNoEncontradaError"
+  }
+}

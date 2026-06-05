@@ -65,6 +65,7 @@ export interface PaginatedResult<T> {
 
 export interface ITiendaSocialRepository {
   resolveTiendaId(slug: string): Promise<string>
+  resolveTiendaInfo(slug: string): Promise<{ tiendaId: string; tenantId: string }>
 
   // Reacciones
   upsertReaccionTienda(tiendaId: string, userId: string, tipo: string): Promise<{ reaccion: TiendaReaccionRaw | null; removed: boolean }>
@@ -88,9 +89,12 @@ export interface ITiendaSocialRepository {
   findPreguntaTienda(preguntaId: string): Promise<TiendaPreguntaRaw | null>
   crearRespuestaTienda(data: { preguntaId: string; userId: string; respuesta: string }): Promise<TiendaRespuestaRaw>
   listarPreguntasTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>>
+  ocultarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw>
+  mostrarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw>
 
   // Favoritos y Seguimiento
   toggleFavoritoTienda(tiendaId: string, userId: string): Promise<{ favorito: boolean }>
+  esFavoritoTienda(tiendaId: string, userId: string): Promise<boolean>
   toggleSeguirTienda(tiendaId: string, userId: string): Promise<{ siguiendo: boolean }>
   contarSeguidoresTienda(tiendaId: string): Promise<number>
   listarFavoritosTiendasUsuario(userId: string, params: { take: number; skip: number }): Promise<PaginatedResult<TiendaFavoritoRaw>>

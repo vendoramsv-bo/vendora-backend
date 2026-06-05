@@ -23,6 +23,10 @@ import { RestauranteSocketNotificador } from "../modules/restaurante/infrastruct
 import { setRestauranteNotificador } from "../modules/restaurante/infrastructure/restaurante.notificador.provider.js"
 import { SocialSocketNotificador } from "../modules/social/infrastructure/social.socket.notificador.js"
 import { setSocialNotificador } from "../modules/social/infrastructure/social.notificador.provider.js"
+import { TiendaSocketNotificador } from "../modules/tienda/infrastructure/tienda.socket.notificador.js"
+import { setTiendaNotificador } from "../modules/tienda/infrastructure/tienda.notificador.provider.js"
+import { tiendaStaffRouter } from "../modules/tienda/adapters/tienda-staff.rest.js"
+import { tiendaPublicaRouter } from "../modules/tienda/adapters/tienda-publica.rest.js"
 import "../workers/recordatorio-cita.worker.js"
 import "../workers/expirar-recetas.worker.js"
 import "../modules/restaurante/infrastructure/publicacion-rrss.bullmq.worker.js"
@@ -40,6 +44,10 @@ app.route("/api", authRouter)
 
 // T029 — router de tenant (endpoints de lectura scoped)
 app.route("/api/tenant", tenantRouter)
+
+// TuTienda — staff (configuración, destacados) y directorio público
+app.route("/api/tenant", tiendaStaffRouter)
+app.route("/api/public/tiendas", tiendaPublicaRouter)
 
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 
@@ -111,6 +119,9 @@ export const socialNotificador = new SocialSocketNotificador(io)
 setSocialNotificador(socialNotificador)
 
 // TiendaSocketNotificador — emite eventos tienda:* al room tenant:{id}
+export const tiendaNotificador = new TiendaSocketNotificador(io)
+setTiendaNotificador(tiendaNotificador)
+
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined

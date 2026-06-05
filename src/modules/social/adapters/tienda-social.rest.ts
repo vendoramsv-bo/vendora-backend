@@ -22,7 +22,11 @@ import {
   NoAutorizado,
   ComentarioEsRespuesta,
   PuntuacionInvalida,
+  TiendaPreguntaNoEncontradaError,
 } from "../domain/social.errors.js"
+import { requireRol } from "../../../core/hono-context.js"
+import { OcultarPreguntaTiendaUseCase } from "../application/tienda/ocultar-pregunta-tienda.usecase.js"
+import { MostrarPreguntaTiendaUseCase } from "../application/tienda/mostrar-pregunta-tienda.usecase.js"
 
 function makeRepo() { return new TiendaSocialPrismaRepository() }
 
@@ -132,7 +136,7 @@ tiendaSocialRouter.post("/tiendas/:slug/preguntas", async (c) => {
   if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
 
   try {
-    const pregunta = await new PreguntarTiendaUseCase(makeRepo()).ejecutar(
+    const pregunta = await new PreguntarTiendaUseCase(makeRepo(), getSocialNotificador()).ejecutar(
       c.req.param("slug"),
       session.user.id,
       parsed.data.pregunta,
@@ -168,8 +172,41 @@ tiendaSocialRouter.post("/tiendas/:slug/favorito", async (c) => {
 tiendaSocialRouter.post("/tiendas/:slug/seguir", async (c) => {
   const session = c.get("session")
   try {
-    const result = await new ToggleSeguirTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), session.user.id)
+    const result = await new ToggleSeguirTiendaUseCase(makeRepo(), getSocialNotificador()).ejecutar(c.req.param("slug"), session.user.id)
     return c.json(result)
+  } catch (err) { return handleSocialError(err, c) as Response }
+})
+
+// Ocultar pregunta (PROPIETARIO|ADMIN)
+tiendaSocialRouter.patch("/tiendas/:slug/preguntas/:preguntaId/ocultar", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
+  try {
+    const result = await new OcultarPreguntaTiendaUseCase(makeRepo()).execute(c.req.param("slug"), c.req.param("preguntaId"))
+    return c.json({ id: result.id, estado: result.estado })
+  } catch (err) {
+    if (err instanceof TiendaPreguntaNoEncontradaError) return c.json({ error: err.code, message: err.message }, 404)
+    return handleSocialError(err, c) as Response
+  }
+})
+
+// Mostrar pregunta (PROPIETARIO|ADMIN)
+tiendaSocialRouter.patch("/tiendas/:slug/preguntas/:preguntaId/mostrar", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
+  try {
+    const result = await new MostrarPreguntaTiendaUseCase(makeRepo()).execute(c.req.param("slug"), c.req.param("preguntaId"))
+    return c.json({ id: result.id, estado: result.estado })
+  } catch (err) {
+    if (err instanceof TiendaPreguntaNoEncontradaError) return c.json({ error: err.code, message: err.message }, 404)
+    return handleSocialError(err, c) as Response
+  }
+})
+
+// Verificar si el usuario autenticado tiene la tienda como favorito
+tiendaSocialRouter.get("/tiendas/:slug/favorito", async (c) => {
+  const session = c.get("session")
+  try {
+    const repo = makeRepo()
+    const tiendaId = await repo.resolveTiendaId(c.req.param("slug"))
+    const esFavorito = await repo.esFavoritoTienda(tiendaId, session.user.id)
+    return c.json({ esFavorito })
   } catch (err) { return handleSocialError(err, c) as Response }
 })
 
