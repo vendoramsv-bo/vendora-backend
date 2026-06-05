@@ -105,7 +105,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
         propietarios: { where: { estado: "ACTIVO" }, select: { nombres: true, imagenUrl: true } },
         equipoDeTrabajo: { where: { estado: "ACTIVO" }, orderBy: { orden: "asc" }, select: { nombres: true, cargo: true, imagenUrl: true } },
         imagenes: { where: { estado: "ACTIVO" }, orderBy: { orden: "asc" }, select: { imagenUrl: true, descripcion: true, orden: true } },
-        actividadesEconomicas: { select: { nombre: true } },
+        actividadesEconomicas: { include: { claActividadEconomica: { select: { nombre: true } } } },
       },
     })
     if (!tenant?.tienda) return null
@@ -123,7 +123,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       propietarios: tenant.propietarios,
       equipoDeTrabajo: tenant.equipoDeTrabajo,
       localizaciones: tenant.localizaciones,
-      actividadesEconomicas: tenant.actividadesEconomicas.map((a: { nombre: string }) => a.nombre),
+      actividadesEconomicas: tenant.actividadesEconomicas.map((a: { claActividadEconomica: { nombre: string } | null }) => a.claActividadEconomica?.nombre ?? ""),
       configuracion: tenant.tienda.configuracion
         ? { tema: tenant.tienda.configuracion.tema, tipoLineado: tenant.tienda.configuracion.tipoLineado }
         : null,
@@ -163,7 +163,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
         where,
         include: {
           localizaciones: { select: { latitud: true, longitud: true, ciudad: true, barrio: true }, take: 1 },
-          actividadesEconomicas: { select: { nombre: true } },
+          actividadesEconomicas: { include: { claActividadEconomica: { select: { nombre: true } } } },
           categorias: { select: { nombre: true } },
           tienda: {
             select: {
@@ -186,7 +186,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       descripcion: string
       logo: string | null
       localizaciones: Array<{ latitud: number; longitud: number; ciudad: string; barrio: string | null }>
-      actividadesEconomicas: Array<{ nombre: string }>
+      actividadesEconomicas: Array<{ claActividadEconomica: { nombre: string } | null }>
       categorias: Array<{ nombre: string }>
     }
 
@@ -201,7 +201,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
         nombre: t.name,
         descripcion: t.descripcion,
         logoUrl: t.logo,
-        actividadesEconomicas: t.actividadesEconomicas.map((a) => a.nombre),
+        actividadesEconomicas: t.actividadesEconomicas.map((a) => a.claActividadEconomica?.nombre ?? ""),
         categorias: t.categorias.map((c) => c.nombre),
         puntuacionPromedio: Math.round(promedio * 10) / 10,
         totalValoraciones: vals.length,

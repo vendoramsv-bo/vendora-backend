@@ -251,7 +251,7 @@ paginación ad-hoc.
 
 ### V.1 — Schema Prisma modularizado
 - Entrada en `prisma/schema.prisma` (generator + datasource).
-- Modelos divididos en `prisma/models/NN-<schema>.prisma` por dominio.
+- Modelos divididos en `prisma/NN-<schema>.prisma` por dominio.
 - Cada modelo lleva `@@schema("<nombre_en_español>")`.
 - Configuración vía `prisma.config.ts` (Prisma 6+).
 

@@ -5,7 +5,7 @@ import { consultorioApp } from "../modules/consultorio/adapters/consultorio-rout
 import { catalogoApp } from "../modules/catalogo/adapters/catalogo-router.js"
 import { almacenApp } from "../modules/almacen/adapters/almacen-router.js"
 import { ventasApp } from "../modules/ventas/adapters/ventas-router.js"
-import { restauranteApp, publicRestauranteApp } from "../modules/restaurante/adapters/restaurante.router.js"
+import { restauranteApp, publicRestauranteApp, publicosRestaurantesApp, staffPerfilPublicoApp, consumerApp } from "../modules/restaurante/adapters/restaurante.router.js"
 import { socialApp, publicSocialApp } from "../modules/social/adapters/social.router.js"
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -53,6 +53,9 @@ export function crearApp() {
   // Módulo restaurante (staff + endpoints públicos)
   app.route("/api/restaurante", restauranteApp)
   app.route("/api/public/restaurante", publicRestauranteApp)
+  app.route("/api/staff/restaurante/perfil", staffPerfilPublicoApp)
+  app.route("/api/public/restaurantes", publicosRestaurantesApp)
+  app.route("/api/consumer", consumerApp)
 
   // Módulo social (interacciones + publicaciones)
   app.route("/api/social", socialApp)

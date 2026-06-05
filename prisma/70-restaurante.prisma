@@ -278,14 +278,25 @@ enum EstadoMenu {
 }
 
 enum EstadoReserva {
+  PENDIENTE       // Reserva online creada, esperando confirmación del staff
   RESERVADA       // Cliente reservó, esperando llegada
   CONFIRMADA      // Cliente llegó y confirmó en persona
   EN_PREPARACION  // Cocina está preparando
   LISTA           // Pedido listo para servirse
   ENTREGADA       // Pedido entregado al cliente
   PAGADA          // Cliente pagó en caja (Venta asociada creada)
-  CANCELADA       // Reserva cancelada (cliente o admin)
+  RECHAZADA       // Staff rechazó la reserva PENDIENTE (solicitud denegada)
+  CANCELADA       // Reserva cancelada (staff/admin — post-confirmación)
+  CANCELADA_CLIENTE // Cancelada por el consumidor online
   NO_ASISTIO      // Cliente no se presentó (no-show)
+  @@schema("restaurante")
+}
+
+enum TipoServicioRestaurante {
+  MESA
+  DELIVERY
+  PARA_LLEVAR
+  MIXTO
   @@schema("restaurante")
 }
 

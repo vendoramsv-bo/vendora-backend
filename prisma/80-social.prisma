@@ -366,6 +366,135 @@ model TiendaSeguidor {
   @@schema("social")
 }
 
+// ─── Restaurante social models ────────────────────────────────────────────────
+
+model RestauranteReaccion {
+  id            String      @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("reaccionesRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  tipo          TipoReaccion
+  createdAt     DateTime    @default(now())
+
+  @@unique([restauranteId, userId])
+  @@index([restauranteId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model RestauranteComentario {
+  id            String                          @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante                     @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User                            @relation("comentariosRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  contenido     String
+  editado       Boolean                         @default(false)
+  estado        Estado                          @default(ACTIVO)
+  padreId       String?
+  padre         RestauranteComentario?          @relation("ComentarioRestauranteRespuestas", fields: [padreId], references: [id])
+  respuestas    RestauranteComentario[]         @relation("ComentarioRestauranteRespuestas")
+  reacciones    RestauranteComentarioReaccion[]
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime?                       @updatedAt
+
+  @@index([restauranteId])
+  @@index([userId])
+  @@index([padreId])
+  @@schema("social")
+}
+
+model RestauranteComentarioReaccion {
+  id           String                @id @default(cuid())
+  comentarioId String
+  comentario   RestauranteComentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                  @relation("reaccionesComentarioRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  tipo         TipoReaccion
+  createdAt    DateTime              @default(now())
+
+  @@unique([comentarioId, userId])
+  @@index([comentarioId])
+  @@schema("social")
+}
+
+model RestauranteValoracion {
+  id            String      @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("valoracionesRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  puntuacion    Int
+  resena        String?
+  estado        Estado      @default(ACTIVO)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime?   @updatedAt
+
+  @@unique([restauranteId, userId])
+  @@index([restauranteId])
+  @@schema("social")
+}
+
+model RestaurantePregunta {
+  id            String                  @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante             @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User                    @relation("preguntasRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  pregunta      String
+  estado        Estado                  @default(ACTIVO)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime?               @updatedAt
+  respuestas    RestauranteRespuesta[]
+
+  @@index([restauranteId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model RestauranteRespuesta {
+  id         String              @id @default(cuid())
+  preguntaId String
+  pregunta   RestaurantePregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                @relation("respuestasRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  respuesta  String
+  estado     Estado              @default(ACTIVO)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime?           @updatedAt
+
+  @@index([preguntaId])
+  @@schema("social")
+}
+
+model RestauranteFavorito {
+  id            String      @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("favoritosRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([restauranteId, userId])
+  @@index([userId])
+  @@schema("social")
+}
+
+model RestauranteSeguidor {
+  id            String      @id @default(cuid())
+  restauranteId String
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("seguidoresRestaurante", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([restauranteId, userId])
+  @@index([restauranteId])
+  @@index([userId])
+  @@schema("social")
+}
+
 // -----------------------------------------------------------------------------
 // ENUMS — schema "social"
 // -----------------------------------------------------------------------------

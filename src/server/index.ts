@@ -25,6 +25,10 @@ import { SocialSocketNotificador } from "../modules/social/infrastructure/social
 import { setSocialNotificador } from "../modules/social/infrastructure/social.notificador.provider.js"
 import { TiendaSocketNotificador } from "../modules/tienda/infrastructure/tienda.socket.notificador.js"
 import { setTiendaNotificador } from "../modules/tienda/infrastructure/tienda.notificador.provider.js"
+import { RestauranteSocialSocketNotificador } from "../modules/social/infrastructure/restaurante-social.socket.notificador.js"
+import { setRestauranteSocialNotificador } from "../modules/social/infrastructure/restaurante-social.notificador.provider.js"
+import { RestaurantePublicoSocketNotificador } from "../modules/restaurante/infrastructure/restaurante-publico.socket.notificador.js"
+import { setRestaurantePublicoNotificador } from "../modules/restaurante/infrastructure/restaurante-publico.notificador.provider.js"
 import { tiendaStaffRouter } from "../modules/tienda/adapters/tienda-staff.rest.js"
 import { tiendaPublicaRouter } from "../modules/tienda/adapters/tienda-publica.rest.js"
 import "../workers/recordatorio-cita.worker.js"
@@ -121,6 +125,12 @@ setSocialNotificador(socialNotificador)
 // TiendaSocketNotificador — emite eventos tienda:* al room tenant:{id}
 export const tiendaNotificador = new TiendaSocketNotificador(io)
 setTiendaNotificador(tiendaNotificador)
+
+// RestaurantePublicoSocketNotificador — emite eventos perfil-publico al room tenant:{id}:restaurante
+setRestaurantePublicoNotificador(new RestaurantePublicoSocketNotificador(io))
+
+// RestauranteSocialSocketNotificador — emite eventos restaurante:* al room tenant:{id}:restaurante
+setRestauranteSocialNotificador(new RestauranteSocialSocketNotificador(io))
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {

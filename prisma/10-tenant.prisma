@@ -351,8 +351,14 @@ model Restaurante {
   // Configuración operativa
   capacidadMesas    Int?                                       // número total de mesas
   capacidadComensales Int?                                     // capacidad máxima simultánea
-  tipoServicio      String?     // "MESA","DELIVERY","PARA_LLEVAR","MIXTO"
+  tipoServicio      TipoServicioRestaurante?                   // enum: MESA, DELIVERY, PARA_LLEVAR, MIXTO
   duracionPromedioMin Int       @default(60)                   // duración estimada por comensal
+
+  // Perfil público configurable
+  especialidad      String?           // "parrilla argentina", "italiana", "comida de mar"
+  horarios          Json?             // HorarioPublico[] — estructura definida en data-model.md
+  fotos             String[]          // URLs de fotos del local
+  contactoPublico   Json?             // ContactoPublico — { telefono?, email?, redesSociales? }
 
   // Plantillas RRSS (colores, logo, tipografía para generación automática)
   plantillaRRSS     Json?
@@ -371,6 +377,14 @@ model Restaurante {
   menus                   Menu[]
   reservas                Reserva[]
   publicacionesMenuRRSS   PublicacionMenuRRSS[]
+
+  // Relaciones sociales del perfil público (módulo social)
+  reacciones            RestauranteReaccion[]
+  comentarios           RestauranteComentario[]
+  valoraciones          RestauranteValoracion[]
+  preguntas             RestaurantePregunta[]
+  favoritos             RestauranteFavorito[]
+  seguidores            RestauranteSeguidor[]
   @@schema("tenant")
 }
 

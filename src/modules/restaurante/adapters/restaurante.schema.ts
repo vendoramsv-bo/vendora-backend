@@ -92,3 +92,65 @@ export const QueryMenusSchema = makeQueryParamsSchema(["createdAt", "nombre", "f
 export const QueryReservasSchema = makeQueryParamsSchema(["createdAt", "codigo", "clienteNombre", "fechaLlegada", "estado"])
 export const QueryPublicacionesSchema = makeQueryParamsSchema(["createdAt", "fechaProgramada", "redSocial", "estado"])
 export const QueryTiemposComidaSchema = makeQueryParamsSchema(["orden", "nombre", "createdAt"])
+
+// ─── Feature 013: Perfil público del restaurante ──────────────────────────────
+
+const TipoServicioRestauranteEnum = z.enum(["MESA", "DELIVERY", "PARA_LLEVAR", "MIXTO"])
+
+const HorarioPublicoSchema = z.object({
+  diaSemana: z.enum(["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"]),
+  tiempoComida: z.string().min(1),
+  horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
+  horaFin: z.string().regex(/^\d{2}:\d{2}$/),
+  activo: z.boolean(),
+})
+
+const ContactoPublicoSchema = z.object({
+  telefono: z.string().optional(),
+  email: z.string().email().optional(),
+  redesSociales: z.array(z.object({ red: z.string(), url: z.string().url() })).optional(),
+})
+
+export const ActivarPerfilSchema = z.object({}).optional()
+
+export const ActualizarConfiguracionPublicaSchema = z.object({
+  especialidad: z.string().max(200).optional(),
+  tipoServicio: TipoServicioRestauranteEnum.optional(),
+  capacidadMesas: z.number().int().min(1).optional(),
+  capacidadComensales: z.number().int().min(1).optional(),
+  duracionPromedioMin: z.number().int().min(1).optional(),
+  horarios: z.array(HorarioPublicoSchema).optional(),
+  fotos: z.array(z.string().url()).optional(),
+  contactoPublico: ContactoPublicoSchema.optional(),
+})
+
+export const DirectorioQuerySchema = z.object({
+  lat: z.coerce.number().optional(),
+  lng: z.coerce.number().optional(),
+  tipoServicio: TipoServicioRestauranteEnum.optional(),
+  especialidad: z.string().optional(),
+  search: z.string().optional(),
+  orderBy: z.enum(["puntuacion", "seguidores", "cercania", "createdAt"]).default("puntuacion"),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().optional(),
+})
+
+export const MenuPublicoQuerySchema = z.object({
+  tiempoComida: z.string().optional(),
+  fecha: z.string().optional(),
+  take: z.coerce.number().int().min(1).max(100).default(10),
+  cursor: z.string().optional(),
+})
+
+export const CrearReservaConsumerSchema = z.object({
+  fechaLlegada: z.string().datetime(),
+  numeroComensales: z.number().int().min(1).default(1),
+  observaciones: z.string().optional(),
+})
+
+export const MisReservasQuerySchema = z.object({
+  estado: z.string().optional(),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().optional(),
+})
