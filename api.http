@@ -1,0 +1,210 @@
+@baseUrl = http://localhost:3000
+@token = REEMPLAZAR_CON_TOKEN_DE_SESION
+@slug = SLUG_DEL_TENANT
+
+### ── Auth ──────────────────────────────────────────────────────────────────────
+
+### Login → copiar el token de la respuesta
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: application/json
+
+{
+  "email": "tu@email.com",
+  "password": "tupassword"
+}
+
+### Ver tenant activo (obtener el slug)
+GET {{baseUrl}}/api/tenant/actual
+Authorization: Bearer {{token}}
+
+
+### ══ TuTienda — SIN AUTH (endpoints públicos) ═════════════════════════════════
+
+### Directorio de tiendas activas
+GET {{baseUrl}}/api/public/tiendas
+
+### Directorio con búsqueda por nombre
+GET {{baseUrl}}/api/public/tiendas?busqueda=farmacia&limit=10
+
+### Directorio por cercanía (lat/lng)
+GET {{baseUrl}}/api/public/tiendas?lat=-34.61&lng=-58.37&ordenarPor=distancia&orden=asc
+
+### Directorio filtrado por actividad económica
+GET {{baseUrl}}/api/public/tiendas?actividadEconomicaId=ID_ACTIVIDAD&ordenarPor=puntuacion
+
+### Perfil público completo de una tienda
+GET {{baseUrl}}/api/public/tiendas/{{slug}}
+
+### Catálogo público de productos de la tienda
+GET {{baseUrl}}/api/public/tiendas/{{slug}}/productos
+
+### Catálogo filtrado
+GET {{baseUrl}}/api/public/tiendas/{{slug}}/productos?busqueda=aspirina&limit=20
+
+
+### ── Interacciones públicas (lectura sin auth) ──────────────────────────────
+
+### Reacciones de la tienda
+GET {{baseUrl}}/api/public/social/{{slug}}/reacciones
+
+### Comentarios de la tienda
+GET {{baseUrl}}/api/public/social/{{slug}}/comentarios
+
+### Valoraciones de la tienda
+GET {{baseUrl}}/api/public/social/{{slug}}/valoraciones
+
+### Preguntas públicas (solo las visibles, estado=ACTIVO)
+GET {{baseUrl}}/api/public/social/{{slug}}/preguntas
+
+### Conteo de seguidores
+GET {{baseUrl}}/api/public/social/{{slug}}/seguidores/count
+
+### Publicaciones del comercio (feed público)
+GET {{baseUrl}}/api/public/social/{{slug}}/publicaciones
+
+
+### ══ TuTienda — CON AUTH (consumidor autenticado) ═════════════════════════════
+
+### Verificar si tengo la tienda como favorito
+GET {{baseUrl}}/api/social/tiendas/{{slug}}/favorito
+Authorization: Bearer {{token}}
+
+### Reaccionar a la tienda (toggle)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/reaccionar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tipo": "ME_GUSTA"
+}
+
+### Comentar en la tienda
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/comentarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "Excelente atención, muy recomendado!"
+}
+
+### Responder un comentario (padreId)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/comentarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "Muchas gracias por tu comentario",
+  "padreId": "ID_DEL_COMENTARIO_PADRE"
+}
+
+### Valorar la tienda (1-5, una sola valoración activa por usuario)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/valorar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "puntuacion": 5,
+  "resena": "Todo perfecto, atención impecable"
+}
+
+### Hacer una pregunta pública (visible inmediatamente)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/preguntas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pregunta": "¿Tienen servicio a domicilio?"
+}
+
+### Seguir / dejar de seguir la tienda (toggle)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/seguir
+Authorization: Bearer {{token}}
+
+### Marcar / quitar de favoritos (toggle)
+POST {{baseUrl}}/api/social/tiendas/{{slug}}/favorito
+Authorization: Bearer {{token}}
+
+
+### ══ TuTienda — STAFF (PROPIETARIO / ADMIN) ══════════════════════════════════
+
+### Activar perfil de tienda (lo hace público en el directorio)
+PATCH {{baseUrl}}/api/tenant/tienda/activar
+Authorization: Bearer {{token}}
+
+### Desactivar perfil (oculta del directorio, no borra datos)
+PATCH {{baseUrl}}/api/tenant/tienda/desactivar
+Authorization: Bearer {{token}}
+
+### Ver configuración visual actual
+GET {{baseUrl}}/api/tenant/tienda/configuracion
+Authorization: Bearer {{token}}
+
+### Actualizar tema visual y layout del POS
+PATCH {{baseUrl}}/api/tenant/tienda/configuracion
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tema": "blue",
+  "tipoDespliegueVentas": "BARRA_SUPERIOR",
+  "tipoLineado": "straightLine"
+}
+
+### Listar productos destacados actuales
+GET {{baseUrl}}/api/tenant/tienda/destacados
+Authorization: Bearer {{token}}
+
+### Agregar producto destacado (máximo 20)
+POST {{baseUrl}}/api/tenant/tienda/destacados
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productoId": "ID_DEL_PRODUCTO",
+  "orden": 0
+}
+
+### Quitar producto de destacados
+DELETE {{baseUrl}}/api/tenant/tienda/destacados/ID_DEL_PRODUCTO
+Authorization: Bearer {{token}}
+
+### Reordenar vitrina
+PATCH {{baseUrl}}/api/tenant/tienda/destacados/reordenar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "orden": ["ID_PRODUCTO_1", "ID_PRODUCTO_2", "ID_PRODUCTO_3"]
+}
+
+### Ocultar pregunta de un consumidor
+PATCH {{baseUrl}}/api/social/tiendas/{{slug}}/preguntas/ID_PREGUNTA/ocultar
+Authorization: Bearer {{token}}
+
+### Volver a mostrar una pregunta ocultada
+PATCH {{baseUrl}}/api/social/tiendas/{{slug}}/preguntas/ID_PREGUNTA/mostrar
+Authorization: Bearer {{token}}
+
+### Responder una pregunta pública
+POST {{baseUrl}}/api/social/preguntas/tienda/ID_PREGUNTA/respuestas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "respuesta": "Sí, hacemos delivery en un radio de 5km"
+}
+
+### Crear publicación del comercio (PROPIETARIO/ADMIN)
+POST {{baseUrl}}/api/social/publicaciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "¡Nueva oferta esta semana! 20% en todos nuestros productos.",
+  "tipo": "TEXTO",
+  "etiquetas": ["oferta", "descuento"]
+}
+
+### Listar publicaciones propias (staff)
+GET {{baseUrl}}/api/social/publicaciones
+Authorization: Bearer {{token}}

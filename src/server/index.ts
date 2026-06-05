@@ -55,7 +55,12 @@ expirarRecetasQueue
 // ─── Socket.IO ────────────────────────────────────────────────────────────────
 
 // T043 — Redis adapter para soporte horizontal
-const pubClient = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", { lazyConnect: true })
+// Upstash usa rediss:// (TLS) — ioredis necesita { tls: {} } explícito para TLS
+const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379"
+const pubClient = new Redis(redisUrl, {
+  lazyConnect: true,
+  ...(redisUrl.startsWith("rediss://") ? { tls: {} } : {}),
+})
 const subClient = pubClient.duplicate()
 
 // Conectar Redis en background (no bloqueante al arranque)
@@ -99,6 +104,7 @@ setRestauranteNotificador(restauranteNotificador)
 export const socialNotificador = new SocialSocketNotificador(io)
 setSocialNotificador(socialNotificador)
 
+// TiendaSocketNotificador — emite eventos tienda:* al room tenant:{id}
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined
