@@ -2,7 +2,7 @@
 // schema.prisma — Punto de entrada de la base de datos modularizada
 //
 // Esta plataforma utiliza la feature `prismaSchemaFolder` (GA en Prisma 6.7+):
-// los modelos viven en archivos separados bajo `prisma/models/`, organizados
+// los modelos viven en archivos separados bajo `prisma`, organizados
 // por dominio. Cada modelo tiene `@@schema("…")` que lo asigna a un namespace
 // de PostgreSQL (feature `multiSchema`, también GA).
 //

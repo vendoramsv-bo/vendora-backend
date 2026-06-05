@@ -141,7 +141,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA autenticacion, tenant, compartido, catalogo
    va en `ventas`. Etc.
 
 2. **Editar el archivo del módulo**. Ej: agregar `OfertaCombo` en
-   `prisma/models/30-catalogo.prisma`.
+   `prisma/30-catalogo.prisma`.
 
 3. **Incluir `@@schema(...)` al final del modelo**:
 

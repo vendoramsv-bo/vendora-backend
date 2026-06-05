@@ -208,3 +208,402 @@ Content-Type: application/json
 ### Listar publicaciones propias (staff)
 GET {{baseUrl}}/api/social/publicaciones
 Authorization: Bearer {{token}}
+
+
+### ══ RESTAURANTE (requieren auth + flag esRestaurante=true) ═══════════════════
+
+### ─── Perfil del restaurante ───────────────────────────────────────────────────
+
+### Ver perfil del restaurante
+GET {{baseUrl}}/api/restaurante/perfil
+Authorization: Bearer {{token}}
+
+### Actualizar perfil del restaurante
+PUT {{baseUrl}}/api/restaurante/perfil
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "capacidadMesas": 20,
+  "capacidadComensales": 80,
+  "tipoServicio": "MIXTO",
+  "duracionPromedioMin": 60
+}
+
+### ─── Tiempos de comida ─────────────────────────────────────────────────────────
+
+### Listar tiempos de comida (Desayuno, Almuerzo, Cena...)
+GET {{baseUrl}}/api/restaurante/tiempos-comida
+Authorization: Bearer {{token}}
+
+### Crear tiempo de comida
+POST {{baseUrl}}/api/restaurante/tiempos-comida
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nombre": "Almuerzo",
+  "horaInicio": "12:00",
+  "horaFin": "15:00"
+}
+
+### Ver tiempo de comida
+GET {{baseUrl}}/api/restaurante/tiempos-comida/ID_TIEMPO
+Authorization: Bearer {{token}}
+
+### ─── Menús ──────────────────────────────────────────────────────────────────────
+
+### Listar menús
+GET {{baseUrl}}/api/restaurante/menus
+Authorization: Bearer {{token}}
+
+### Crear menú del día
+POST {{baseUrl}}/api/restaurante/menus
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tiempoComidaId": "ID_TIEMPO_COMIDA",
+  "fecha": "2026-06-04",
+  "descripcion": "Menú del día"
+}
+
+### Ver menú específico
+GET {{baseUrl}}/api/restaurante/menus/ID_MENU
+Authorization: Bearer {{token}}
+
+### Cambiar estado del menú (BORRADOR → PUBLICADO)
+PATCH {{baseUrl}}/api/restaurante/menus/ID_MENU/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estado": "PUBLICADO"
+}
+
+### ─── Ítems del menú ─────────────────────────────────────────────────────────────
+
+### Listar ítems de un menú
+GET {{baseUrl}}/api/restaurante/menus/ID_MENU/items
+Authorization: Bearer {{token}}
+
+### Agregar ítem al menú
+POST {{baseUrl}}/api/restaurante/menus/ID_MENU/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productoId": "ID_PRODUCTO",
+  "precio": 25000,
+  "disponible": true
+}
+
+### ─── Cocina (pedidos activos) ───────────────────────────────────────────────────
+
+### Ver pedidos activos en cocina
+GET {{baseUrl}}/api/restaurante/cocina
+Authorization: Bearer {{token}}
+
+### Cambiar estado de un pedido en cocina
+PATCH {{baseUrl}}/api/restaurante/cocina/ID_PEDIDO/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estado": "EN_PREPARACION"
+}
+
+### ─── Reservas (staff) ───────────────────────────────────────────────────────────
+
+### Listar reservas
+GET {{baseUrl}}/api/restaurante/reservas
+Authorization: Bearer {{token}}
+
+### Ver reserva
+GET {{baseUrl}}/api/restaurante/reservas/ID_RESERVA
+Authorization: Bearer {{token}}
+
+### Cambiar estado de reserva
+PATCH {{baseUrl}}/api/restaurante/reservas/ID_RESERVA/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estado": "CONFIRMADA"
+}
+
+### ─── Publicaciones RRSS ─────────────────────────────────────────────────────────
+
+### Listar publicaciones para RRSS
+GET {{baseUrl}}/api/restaurante/publicaciones
+Authorization: Bearer {{token}}
+
+### Crear publicación para RRSS (imagen del menú del día)
+POST {{baseUrl}}/api/restaurante/publicaciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "menuId": "ID_MENU",
+  "plataforma": "INSTAGRAM"
+}
+
+### ─── Reservas públicas (SIN AUTH) ──────────────────────────────────────────────
+
+### Crear reserva como cliente público
+POST {{baseUrl}}/api/public/restaurante/{{slug}}/reservas
+Content-Type: application/json
+
+{
+  "nombre": "Juan Pérez",
+  "telefono": "3001234567",
+  "email": "juan@email.com",
+  "cantidadPersonas": 4,
+  "fecha": "2026-06-10",
+  "hora": "13:00",
+  "observaciones": "Mesa cerca de la ventana"
+}
+
+### Ver mis reservas (requiere auth de cliente)
+GET {{baseUrl}}/api/public/restaurante/{{slug}}/mis-reservas
+Authorization: Bearer {{token}}
+
+### Ver menús públicos del restaurante (SIN AUTH)
+GET {{baseUrl}}/api/public/restaurante/{{slug}}/menus
+
+### Ver menú público específico (SIN AUTH)
+GET {{baseUrl}}/api/public/restaurante/{{slug}}/menus/ID_MENU
+
+
+### ══ CONSULTORIO (requieren auth + flag esConsultorio=true) ═══════════════════
+
+### ─── Perfil del consultorio ───────────────────────────────────────────────────
+
+### Ver perfil del consultorio
+GET {{baseUrl}}/api/consultorio/perfil
+Authorization: Bearer {{token}}
+
+### Actualizar perfil del consultorio
+PUT {{baseUrl}}/api/consultorio/perfil
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "especialidades": ["MEDICINA_GENERAL", "PEDIATRIA"],
+  "nroRegistro": "HMC-2024-001"
+}
+
+### ─── Médicos ─────────────────────────────────────────────────────────────────────
+
+### Listar médicos del consultorio
+GET {{baseUrl}}/api/consultorio/medicos
+Authorization: Bearer {{token}}
+
+### Registrar médico
+POST {{baseUrl}}/api/consultorio/medicos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": "ID_USUARIO_MIEMBRO",
+  "especialidad": "MEDICINA_GENERAL",
+  "nroMatricula": "MP-12345"
+}
+
+### Ver médico
+GET {{baseUrl}}/api/consultorio/medicos/ID_MEDICO
+Authorization: Bearer {{token}}
+
+### Ver horarios de un médico
+GET {{baseUrl}}/api/consultorio/medicos/ID_MEDICO/horarios
+Authorization: Bearer {{token}}
+
+### ─── Servicios médicos ───────────────────────────────────────────────────────────
+
+### Listar servicios
+GET {{baseUrl}}/api/consultorio/servicios
+Authorization: Bearer {{token}}
+
+### Crear servicio
+POST {{baseUrl}}/api/consultorio/servicios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nombre": "Consulta general",
+  "duracionMin": 30,
+  "precio": 50000
+}
+
+### ─── Pacientes ───────────────────────────────────────────────────────────────────
+
+### Listar pacientes
+GET {{baseUrl}}/api/consultorio/pacientes
+Authorization: Bearer {{token}}
+
+### Registrar paciente
+POST {{baseUrl}}/api/consultorio/pacientes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nombres": "María García",
+  "apellidos": "López",
+  "fechaNacimiento": "1990-05-15",
+  "tipoDocumento": "CC",
+  "nroDocumento": "1234567890",
+  "telefono": "3101234567",
+  "email": "maria@email.com"
+}
+
+### Ver paciente
+GET {{baseUrl}}/api/consultorio/pacientes/ID_PACIENTE
+Authorization: Bearer {{token}}
+
+### ─── Citas ───────────────────────────────────────────────────────────────────────
+
+### Listar citas
+GET {{baseUrl}}/api/consultorio/citas
+Authorization: Bearer {{token}}
+
+### Crear cita
+POST {{baseUrl}}/api/consultorio/citas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pacienteId": "ID_PACIENTE",
+  "medicoId": "ID_MEDICO",
+  "servicioId": "ID_SERVICIO",
+  "fecha": "2026-06-10",
+  "hora": "09:00",
+  "observaciones": "Primera consulta"
+}
+
+### Ver cita
+GET {{baseUrl}}/api/consultorio/citas/ID_CITA
+Authorization: Bearer {{token}}
+
+### Confirmar cita
+POST {{baseUrl}}/api/consultorio/citas/ID_CITA/confirmar
+Authorization: Bearer {{token}}
+
+### Cancelar cita
+POST {{baseUrl}}/api/consultorio/citas/ID_CITA/cancelar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "motivo": "Paciente no puede asistir"
+}
+
+### Marcar no asistió
+POST {{baseUrl}}/api/consultorio/citas/ID_CITA/no-asistio
+Authorization: Bearer {{token}}
+
+### ─── Atenciones médicas ─────────────────────────────────────────────────────────
+
+### Listar atenciones
+GET {{baseUrl}}/api/consultorio/atenciones
+Authorization: Bearer {{token}}
+
+### Crear atención médica
+POST {{baseUrl}}/api/consultorio/atenciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pacienteId": "ID_PACIENTE",
+  "medicoId": "ID_MEDICO",
+  "citaId": "ID_CITA",
+  "motivoConsulta": "Dolor de cabeza recurrente",
+  "diagnostico": "Migraña tensional"
+}
+
+### Ver atención
+GET {{baseUrl}}/api/consultorio/atenciones/ID_ATENCION
+Authorization: Bearer {{token}}
+
+### Registrar pago de atención
+POST {{baseUrl}}/api/consultorio/atenciones/ID_ATENCION/pagos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "monto": 50000,
+  "tipoPago": "EFECTIVO"
+}
+
+### Anular atención
+POST {{baseUrl}}/api/consultorio/atenciones/ID_ATENCION/anular
+Authorization: Bearer {{token}}
+
+### ─── Historias clínicas ─────────────────────────────────────────────────────────
+
+### Listar historias clínicas
+GET {{baseUrl}}/api/consultorio/historias
+Authorization: Bearer {{token}}
+
+### Crear historia clínica
+POST {{baseUrl}}/api/consultorio/historias
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pacienteId": "ID_PACIENTE",
+  "tipo": "MEDICINA_GENERAL"
+}
+
+### Ver historia clínica
+GET {{baseUrl}}/api/consultorio/historias/ID_HISTORIA
+Authorization: Bearer {{token}}
+
+### ─── Recetas médicas ─────────────────────────────────────────────────────────────
+
+### Listar recetas
+GET {{baseUrl}}/api/consultorio/recetas
+Authorization: Bearer {{token}}
+
+### Crear receta
+POST {{baseUrl}}/api/consultorio/recetas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pacienteId": "ID_PACIENTE",
+  "medicoId": "ID_MEDICO",
+  "atencionId": "ID_ATENCION",
+  "medicamentos": [
+    { "nombre": "Ibuprofeno 400mg", "dosis": "1 tableta cada 8 horas", "dias": 5 }
+  ]
+}
+
+### Ver receta
+GET {{baseUrl}}/api/consultorio/recetas/ID_RECETA
+Authorization: Bearer {{token}}
+
+### Anular receta
+POST {{baseUrl}}/api/consultorio/recetas/ID_RECETA/anular
+Authorization: Bearer {{token}}
+
+### ─── Vacunaciones ───────────────────────────────────────────────────────────────
+
+### Ver vacunaciones de un paciente
+GET {{baseUrl}}/api/consultorio/pacientes/ID_PACIENTE/vacunaciones
+Authorization: Bearer {{token}}
+
+### Registrar vacunación
+POST {{baseUrl}}/api/consultorio/pacientes/ID_PACIENTE/vacunaciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "vacuna": "Hepatitis B",
+  "dosis": "1ra dosis",
+  "fecha": "2026-06-04",
+  "lote": "HB-2026-001"
+}
+
+### Eliminar vacunación
+DELETE {{baseUrl}}/api/consultorio/pacientes/ID_PACIENTE/vacunaciones/ID_VACUNACION
+Authorization: Bearer {{token}}

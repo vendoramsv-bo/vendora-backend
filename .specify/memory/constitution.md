@@ -196,7 +196,7 @@ NO se reimplementa paginación ad-hoc.
 ### Artículo V — Capa de Datos
 
 - **V.1 — Schema Prisma modularizado:** Entrada en `prisma/schema.prisma` (generator +
-  datasource). Modelos en `prisma/models/NN-<schema>.prisma` por dominio. Cada modelo lleva
+  datasource). Modelos en `prisma/NN-<schema>.prisma` por dominio. Cada modelo lleva
   `@@schema("<nombre_en_español>")`. Configuración vía `prisma.config.ts` (Prisma 7).
 - **V.2 — Nomenclatura:** Schemas de PostgreSQL en español. Conjunto inicial: `autenticacion`,
   `tenant`, `compartido`, `catalogo`, `almacen`, `ventas`, `consultorio`, `restaurante`,

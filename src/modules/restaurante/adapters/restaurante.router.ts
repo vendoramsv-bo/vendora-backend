@@ -8,6 +8,8 @@ import { reservaRouter } from "./reserva.rest.js"
 import { reservaPublicaRouter } from "./reserva-publica.rest.js"
 import { cocinaRouter } from "./cocina.rest.js"
 import { publicacionRRSSRouter } from "./publicacion-rrss.rest.js"
+import { restauranteStaffPublicoRouter } from "./restaurante-staff-publico.rest.js"
+import { publicoRestauranteRouter, consumerRestauranteRouter, consumerMisReservasRouter } from "./restaurante-publica.rest.js"
 
 // ─── Staff router (auth required) ────────────────────────────────────────────
 
@@ -23,11 +25,27 @@ restauranteApp.route("/", reservaRouter)
 restauranteApp.route("/", cocinaRouter)
 restauranteApp.route("/", publicacionRRSSRouter)
 
-// ─── Public router (no auth) ──────────────────────────────────────────────────
+// ─── Public router (no auth) — legacy /api/public/restaurante ────────────────
 
 const publicRestauranteApp = new Hono<HonoEnv>()
 
 publicRestauranteApp.route("/", publicMenuRouter)
 publicRestauranteApp.route("/", reservaPublicaRouter)
 
-export { restauranteApp, publicRestauranteApp }
+// ─── Nuevo directorio público /api/public/restaurantes ────────────────────────
+
+const publicosRestaurantesApp = new Hono<HonoEnv>()
+publicosRestaurantesApp.route("/", publicoRestauranteRouter)
+
+// ─── Staff perfil público /api/staff/restaurante/perfil ───────────────────────
+
+const staffPerfilPublicoApp = new Hono<HonoEnv>()
+staffPerfilPublicoApp.route("/", restauranteStaffPublicoRouter)
+
+// ─── Consumer /api/consumer — reservas y social autenticados ─────────────────
+
+const consumerApp = new Hono<HonoEnv>()
+consumerApp.route("/restaurantes", consumerRestauranteRouter)
+consumerApp.route("/mis-reservas", consumerMisReservasRouter)
+
+export { restauranteApp, publicRestauranteApp, publicosRestaurantesApp, staffPerfilPublicoApp, consumerApp }
