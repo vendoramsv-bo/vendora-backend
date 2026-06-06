@@ -1,6 +1,7 @@
 @baseUrl = http://localhost:3000
 @token = REEMPLAZAR_CON_TOKEN_DE_SESION
 @slug = SLUG_DEL_TENANT
+@consultorioSlug = SLUG_DEL_CONSULTORIO
 
 ### ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -607,3 +608,252 @@ Content-Type: application/json
 ### Eliminar vacunación
 DELETE {{baseUrl}}/api/consultorio/pacientes/ID_PACIENTE/vacunaciones/ID_VACUNACION
 Authorization: Bearer {{token}}
+
+
+### ══ TU CONSULTORIO — PERFIL PÚBLICO (staff, requiere esConsultorio) ══════════
+
+### Activar perfil público (aparece en el directorio)
+POST {{baseUrl}}/api/consultorio/activar-perfil-publico
+Authorization: Bearer {{token}}
+
+### Desactivar perfil público (oculta del directorio, no borra datos)
+POST {{baseUrl}}/api/consultorio/desactivar-perfil-publico
+Authorization: Bearer {{token}}
+
+### Actualizar configuración pública (horarios, contacto, tipo, fotos, especialidades)
+PATCH {{baseUrl}}/api/consultorio/configuracion-publica
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "horarios": [
+    { "diaSemana": 1, "horaInicio": "08:00", "horaFin": "12:00", "activo": true },
+    { "diaSemana": 1, "horaInicio": "14:00", "horaFin": "18:00", "activo": true },
+    { "diaSemana": 2, "horaInicio": "08:00", "horaFin": "17:00", "activo": true }
+  ],
+  "contactoPublico": {
+    "telefono": "3001234567",
+    "whatsapp": "3001234567",
+    "email": "consultas@clinica.com",
+    "direccion": "Calle 123 #45-67"
+  },
+  "tipoServicio": "PRESENCIAL",
+  "fotos": ["https://ejemplo.com/foto1.jpg"],
+  "especialidades": ["MEDICINA_GENERAL", "PEDIATRIA"]
+}
+
+### Cambiar visibilidad de un médico en el perfil público
+PATCH {{baseUrl}}/api/consultorio/medicos/ID_MEDICO/visibilidad
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "visiblePublico": true
+}
+
+### Cambiar visibilidad de un servicio en el catálogo público
+PATCH {{baseUrl}}/api/consultorio/servicios/ID_SERVICIO/visibilidad
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "visiblePublico": true,
+  "mostrarPrecio": true
+}
+
+### ─── Citas online (staff) ───────────────────────────────────────────────────
+
+### Listar citas online pendientes (origen web/app)
+GET {{baseUrl}}/api/consultorio/citas-online
+Authorization: Bearer {{token}}
+
+### Listar filtradas por estado
+GET {{baseUrl}}/api/consultorio/citas-online?estado=PENDIENTE&page=1&take=20
+Authorization: Bearer {{token}}
+
+### Confirmar cita online
+PATCH {{baseUrl}}/api/consultorio/citas-online/ID_CITA/confirmar
+Authorization: Bearer {{token}}
+
+### Rechazar cita online (con motivo opcional)
+PATCH {{baseUrl}}/api/consultorio/citas-online/ID_CITA/rechazar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "motivo": "El médico no tiene disponibilidad ese día"
+}
+
+
+### ══ TU CONSULTORIO — SIN AUTH (directorio y perfil público) ════════════════
+
+### Directorio de consultorios públicos
+GET {{baseUrl}}/api/public/consultorios
+
+### Directorio con filtros
+GET {{baseUrl}}/api/public/consultorios?especialidad=PEDIATRIA&tipoServicio=PRESENCIAL&page=1&take=20
+
+### Directorio ordenado por puntuación
+GET {{baseUrl}}/api/public/consultorios?orderBy=puntuacion&order=desc
+
+### Directorio por cercanía geográfica
+GET {{baseUrl}}/api/public/consultorios?lat=-17.78&lon=-63.18&orderBy=distancia&order=asc
+
+### Perfil público completo de un consultorio
+GET {{baseUrl}}/api/public/consultorios/{{consultorioSlug}}
+
+### Catálogo de servicios públicos del consultorio
+GET {{baseUrl}}/api/public/consultorios/{{consultorioSlug}}/servicios
+
+### Catálogo filtrado por especialidad
+GET {{baseUrl}}/api/public/consultorios/{{consultorioSlug}}/servicios?especialidad=PEDIATRIA&page=1&take=20
+
+### Consultar disponibilidad de slots (máx 30 días de rango)
+GET {{baseUrl}}/api/public/consultorios/{{consultorioSlug}}/disponibilidad?medicoId=ID_MEDICO&servicioId=ID_SERVICIO&fechaDesde=2026-06-10&fechaHasta=2026-06-20
+
+
+### ══ TU CONSULTORIO — CON AUTH (consumidor autenticado) ════════════════════
+
+### Agendar cita online (estado inicial = PENDIENTE)
+POST {{baseUrl}}/api/consumer/consultorios/{{consultorioSlug}}/citas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "medicoId": "ID_MEDICO",
+  "servicioId": "ID_SERVICIO",
+  "fechaHora": "2026-06-10T09:00:00.000Z",
+  "motivo": "Consulta de control rutinario"
+}
+
+### Ver mis citas online (todas mis reservas como consumidor)
+GET {{baseUrl}}/api/consumer/consultorios/mis-citas
+Authorization: Bearer {{token}}
+
+### Mis citas filtradas por estado y paginadas
+GET {{baseUrl}}/api/consumer/consultorios/mis-citas?estado=PENDIENTE&page=1&take=10
+Authorization: Bearer {{token}}
+
+### Cancelar mi cita (solo PENDIENTE o CONFIRMADA)
+PATCH {{baseUrl}}/api/consumer/consultorios/mis-citas/ID_CITA/cancelar
+Authorization: Bearer {{token}}
+
+
+### ══ TU CONSULTORIO — SOCIAL SIN AUTH (lectura pública) ════════════════════
+
+### Reacciones agrupadas del consultorio
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/reacciones
+
+### Comentarios públicos (cursor-based, excluye INACTIVO)
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/comentarios
+
+### Comentarios con paginación por cursor
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/comentarios?take=20&cursor=ID_ULTIMO_COMENTARIO&order=desc
+
+### Valoraciones públicas
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/valoraciones
+
+### Valoraciones ordenadas por puntuación
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/valoraciones?orderBy=puntuacion&order=desc&take=10
+
+### Preguntas públicas con respuestas (solo ACTIVO)
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/preguntas
+
+### Conteo de seguidores
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/seguidores/count
+
+### Publicaciones / novedades del consultorio
+GET {{baseUrl}}/api/public/social/consultorios/{{consultorioSlug}}/publicaciones
+
+
+### ══ TU CONSULTORIO — SOCIAL CON AUTH (consumidor autenticado) ═════════════
+
+### Reaccionar al consultorio (toggle — mismo tipo quita la reacción)
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/reaccionar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tipo": "ME_GUSTA"
+}
+
+### Comentar en el consultorio
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/comentarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "Excelente atención, muy profesionales!"
+}
+
+### Responder un comentario existente (máx 2 niveles de anidación)
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/comentarios/ID_COMENTARIO/responder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "Muchas gracias por tu comentario"
+}
+
+### Valorar el consultorio (1–5, upsert — segunda llamada actualiza)
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/valorar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "puntuacion": 5,
+  "resena": "Médicos muy atentos, instalaciones limpias y modernas"
+}
+
+### Hacer una pregunta pública al consultorio
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/preguntas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pregunta": "¿Aceptan el seguro médico XYZ?"
+}
+
+### Seguir / dejar de seguir el consultorio (toggle)
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/seguir
+Authorization: Bearer {{token}}
+
+### Agregar / quitar de favoritos (toggle)
+POST {{baseUrl}}/api/social/consultorios/{{consultorioSlug}}/favorito
+Authorization: Bearer {{token}}
+
+
+### ══ TU CONSULTORIO — SOCIAL STAFF (PROPIETARIO / ADMIN) ══════════════════
+
+### Ver todas las preguntas incluyendo las ocultadas
+GET {{baseUrl}}/api/social/staff/consultorios/{{consultorioSlug}}/preguntas?incluirInactivas=true
+Authorization: Bearer {{token}}
+
+### Responder una pregunta pública
+POST {{baseUrl}}/api/social/staff/consultorios/{{consultorioSlug}}/preguntas/ID_PREGUNTA/responder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "respuesta": "Sí, trabajamos con los seguros XYZ y ABC. Puede llamar para más info."
+}
+
+### Ocultar pregunta inapropiada (estado → INACTIVO)
+PATCH {{baseUrl}}/api/social/staff/consultorios/{{consultorioSlug}}/preguntas/ID_PREGUNTA/ocultar
+Authorization: Bearer {{token}}
+
+### Volver a mostrar pregunta ocultada (estado → ACTIVO)
+PATCH {{baseUrl}}/api/social/staff/consultorios/{{consultorioSlug}}/preguntas/ID_PREGUNTA/mostrar
+Authorization: Bearer {{token}}
+
+### Publicar novedad del consultorio (PROPIETARIO/ADMIN)
+POST {{baseUrl}}/api/social/staff/consultorios/{{consultorioSlug}}/novedades
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contenido": "¡Ahora contamos con servicio de teleconsulta! Agenda tu cita online.",
+  "tipo": "TEXTO",
+  "etiquetas": ["teleconsulta", "novedad"],
+  "medios": []
+}
