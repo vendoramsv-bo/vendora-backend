@@ -89,6 +89,16 @@ model User {
   favoritosRestaurante             RestauranteFavorito[]           @relation("favoritosRestaurante")
   seguidoresRestaurante            RestauranteSeguidor[]           @relation("seguidoresRestaurante")
 
+  // ---- Social consultorio (perfil público del consultorio) ----
+  reaccionesConsultorio            ConsultorioReaccion[]           @relation("reaccionesConsultorio")
+  comentariosConsultorio           ConsultorioComentario[]         @relation("comentariosConsultorio")
+  reaccionesComentarioConsultorio  ConsultorioComentarioReaccion[] @relation("reaccionesComentarioConsultorio")
+  valoracionesConsultorio          ConsultorioValoracion[]         @relation("valoracionesConsultorio")
+  preguntasConsultorio             ConsultorioPregunta[]           @relation("preguntasConsultorio")
+  respuestasConsultorio            ConsultorioRespuesta[]          @relation("respuestasConsultorio")
+  favoritosConsultorio             ConsultorioFavorito[]           @relation("favoritosConsultorio")
+  seguidoresConsultorio            ConsultorioSeguidor[]           @relation("seguidoresConsultorio")
+
   @@map("user")
   @@schema("autenticacion")
 }

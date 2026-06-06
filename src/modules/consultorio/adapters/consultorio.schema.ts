@@ -171,3 +171,83 @@ export const PagoAtencionBodySchema = PagoSchema.extend({
 })
 
 export const QueryParamsConsultorioSchema = makeQueryParamsSchema(["createdAt", "nombre", "apellido", "fechaHora", "estado"])
+
+// ─── Schemas para perfil público (feature 015) ───────────────────────────────
+
+export const HorarioConsultorioPublicoSchema = z.object({
+  diaSemana: z.number().int().min(0).max(6),
+  horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
+  horaFin: z.string().regex(/^\d{2}:\d{2}$/),
+  activo: z.boolean(),
+})
+
+export const ContactoPublicoSchema = z.object({
+  telefono: z.string().optional(),
+  email: z.string().email().optional(),
+  redesSociales: z.array(z.object({ nombre: z.string(), url: z.string().url() })).optional(),
+})
+
+export const ActualizarConfiguracionPublicaBodySchema = z.object({
+  horarios: z.array(HorarioConsultorioPublicoSchema).optional(),
+  contactoPublico: ContactoPublicoSchema.optional(),
+  tipoServicio: z.enum(["PRESENCIAL", "TELECONSULTA", "AMBOS"]).optional(),
+  fotos: z.array(z.string().url()).optional(),
+  especialidades: z.array(z.string()).optional(),
+})
+
+export const CrearCitaOnlineBodySchema = z.object({
+  medicoId: z.string().min(1),
+  servicioId: z.string().min(1),
+  fechaHora: z.string().datetime(),
+  motivo: z.string().max(500).optional(),
+})
+
+export const MisCitasQuerySchema = z.object({
+  estado: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+  order: z.enum(["asc", "desc"]).default("desc"),
+})
+
+export const DirectorioConsultorioQuerySchema = z.object({
+  lat: z.coerce.number().optional(),
+  lon: z.coerce.number().optional(),
+  especialidad: z.string().optional(),
+  tipoServicio: z.enum(["PRESENCIAL", "TELECONSULTA", "AMBOS"]).optional(),
+  orderBy: z.enum(["puntuacion", "seguidores", "distancia", "fecha"]).optional(),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  page: z.coerce.number().int().min(1).default(1),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+export const DisponibilidadQuerySchema = z.object({
+  medicoId: z.string().min(1),
+  servicioId: z.string().min(1),
+  fechaDesde: z.string().datetime(),
+  fechaHasta: z.string().datetime(),
+})
+
+export const VisibilidadMedicoBodySchema = z.object({
+  visiblePublico: z.boolean(),
+})
+
+export const VisibilidadServicioBodySchema = z.object({
+  visiblePublico: z.boolean(),
+  mostrarPrecio: z.boolean().optional(),
+})
+
+export const CitasOnlineQuerySchema = z.object({
+  estado: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+export const RechazarCitaBodySchema = z.object({
+  motivo: z.string().max(500).optional(),
+})
+
+export const ServiciosPublicosQuerySchema = z.object({
+  especialidad: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  take: z.coerce.number().int().min(1).max(100).default(20),
+})

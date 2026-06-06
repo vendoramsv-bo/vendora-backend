@@ -327,6 +327,13 @@ model Consultorio {
   especialidades String[]  // ["ODONTOLOGIA","PEDIATRIA","MEDICINA_GENERAL"]
   nroRegistro    String?   // número de habilitación del establecimiento
   estado         Estado    @default(PENDIENTE)
+
+  // Perfil público configurable
+  horarios        Json?
+  contactoPublico Json?
+  tipoServicio    TipoServicioConsultorio @default(PRESENCIAL)
+  fotos           String[]
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime? @updatedAt
   // Auditoría — quién creó y quién modificó el registro
@@ -340,6 +347,14 @@ model Consultorio {
   serviciosMedicos ServicioMedico[]
   atencionesMedicas AtencionMedica[]
   recetasMedicas    RecetaMedica[]
+
+  // Relaciones sociales del perfil público
+  reacciones    ConsultorioReaccion[]
+  comentarios   ConsultorioComentario[]
+  valoraciones  ConsultorioValoracion[]
+  preguntas     ConsultorioPregunta[]
+  favoritos     ConsultorioFavorito[]
+  seguidores    ConsultorioSeguidor[]
   @@schema("tenant")
 }
 
