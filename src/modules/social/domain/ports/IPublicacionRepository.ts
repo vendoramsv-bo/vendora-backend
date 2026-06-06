@@ -59,6 +59,11 @@ export interface PublicacionCompartidoRaw {
 export interface PaginatedResult<T> {
   data: T[]
   total: number
+  page: number
+  take: number
+  totalPaginas: number
+  hayPaginaSiguiente: boolean
+  hayPaginaAnterior: boolean
 }
 
 export interface MediaInput {
@@ -75,8 +80,8 @@ export interface IPublicacionRepository {
   create(data: { tenantId: string; autorId: string; titulo?: string; contenido?: string; tipo: string; etiquetas: string[]; medios: MediaInput[] }): Promise<PublicacionRaw>
   update(id: string, tenantId: string, data: { titulo?: string; contenido?: string; tipo?: string; etiquetas?: string[]; medios?: MediaInput[] }): Promise<PublicacionRaw>
   findById(id: string, tenantId?: string): Promise<PublicacionRaw | null>
-  findPublicas(tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>>
-  findByTenant(tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; estado?: string; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>>
+  findPublicas(tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>>
+  findByTenant(tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; estado?: string; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>>
   cambiarEstado(id: string, nuevoEstado: string, publicadoEn?: Date): Promise<PublicacionRaw>
   delete(id: string, tenantId: string): Promise<void>
 
@@ -95,5 +100,5 @@ export interface IPublicacionRepository {
 
   // Helpers para obtener detalle público
   getReaccionesCount(publicacionId: string): Promise<{ tipo: string; count: number }[]>
-  listarComentariosPublicacion(publicacionId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<PublicacionComentarioRaw>>
+  listarComentariosPublicacion(publicacionId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<PublicacionComentarioRaw>>
 }

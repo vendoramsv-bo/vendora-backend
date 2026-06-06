@@ -46,11 +46,11 @@ publicacionStaffRouter.get("/publicaciones", async (c) => {
   const tenantId = c.get("tenantId")
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
-  const result = await new ListarPublicacionesUseCase(makeRepo()).ejecutar(tenantId, { take, skip, order, estado: q.estado, etiqueta: q.etiqueta })
-  return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+  const result = await new ListarPublicacionesUseCase(makeRepo()).ejecutar(tenantId, { take, page, order, estado: q.estado, etiqueta: q.etiqueta })
+  return c.json(result)
 })
 
 publicacionStaffRouter.post("/publicaciones", async (c) => {

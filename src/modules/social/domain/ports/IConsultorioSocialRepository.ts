@@ -69,13 +69,13 @@ export interface IConsultorioSocialRepository {
   // Comentarios
   crearComentario(data: { consultorioId: string; userId: string; contenido: string; padreId?: string }): Promise<ConsultorioComentarioRaw>
   findComentario(comentarioId: string): Promise<ConsultorioComentarioRaw | null>
-  listarComentarios(consultorioId: string, params: { take: number; cursor?: string; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<ConsultorioComentarioRaw>>
+  listarComentarios(consultorioId: string, params: { take: number; page?: number; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<ConsultorioComentarioRaw>>
   responderComentario(data: { consultorioId: string; userId: string; contenido: string; padreId: string }): Promise<ConsultorioComentarioRaw>
 
   // Valoraciones
   upsertValoracion(data: { consultorioId: string; userId: string; puntuacion: number; resena?: string }): Promise<ConsultorioValoracionRaw>
   getPromedioValoraciones(consultorioId: string): Promise<number>
-  listarValoraciones(consultorioId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ConsultorioValoracionRaw>>
+  listarValoraciones(consultorioId: string, params: { take: number; page?: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ConsultorioValoracionRaw>>
 
   // Preguntas
   crearPregunta(data: { consultorioId: string; userId: string; pregunta: string }): Promise<ConsultorioPreguntaRaw>
@@ -83,7 +83,7 @@ export interface IConsultorioSocialRepository {
   responderPregunta(data: { preguntaId: string; userId: string; respuesta: string }): Promise<ConsultorioRespuestaRaw>
   ocultarPregunta(preguntaId: string, consultorioId: string): Promise<ConsultorioPreguntaRaw>
   mostrarPregunta(preguntaId: string, consultorioId: string): Promise<ConsultorioPreguntaRaw>
-  listarPreguntas(consultorioId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<ConsultorioPreguntaRaw>>
+  listarPreguntas(consultorioId: string, params: { take: number; page?: number; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<ConsultorioPreguntaRaw>>
 
   // Favoritos y Seguimiento
   toggleFavorito(consultorioId: string, userId: string): Promise<{ favorito: boolean }>
@@ -92,5 +92,5 @@ export interface IConsultorioSocialRepository {
 
   // Publicaciones de novedad
   crearPublicacion(data: { tenantId: string; autorId: string; titulo?: string; contenido: string; tipo: string; etiquetas?: string[]; medios?: { tipo: string; url?: string; embedUrl?: string }[] }): Promise<{ id: string; estado: string; createdAt: Date }>
-  listarPublicaciones(tenantId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<unknown>>
+  listarPublicaciones(tenantId: string, params: { take: number; page?: number }): Promise<PaginatedResult<unknown>>
 }

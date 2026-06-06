@@ -28,10 +28,10 @@ consultorioSocialPublicaRouter.get("/:slug/reacciones", async (c) => {
 consultorioSocialPublicaRouter.get("/:slug/comentarios", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarComentariosConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order })
+    const result = await new ListarComentariosConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -39,10 +39,10 @@ consultorioSocialPublicaRouter.get("/:slug/comentarios", async (c) => {
 consultorioSocialPublicaRouter.get("/:slug/valoraciones", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarValoracionesConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order, orderBy: q.orderBy })
+    const result = await new ListarValoracionesConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order, orderBy: q.orderBy })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -50,10 +50,10 @@ consultorioSocialPublicaRouter.get("/:slug/valoraciones", async (c) => {
 consultorioSocialPublicaRouter.get("/:slug/preguntas", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarPreguntasConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order })
+    const result = await new ListarPreguntasConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -70,9 +70,9 @@ consultorioSocialPublicaRouter.get("/:slug/seguidores/count", async (c) => {
 consultorioSocialPublicaRouter.get("/:slug/publicaciones", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   try {
-    const result = await new ListarPublicacionesConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor })
+    const result = await new ListarPublicacionesConsultorioUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })

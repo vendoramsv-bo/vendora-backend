@@ -61,6 +61,11 @@ export interface TiendaFavoritoRaw {
 export interface PaginatedResult<T> {
   data: T[]
   total: number
+  page: number
+  take: number
+  totalPaginas: number
+  hayPaginaSiguiente: boolean
+  hayPaginaAnterior: boolean
 }
 
 export interface ITiendaSocialRepository {
@@ -77,18 +82,18 @@ export interface ITiendaSocialRepository {
   editarComentarioTienda(comentarioId: string, contenido: string): Promise<TiendaComentarioRaw>
   deleteRespuestasTienda(padreId: string): Promise<void>
   deleteComentarioTienda(comentarioId: string): Promise<void>
-  listarComentariosTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaComentarioRaw>>
+  listarComentariosTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaComentarioRaw>>
 
   // Valoraciones
   upsertValoracionTienda(data: { tiendaId: string; userId: string; puntuacion: number; resena?: string }): Promise<TiendaValoracionRaw>
   getPromedioValoracionesTienda(tiendaId: string): Promise<number>
-  listarValoracionesTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<TiendaValoracionRaw>>
+  listarValoracionesTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<TiendaValoracionRaw>>
 
   // Preguntas
   crearPreguntaTienda(data: { tiendaId: string; userId: string; pregunta: string }): Promise<TiendaPreguntaRaw>
   findPreguntaTienda(preguntaId: string): Promise<TiendaPreguntaRaw | null>
   crearRespuestaTienda(data: { preguntaId: string; userId: string; respuesta: string }): Promise<TiendaRespuestaRaw>
-  listarPreguntasTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>>
+  listarPreguntasTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>>
   ocultarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw>
   mostrarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw>
 
@@ -97,5 +102,5 @@ export interface ITiendaSocialRepository {
   esFavoritoTienda(tiendaId: string, userId: string): Promise<boolean>
   toggleSeguirTienda(tiendaId: string, userId: string): Promise<{ siguiendo: boolean }>
   contarSeguidoresTienda(tiendaId: string): Promise<number>
-  listarFavoritosTiendasUsuario(userId: string, params: { take: number; skip: number }): Promise<PaginatedResult<TiendaFavoritoRaw>>
+  listarFavoritosTiendasUsuario(userId: string, params: { take: number; page: number }): Promise<PaginatedResult<TiendaFavoritoRaw>>
 }

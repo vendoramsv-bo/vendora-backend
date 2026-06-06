@@ -52,16 +52,17 @@ export function toPrismaArgs(params: QueryParams, searchFields?: string[]) {
 
 // ─── Pagination Helper ────────────────────────────────────────────────────────
 
-export function paginate<T>(data: T[], total: number, params: QueryParams) {
+export function paginate<T>(data: T[], total: number, params: { take: number; skip: number }) {
   const { take, skip } = params
+  const page = take > 0 ? Math.floor(skip / take) + 1 : 1
+  const totalPaginas = take > 0 ? Math.ceil(total / take) : 1
   return {
     data,
-    meta: {
-      take,
-      skip,
-      total,
-      hasMore: skip + data.length < total,
-      nextCursor: skip + data.length < total ? skip + take : null,
-    },
+    total,
+    page,
+    take,
+    totalPaginas,
+    hayPaginaSiguiente: page < totalPaginas,
+    hayPaginaAnterior: page > 1,
   }
 }

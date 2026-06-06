@@ -1,4 +1,4 @@
-export interface ProductoReaccionResult {
+﻿export interface ProductoReaccionResult {
   id: string
   emoji: string
   userId: string
@@ -66,6 +66,11 @@ export interface ProductoFavoritoRaw {
 export interface PaginatedResult<T> {
   data: T[]
   total: number
+  page: number
+  take: number
+  totalPaginas: number
+  hayPaginaSiguiente: boolean
+  hayPaginaAnterior: boolean
 }
 
 export interface IProductoSocialRepository {
@@ -82,20 +87,20 @@ export interface IProductoSocialRepository {
   editarComentarioProducto(comentarioId: string, contenido: string): Promise<ProductoComentarioRaw>
   deleteRespuestasProducto(padreId: string): Promise<void>
   deleteComentarioProducto(comentarioId: string): Promise<void>
-  listarComentariosProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; soloRaiz?: boolean }): Promise<PaginatedResult<ProductoComentarioRaw>>
+  listarComentariosProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; soloRaiz?: boolean }): Promise<PaginatedResult<ProductoComentarioRaw>>
 
   // Valoraciones
   upsertValoracionProducto(data: { productoId: string; tenantId: string; userId: string; puntuacion: number; resena?: string }): Promise<ProductoValoracionRaw>
   getPromedioValoracionesProducto(productoId: string): Promise<number>
-  listarValoracionesProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ProductoValoracionRaw>>
+  listarValoracionesProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ProductoValoracionRaw>>
 
   // Preguntas
   crearPreguntaProducto(data: { productoId: string; tenantId: string; userId: string; pregunta: string }): Promise<ProductoPreguntaRaw>
   findPreguntaProducto(preguntaId: string): Promise<ProductoPreguntaRaw | null>
   crearRespuestaProducto(data: { preguntaId: string; userId: string; respuesta: string }): Promise<ProductoRespuestaRaw>
-  listarPreguntasProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<ProductoPreguntaRaw>>
+  listarPreguntasProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<ProductoPreguntaRaw>>
 
   // Favoritos
   toggleFavoritoProducto(productoId: string, tenantId: string, userId: string): Promise<{ favorito: boolean }>
-  listarFavoritosUsuario(userId: string, params: { take: number; skip: number }): Promise<PaginatedResult<ProductoFavoritoRaw>>
+  listarFavoritosUsuario(userId: string, params: { take: number; page: number }): Promise<PaginatedResult<ProductoFavoritoRaw>>
 }

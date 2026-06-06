@@ -150,8 +150,8 @@ export class TiendaPrismaRepository implements ITiendaRepository {
   async listarDirectorio(query: DirectorioQueryDTO): Promise<DirectorioResultDTO> {
     const { lat, lng, actividadEconomicaId, categoriaId, busqueda, ordenarPor = "createdAt", orden = "desc" } = query
     const page = Math.max(1, query.page ?? 1)
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20))
-    const skip = (page - 1) * limit
+    const take = Math.min(100, Math.max(1, query.take ?? query.limit ?? 20))
+    const skip = (page - 1) * take
 
     const where: Record<string, unknown> = { esTienda: true }
     if (busqueda) where.OR = [{ name: { contains: busqueda, mode: "insensitive" } }, { descripcion: { contains: busqueda, mode: "insensitive" } }]
@@ -174,7 +174,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
           },
         },
         skip,
-        take: limit,
+        take: take,
       }),
       this.db.tenant.count({ where }),
     ])
@@ -220,8 +220,8 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       items = items.sort((a, b) => (orden === "asc" ? a.totalSeguidores - b.totalSeguidores : b.totalSeguidores - a.totalSeguidores))
     }
 
-    const totalPaginas = Math.ceil(total / limit)
-    return { data: items, total, page, limit, totalPaginas, hayPaginaSiguiente: page < totalPaginas, hayPaginaAnterior: page > 1 }
+    const totalPaginas = Math.ceil(total / take)
+    return { data: items, total, page, take, totalPaginas, hayPaginaSiguiente: page < totalPaginas, hayPaginaAnterior: page > 1 }
   }
 
   async agregarDestacado(dto: AgregarDestacadoDTO): Promise<DestacadoItemDTO> {
@@ -292,6 +292,6 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       this.db.producto.count({ where }),
     ])
     const result = paginate(data, total, params)
-    return { data: result.data, total: result.meta.total }
+    return { data: result.data, total: result.total }
   }
 }

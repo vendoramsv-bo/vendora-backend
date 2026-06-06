@@ -7,20 +7,11 @@ import type {
   RestauranteRespuestaRaw,
   PaginatedResult,
 } from "../domain/ports/IRestauranteSocialRepository.js"
+import { paginate } from "../../../core/query-params.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prismaBase as any
-
-function makeMeta<T>(data: T[], take: number, total: number): PaginatedResult<T>["meta"] {
-  const lastItem = data[data.length - 1] as { id?: string; createdAt?: Date } | undefined
-  return {
-    take,
-    total,
-    hasMore: data.length === take,
-    nextCursor: lastItem?.id ?? null,
-  }
-}
 
 export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepository {
   async resolveRestauranteInfo(slug: string): Promise<{ restauranteId: string; tenantId: string }> {
@@ -78,14 +69,14 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
     return db.restauranteComentario.findUnique({ where: { id: comentarioId } })
   }
 
-  async listarComentarios(restauranteId: string, params: { take: number; cursor?: string; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<RestauranteComentarioRaw>> {
+  async listarComentarios(restauranteId: string, params: { take: number; page?: number; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<RestauranteComentarioRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { restauranteId, estado: "ACTIVO", padreId: params.padreId ?? null }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
       db.restauranteComentario.findMany({
-        where,
-        ...cursorClause,
-        take: params.take,
+        where, skip, take,
         orderBy: { createdAt: params.order },
         include: {
           respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" }, take: 5 },
@@ -94,7 +85,7 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
       }),
       db.restauranteComentario.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   async responderComentario(data: { restauranteId: string; userId: string; contenido: string; padreId: string }): Promise<RestauranteComentarioRaw> {
@@ -118,15 +109,17 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
     return agg._avg.puntuacion ?? 0
   }
 
-  async listarValoraciones(restauranteId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<RestauranteValoracionRaw>> {
+  async listarValoraciones(restauranteId: string, params: { take: number; page?: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<RestauranteValoracionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const orderField = params.orderBy === "puntuacion" ? "puntuacion" : "createdAt"
     const where = { restauranteId }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
-      db.restauranteValoracion.findMany({ where, ...cursorClause, take: params.take, orderBy: { [orderField]: params.order } }),
+      db.restauranteValoracion.findMany({ where, skip, take, orderBy: { [orderField]: params.order } }),
       db.restauranteValoracion.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Preguntas ────────────────────────────────────────────────────────────
@@ -151,21 +144,21 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
     return db.restaurantePregunta.update({ where: { id: preguntaId, restauranteId }, data: { estado: "ACTIVO" } })
   }
 
-  async listarPreguntas(restauranteId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<RestaurantePreguntaRaw>> {
+  async listarPreguntas(restauranteId: string, params: { take: number; page?: number; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<RestaurantePreguntaRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { restauranteId }
     if (!params.incluirInactivas) where["estado"] = "ACTIVO"
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
       db.restaurantePregunta.findMany({
-        where,
-        ...cursorClause,
-        take: params.take,
+        where, skip, take,
         orderBy: { createdAt: params.order },
         include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" } } },
       }),
       db.restaurantePregunta.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Favoritos y Seguimiento ───────────────────────────────────────────────
@@ -191,13 +184,15 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
     return { siguiendo: !existing, totalSeguidores }
   }
 
-  async listarSeguidores(restauranteId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<{ userId: string; createdAt: Date }>> {
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
+  async listarSeguidores(restauranteId: string, params: { take: number; page?: number }): Promise<PaginatedResult<{ userId: string; createdAt: Date }>> {
+    const take = Math.max(1, params.take)
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const [data, total] = await Promise.all([
-      db.restauranteSeguidor.findMany({ where: { restauranteId }, ...cursorClause, take: params.take, orderBy: { createdAt: "desc" }, select: { id: true, userId: true, createdAt: true } }),
+      db.restauranteSeguidor.findMany({ where: { restauranteId }, skip, take, orderBy: { createdAt: "desc" }, select: { id: true, userId: true, createdAt: true } }),
       db.restauranteSeguidor.count({ where: { restauranteId } }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Publicaciones de novedad ──────────────────────────────────────────────
@@ -236,13 +231,15 @@ export class RestauranteSocialPrismaRepository implements IRestauranteSocialRepo
     })
   }
 
-  async listarPublicaciones(tenantId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<unknown>> {
+  async listarPublicaciones(tenantId: string, params: { take: number; page?: number }): Promise<PaginatedResult<unknown>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where = { tenantId, estado: "PUBLICADO" }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
-      db.publicacion.findMany({ where, ...cursorClause, take: params.take, orderBy: { publicadoEn: "desc" }, include: { medios: { orderBy: { orden: "asc" } } } }),
+      db.publicacion.findMany({ where, skip, take, orderBy: { publicadoEn: "desc" }, include: { medios: { orderBy: { orden: "asc" } } } }),
       db.publicacion.count({ where }),
     ])
-    return { data, meta: makeMeta(data as { id: string }[], params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 }

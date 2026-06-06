@@ -8,15 +8,11 @@ import type {
 } from "../domain/ports/IConsultorioSocialRepository.js"
 import type { PaginatedResult } from "../domain/ports/IRestauranteSocialRepository.js"
 import { ConsultorioSocialNoActivoError } from "../domain/consultorio-social.errors.js"
+import { paginate } from "../../../core/query-params.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prismaBase as any
-
-function makeMeta<T>(data: T[], take: number, total: number): PaginatedResult<T>["meta"] {
-  const lastItem = data[data.length - 1] as { id?: string } | undefined
-  return { take, total, hasMore: data.length === take, nextCursor: lastItem?.id ?? null }
-}
 
 export class ConsultorioSocialPrismaRepository implements IConsultorioSocialRepository {
 
@@ -67,17 +63,19 @@ export class ConsultorioSocialPrismaRepository implements IConsultorioSocialRepo
     return db.consultorioComentario.findUnique({ where: { id: comentarioId } })
   }
 
-  async listarComentarios(consultorioId: string, params: { take: number; cursor?: string; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<ConsultorioComentarioRaw>> {
+  async listarComentarios(consultorioId: string, params: { take: number; page?: number; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<ConsultorioComentarioRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { consultorioId, estado: "ACTIVO", padreId: params.padreId ?? null }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
       db.consultorioComentario.findMany({
-        where, ...cursorClause, take: params.take, orderBy: { createdAt: params.order },
+        where, skip, take, orderBy: { createdAt: params.order },
         include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" }, take: 5 }, _count: { select: { respuestas: true } } },
       }),
       db.consultorioComentario.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   async responderComentario(data: { consultorioId: string; userId: string; contenido: string; padreId: string }): Promise<ConsultorioComentarioRaw> {
@@ -99,15 +97,17 @@ export class ConsultorioSocialPrismaRepository implements IConsultorioSocialRepo
     return agg._avg.puntuacion ?? 0
   }
 
-  async listarValoraciones(consultorioId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ConsultorioValoracionRaw>> {
+  async listarValoraciones(consultorioId: string, params: { take: number; page?: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ConsultorioValoracionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const orderField = params.orderBy === "puntuacion" ? "puntuacion" : "createdAt"
     const where = { consultorioId }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
-      db.consultorioValoracion.findMany({ where, ...cursorClause, take: params.take, orderBy: { [orderField]: params.order } }),
+      db.consultorioValoracion.findMany({ where, skip, take, orderBy: { [orderField]: params.order } }),
       db.consultorioValoracion.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   async crearPregunta(data: { consultorioId: string; userId: string; pregunta: string }): Promise<ConsultorioPreguntaRaw> {
@@ -130,18 +130,20 @@ export class ConsultorioSocialPrismaRepository implements IConsultorioSocialRepo
     return db.consultorioPregunta.update({ where: { id: preguntaId, consultorioId }, data: { estado: "ACTIVO" } })
   }
 
-  async listarPreguntas(consultorioId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<ConsultorioPreguntaRaw>> {
+  async listarPreguntas(consultorioId: string, params: { take: number; page?: number; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<ConsultorioPreguntaRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { consultorioId }
     if (!params.incluirInactivas) where["estado"] = "ACTIVO"
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
       db.consultorioPregunta.findMany({
-        where, ...cursorClause, take: params.take, orderBy: { createdAt: params.order },
+        where, skip, take, orderBy: { createdAt: params.order },
         include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" } } },
       }),
       db.consultorioPregunta.count({ where }),
     ])
-    return { data, meta: makeMeta(data, params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 
   async toggleFavorito(consultorioId: string, userId: string): Promise<{ favorito: boolean }> {
@@ -183,13 +185,15 @@ export class ConsultorioSocialPrismaRepository implements IConsultorioSocialRepo
     })
   }
 
-  async listarPublicaciones(tenantId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<unknown>> {
+  async listarPublicaciones(tenantId: string, params: { take: number; page?: number }): Promise<PaginatedResult<unknown>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
     const where = { tenantId, estado: "PUBLICADO" }
-    const cursorClause = params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}
     const [data, total] = await Promise.all([
-      db.publicacion.findMany({ where, ...cursorClause, take: params.take, orderBy: { publicadoEn: "desc" }, include: { medios: { orderBy: { orden: "asc" } } } }),
+      db.publicacion.findMany({ where, skip, take, orderBy: { publicadoEn: "desc" }, include: { medios: { orderBy: { orden: "asc" } } } }),
       db.publicacion.count({ where }),
     ])
-    return { data, meta: makeMeta(data as { id: string }[], params.take, total) }
+    return paginate(data, total, { take, skip })
   }
 }

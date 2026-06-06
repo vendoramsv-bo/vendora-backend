@@ -133,14 +133,14 @@ export const DirectorioQuerySchema = z.object({
   orderBy: z.enum(["puntuacion", "seguidores", "cercania", "createdAt"]).default("puntuacion"),
   order: z.enum(["asc", "desc"]).default("desc"),
   take: z.coerce.number().int().min(1).max(100).default(20),
-  cursor: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
 })
 
 export const MenuPublicoQuerySchema = z.object({
   tiempoComida: z.string().optional(),
   fecha: z.string().optional(),
   take: z.coerce.number().int().min(1).max(100).default(10),
-  cursor: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
 })
 
 export const CrearReservaConsumerSchema = z.object({
@@ -152,5 +152,5 @@ export const CrearReservaConsumerSchema = z.object({
 export const MisReservasQuerySchema = z.object({
   estado: z.string().optional(),
   take: z.coerce.number().int().min(1).max(100).default(20),
-  cursor: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
 })

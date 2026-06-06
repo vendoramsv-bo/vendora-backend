@@ -1,6 +1,11 @@
 export interface PaginatedResult<T> {
   data: T[]
-  meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null }
+  total: number
+  page: number
+  take: number
+  totalPaginas: number
+  hayPaginaSiguiente: boolean
+  hayPaginaAnterior: boolean
 }
 
 export interface RestauranteReaccionRaw {
@@ -76,13 +81,13 @@ export interface IRestauranteSocialRepository {
   // Comentarios
   crearComentario(data: { restauranteId: string; userId: string; contenido: string; padreId?: string }): Promise<RestauranteComentarioRaw>
   findComentario(comentarioId: string): Promise<RestauranteComentarioRaw | null>
-  listarComentarios(restauranteId: string, params: { take: number; cursor?: string; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<RestauranteComentarioRaw>>
+  listarComentarios(restauranteId: string, params: { take: number; page?: number; padreId?: string; order: "asc" | "desc" }): Promise<PaginatedResult<RestauranteComentarioRaw>>
   responderComentario(data: { restauranteId: string; userId: string; contenido: string; padreId: string }): Promise<RestauranteComentarioRaw>
 
   // Valoraciones
   upsertValoracion(data: { restauranteId: string; userId: string; puntuacion: number; resena?: string }): Promise<RestauranteValoracionRaw>
   getPromedioValoraciones(restauranteId: string): Promise<number>
-  listarValoraciones(restauranteId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<RestauranteValoracionRaw>>
+  listarValoraciones(restauranteId: string, params: { take: number; page?: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<RestauranteValoracionRaw>>
 
   // Preguntas
   crearPregunta(data: { restauranteId: string; userId: string; pregunta: string }): Promise<RestaurantePreguntaRaw>
@@ -90,14 +95,14 @@ export interface IRestauranteSocialRepository {
   responderPregunta(data: { preguntaId: string; userId: string; respuesta: string }): Promise<RestauranteRespuestaRaw>
   ocultarPregunta(preguntaId: string, restauranteId: string): Promise<RestaurantePreguntaRaw>
   mostrarPregunta(preguntaId: string, restauranteId: string): Promise<RestaurantePreguntaRaw>
-  listarPreguntas(restauranteId: string, params: { take: number; cursor?: string; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<RestaurantePreguntaRaw>>
+  listarPreguntas(restauranteId: string, params: { take: number; page?: number; order: "asc" | "desc"; incluirInactivas?: boolean }): Promise<PaginatedResult<RestaurantePreguntaRaw>>
 
   // Favoritos y Seguimiento
   toggleFavorito(restauranteId: string, userId: string): Promise<{ favorito: boolean }>
   toggleSeguir(restauranteId: string, userId: string): Promise<{ siguiendo: boolean; totalSeguidores: number }>
-  listarSeguidores(restauranteId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<{ userId: string; createdAt: Date }>>
+  listarSeguidores(restauranteId: string, params: { take: number; page?: number }): Promise<PaginatedResult<{ userId: string; createdAt: Date }>>
 
   // Publicaciones de novedad
   crearPublicacion(data: { tenantId: string; autorId: string; titulo?: string; contenido: string; tipo: string; etiquetas?: string[]; medios?: { tipo: string; url?: string; embedUrl?: string }[] }): Promise<{ id: string; estado: string; createdAt: Date }>
-  listarPublicaciones(tenantId: string, params: { take: number; cursor?: string }): Promise<PaginatedResult<unknown>>
+  listarPublicaciones(tenantId: string, params: { take: number; page?: number }): Promise<PaginatedResult<unknown>>
 }

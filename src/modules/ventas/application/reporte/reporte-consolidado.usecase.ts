@@ -1,5 +1,6 @@
 import type { IReporteRepository, ReporteIngresoDTO, ReporteFiltros } from "../../domain/ports/IReporteRepository.js"
 import type { QueryParams } from "../../../../core/query-params.js"
+import { paginate } from "../../../../core/query-params.js"
 
 export interface ReporteConsolidadoInput {
   tenantId: string
@@ -13,16 +14,6 @@ export class ReporteConsolidadoUseCase {
   async execute(input: ReporteConsolidadoInput) {
     const { take, skip } = input.params
     const { data, total } = await this.repo.getConsolidado(input.tenantId, input.filtros, take, skip)
-
-    return {
-      data: data as ReporteIngresoDTO[],
-      meta: {
-        take,
-        skip,
-        total,
-        hasMore: skip + data.length < total,
-        nextCursor: skip + data.length < total ? skip + take : null,
-      },
-    }
+    return paginate(data as ReporteIngresoDTO[], total, { take, skip })
   }
 }

@@ -1,4 +1,5 @@
 import type { IPublicacionRepository, PublicacionRaw, PublicacionComentarioRaw, PublicacionReaccionRaw, PublicacionCompartidoRaw, PaginatedResult, MediaInput } from "../domain/ports/IPublicacionRepository.js"
+import { paginate } from "../../../core/query-params.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,27 +70,33 @@ export class PublicacionPrismaRepository implements IPublicacionRepository {
     return db.publicacion.findFirst({ where, include: INCLUDE_MEDIOS })
   }
 
-  async findPublicas(tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>> {
+  async findPublicas(tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { tenantId, estado: "PUBLICADO" }
     if (params.etiqueta) where["etiquetas"] = { has: params.etiqueta }
 
     const [data, total] = await Promise.all([
-      db.publicacion.findMany({ where, take: params.take, skip: params.skip, orderBy: { publicadoEn: params.order }, include: INCLUDE_MEDIOS }),
+      db.publicacion.findMany({ where, take, skip, orderBy: { publicadoEn: params.order }, include: INCLUDE_MEDIOS }),
       db.publicacion.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
-  async findByTenant(tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; estado?: string; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>> {
+  async findByTenant(tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; estado?: string; etiqueta?: string }): Promise<PaginatedResult<PublicacionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { tenantId }
     if (params.estado) where["estado"] = params.estado
     if (params.etiqueta) where["etiquetas"] = { has: params.etiqueta }
 
     const [data, total] = await Promise.all([
-      db.publicacion.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: INCLUDE_MEDIOS }),
+      db.publicacion.findMany({ where, take, skip, orderBy: { createdAt: params.order }, include: INCLUDE_MEDIOS }),
       db.publicacion.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   async cambiarEstado(id: string, nuevoEstado: string, publicadoEn?: Date): Promise<PublicacionRaw> {
@@ -155,13 +162,16 @@ export class PublicacionPrismaRepository implements IPublicacionRepository {
     await db.publicacionComentario.delete({ where: { id: comentarioId } })
   }
 
-  async listarComentariosPublicacion(publicacionId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<PublicacionComentarioRaw>> {
+  async listarComentariosPublicacion(publicacionId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<PublicacionComentarioRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { publicacionId, padreId: null }
     const [data, total] = await Promise.all([
-      db.publicacionComentario.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: { respuestas: { orderBy: { createdAt: "asc" } } } }),
+      db.publicacionComentario.findMany({ where, take, skip, orderBy: { createdAt: params.order }, include: { respuestas: { orderBy: { createdAt: "asc" } } } }),
       db.publicacionComentario.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Compartir ─────────────────────────────────────────────────────────────

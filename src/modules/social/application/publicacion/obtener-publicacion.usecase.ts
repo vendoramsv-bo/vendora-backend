@@ -1,4 +1,4 @@
-import type { IPublicacionRepository } from "../../domain/ports/IPublicacionRepository.js"
+﻿import type { IPublicacionRepository } from "../../domain/ports/IPublicacionRepository.js"
 import { PublicacionNoEncontrada } from "../../domain/social.errors.js"
 
 export class ObtenerPublicacionUseCase {
@@ -11,7 +11,7 @@ export class ObtenerPublicacionUseCase {
 
     const [reacciones, comentarios] = await Promise.all([
       this.repo.getReaccionesCount(id),
-      this.repo.listarComentariosPublicacion(id, { take: 20, skip: 0, order: "desc" }),
+      this.repo.listarComentariosPublicacion(id, { take: 20, page: 1, order: "desc" }),
     ])
 
     return { ...raw, reacciones, comentarios: comentarios.data, totalComentarios: comentarios.total }

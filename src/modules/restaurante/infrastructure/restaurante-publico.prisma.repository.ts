@@ -167,6 +167,8 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
   async listarDirectorio(params: DirectorioRestauranteQueryDTO): Promise<DirectorioRestauranteResultDTO> {
     const { lat, lng, tipoServicio, especialidad, search, orderBy = "puntuacion", order = "desc" } = params
     const take = Math.min(100, Math.max(1, params.take ?? 20))
+    const page = Math.max(1, params.page ?? 1)
+    const skip = (page - 1) * take
 
     const where: Record<string, unknown> = { esRestaurante: true }
     if (search) where.OR = [{ name: { contains: search, mode: "insensitive" } }, { descripcion: { contains: search, mode: "insensitive" } }]
@@ -191,7 +193,8 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
           },
           localizaciones: { select: { latitud: true, longitud: true, ciudad: true }, take: 1 },
         },
-        take: take + 1,
+        skip,
+        take,
       }),
       db.tenant.count({ where }),
     ])
@@ -241,20 +244,25 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
       items = items.sort((a, b) => order === "asc" ? a.totalSeguidores - b.totalSeguidores : b.totalSeguidores - a.totalSeguidores)
     }
 
-    const hasMore = items.length > take
-    if (hasMore) items.pop()
-
+    const totalPaginas = Math.ceil(total / take)
     return {
       data: items,
-      meta: { take, total, hasMore, nextCursor: hasMore ? items[items.length - 1]?.slug ?? null : null },
+      total,
+      page,
+      take,
+      totalPaginas,
+      hayPaginaSiguiente: page < totalPaginas,
+      hayPaginaAnterior: page > 1,
     }
   }
 
   // ─── US3: Menú público ────────────────────────────────────────────────────────
 
-  async listarMenusPublicos(query: MenuPublicoQueryDTO): Promise<{ data: unknown[]; meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null } }> {
+  async listarMenusPublicos(query: MenuPublicoQueryDTO): Promise<{ data: unknown[]; total: number; page: number; take: number; totalPaginas: number; hayPaginaSiguiente: boolean; hayPaginaAnterior: boolean }> {
     const { restauranteId, tiempoComida, fecha } = query
     const take = Math.min(100, Math.max(1, query.take ?? 10))
+    const page = Math.max(1, query.page ?? 1)
+    const skip = (page - 1) * take
 
     const fechaRef = fecha ? new Date(fecha) : new Date()
     fechaRef.setHours(0, 0, 0, 0)
@@ -271,7 +279,8 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
     const [menus, total] = await Promise.all([
       db.menu.findMany({
         where,
-        take: take + 1,
+        take,
+        skip,
         orderBy: { fechaInicio: "desc" },
         select: {
           id: true,
@@ -300,8 +309,7 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
       db.menu.count({ where }),
     ])
 
-    const hasMore = menus.length > take
-    const data = menus.slice(0, take).map((m: {
+    const data = menus.map((m: {
       id: string
       nombre: string
       descripcion: string | null
@@ -339,9 +347,15 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
       })),
     }))
 
+    const totalPaginas = Math.ceil(total / take)
     return {
       data,
-      meta: { take, total, hasMore, nextCursor: hasMore ? data[data.length - 1]?.id ?? null : null },
+      total,
+      page,
+      take,
+      totalPaginas,
+      hayPaginaSiguiente: page < totalPaginas,
+      hayPaginaAnterior: page > 1,
     }
   }
 
@@ -384,15 +398,18 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
     }
   }
 
-  async listarMisReservas(query: MisReservasQueryDTO): Promise<{ data: ReservaPublicaDTO[]; meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null } }> {
+  async listarMisReservas(query: MisReservasQueryDTO): Promise<{ data: ReservaPublicaDTO[]; total: number; page: number; take: number; totalPaginas: number; hayPaginaSiguiente: boolean; hayPaginaAnterior: boolean }> {
     const take = Math.min(100, Math.max(1, query.take ?? 20))
+    const page = Math.max(1, query.page ?? 1)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { createdById: query.userId }
     if (query.estado) where.estado = query.estado
 
     const [reservas, total] = await Promise.all([
       db.reserva.findMany({
         where,
-        take: take + 1,
+        take,
+        skip,
         orderBy: { createdAt: "desc" },
         include: {
           restaurante: {
@@ -403,8 +420,7 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
       db.reserva.count({ where }),
     ])
 
-    const hasMore = reservas.length > take
-    const data = reservas.slice(0, take).map((r: {
+    const data = reservas.map((r: {
       id: string
       codigo: string
       fechaLlegada: Date
@@ -426,9 +442,15 @@ export class RestaurantePublicoPrismaRepository implements IRestaurantePublicoRe
       },
     }))
 
+    const totalPaginas = Math.ceil(total / take)
     return {
       data,
-      meta: { take, total, hasMore, nextCursor: hasMore ? data[data.length - 1]?.id ?? null : null },
+      total,
+      page,
+      take,
+      totalPaginas,
+      hayPaginaSiguiente: page < totalPaginas,
+      hayPaginaAnterior: page > 1,
     }
   }
 

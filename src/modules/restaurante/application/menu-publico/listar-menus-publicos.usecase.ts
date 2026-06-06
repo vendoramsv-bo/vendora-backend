@@ -1,4 +1,4 @@
-import type { IRestaurantePublicoRepository } from "../../domain/ports/IRestaurantePublicoRepository.js"
+﻿import type { IRestaurantePublicoRepository } from "../../domain/ports/IRestaurantePublicoRepository.js"
 import { PerfilNoEncontradoError } from "../../domain/restaurante-publico.errors.js"
 import { prismaBase } from "../../../../core/prisma-scoped.js"
 
@@ -9,7 +9,7 @@ export interface ListarMenusPublicosParams {
   tiempoComida?: string
   fecha?: string
   take?: number
-  cursor?: string
+  page?: number
 }
 
 export class ListarMenusPublicosUseCase {

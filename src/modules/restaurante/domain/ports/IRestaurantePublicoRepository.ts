@@ -54,7 +54,7 @@ export interface DirectorioRestauranteQueryDTO {
   orderBy?: string
   order?: "asc" | "desc"
   take?: number
-  cursor?: string
+  page?: number
 }
 
 export interface DirectorioRestauranteItemDTO {
@@ -73,7 +73,12 @@ export interface DirectorioRestauranteItemDTO {
 
 export interface DirectorioRestauranteResultDTO {
   data: DirectorioRestauranteItemDTO[]
-  meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null }
+  total: number
+  page: number
+  take: number
+  totalPaginas: number
+  hayPaginaSiguiente: boolean
+  hayPaginaAnterior: boolean
 }
 
 export interface MenuPublicoQueryDTO {
@@ -81,7 +86,7 @@ export interface MenuPublicoQueryDTO {
   tiempoComida?: string
   fecha?: string
   take?: number
-  cursor?: string
+  page?: number
 }
 
 export interface ReservaPublicaCreateDTO {
@@ -107,7 +112,7 @@ export interface MisReservasQueryDTO {
   userId: string
   estado?: string
   take?: number
-  cursor?: string
+  page?: number
 }
 
 export interface IRestaurantePublicoRepository {
@@ -122,10 +127,10 @@ export interface IRestaurantePublicoRepository {
   listarDirectorio(params: DirectorioRestauranteQueryDTO): Promise<DirectorioRestauranteResultDTO>
 
   // US3 — menú público
-  listarMenusPublicos(query: MenuPublicoQueryDTO): Promise<{ data: unknown[]; meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null } }>
+  listarMenusPublicos(query: MenuPublicoQueryDTO): Promise<{ data: unknown[]; total: number; page: number; take: number; totalPaginas: number; hayPaginaSiguiente: boolean; hayPaginaAnterior: boolean }>
 
   // US4 — reservas
   crearReservaPublica(datos: ReservaPublicaCreateDTO): Promise<{ id: string; codigo: string; fechaLlegada: Date; numeroComensales: number; estado: string }>
-  listarMisReservas(query: MisReservasQueryDTO): Promise<{ data: ReservaPublicaDTO[]; meta: { take: number; total: number; hasMore: boolean; nextCursor: string | null } }>
+  listarMisReservas(query: MisReservasQueryDTO): Promise<{ data: ReservaPublicaDTO[]; total: number; page: number; take: number; totalPaginas: number; hayPaginaSiguiente: boolean; hayPaginaAnterior: boolean }>
   cancelarReservaPublica(reservaId: string, userId: string): Promise<{ id: string; estado: string }>
 }

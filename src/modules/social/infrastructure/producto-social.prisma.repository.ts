@@ -1,4 +1,5 @@
 import type { IProductoSocialRepository, ProductoReaccionResult, ProductoComentarioRaw, ProductoValoracionRaw, ProductoPreguntaRaw, ProductoRespuestaRaw, ProductoFavoritoRaw, PaginatedResult } from "../domain/ports/IProductoSocialRepository.js"
+import { paginate } from "../../../core/query-params.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,21 +78,22 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
     await db.productoComentario.delete({ where: { id: comentarioId } })
   }
 
-  async listarComentariosProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; soloRaiz?: boolean }): Promise<PaginatedResult<ProductoComentarioRaw>> {
+  async listarComentariosProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; soloRaiz?: boolean }): Promise<PaginatedResult<ProductoComentarioRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where: Record<string, unknown> = { productoId, tenantId }
     if (params.soloRaiz) where["padreId"] = null
 
     const [data, total] = await Promise.all([
       db.productoComentario.findMany({
-        where,
-        take: params.take,
-        skip: params.skip,
+        where, take, skip,
         orderBy: { createdAt: params.order },
         include: params.soloRaiz ? { respuestas: { orderBy: { createdAt: "asc" } } } : undefined,
       }),
       db.productoComentario.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Valoraciones ─────────────────────────────────────────────────────────
@@ -112,14 +114,17 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
     return agg._avg.puntuacion ?? 0
   }
 
-  async listarValoracionesProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ProductoValoracionRaw>> {
+  async listarValoracionesProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<ProductoValoracionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const orderField = params.orderBy === "puntuacion" ? "puntuacion" : "createdAt"
     const where = { productoId, tenantId }
     const [data, total] = await Promise.all([
-      db.productoValoracion.findMany({ where, take: params.take, skip: params.skip, orderBy: { [orderField]: params.order } }),
+      db.productoValoracion.findMany({ where, take, skip, orderBy: { [orderField]: params.order } }),
       db.productoValoracion.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Preguntas ─────────────────────────────────────────────────────────────
@@ -144,13 +149,16 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
     return respuesta
   }
 
-  async listarPreguntasProducto(productoId: string, tenantId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<ProductoPreguntaRaw>> {
+  async listarPreguntasProducto(productoId: string, tenantId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<ProductoPreguntaRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { productoId, tenantId }
     const [data, total] = await Promise.all([
-      db.productoPregunta.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: { respuestas: { orderBy: { createdAt: "asc" } } } }),
+      db.productoPregunta.findMany({ where, take, skip, orderBy: { createdAt: params.order }, include: { respuestas: { orderBy: { createdAt: "asc" } } } }),
       db.productoPregunta.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Favoritos ─────────────────────────────────────────────────────────────
@@ -169,12 +177,15 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
     return { favorito: true }
   }
 
-  async listarFavoritosUsuario(userId: string, params: { take: number; skip: number }): Promise<PaginatedResult<ProductoFavoritoRaw>> {
+  async listarFavoritosUsuario(userId: string, params: { take: number; page: number }): Promise<PaginatedResult<ProductoFavoritoRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { userId }
     const [data, total] = await Promise.all([
-      db.productoFavorito.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: "desc" }, include: { producto: true } }),
+      db.productoFavorito.findMany({ where, take, skip, orderBy: { createdAt: "desc" }, include: { producto: true } }),
       db.productoFavorito.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 }

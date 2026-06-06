@@ -1,5 +1,6 @@
 import type { ITiendaSocialRepository, TiendaReaccionRaw, TiendaComentarioRaw, TiendaValoracionRaw, TiendaPreguntaRaw, TiendaRespuestaRaw, TiendaFavoritoRaw, PaginatedResult } from "../domain/ports/ITiendaSocialRepository.js"
 import { TiendaNoEncontrada } from "../domain/social.errors.js"
+import { paginate } from "../../../core/query-params.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,19 +79,20 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
     await db.tiendaComentario.delete({ where: { id: comentarioId } })
   }
 
-  async listarComentariosTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaComentarioRaw>> {
+  async listarComentariosTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaComentarioRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { tiendaId, padreId: null }
     const [data, total] = await Promise.all([
       db.tiendaComentario.findMany({
-        where,
-        take: params.take,
-        skip: params.skip,
+        where, take, skip,
         orderBy: { createdAt: params.order },
         include: { respuestas: { orderBy: { createdAt: "asc" } } },
       }),
       db.tiendaComentario.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Valoraciones ─────────────────────────────────────────────────────────
@@ -108,14 +110,17 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
     return agg._avg.puntuacion ?? 0
   }
 
-  async listarValoracionesTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<TiendaValoracionRaw>> {
+  async listarValoracionesTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc"; orderBy?: string }): Promise<PaginatedResult<TiendaValoracionRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const orderField = params.orderBy === "puntuacion" ? "puntuacion" : "createdAt"
     const where = { tiendaId }
     const [data, total] = await Promise.all([
-      db.tiendaValoracion.findMany({ where, take: params.take, skip: params.skip, orderBy: { [orderField]: params.order } }),
+      db.tiendaValoracion.findMany({ where, take, skip, orderBy: { [orderField]: params.order } }),
       db.tiendaValoracion.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Preguntas ─────────────────────────────────────────────────────────────
@@ -136,13 +141,16 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
     return respuesta
   }
 
-  async listarPreguntasTienda(tiendaId: string, params: { take: number; skip: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>> {
+  async listarPreguntasTienda(tiendaId: string, params: { take: number; page: number; order: "asc" | "desc" }): Promise<PaginatedResult<TiendaPreguntaRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { tiendaId, estado: "ACTIVO" }
     const [data, total] = await Promise.all([
-      db.tiendaPregunta.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: params.order }, include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" } } } }),
+      db.tiendaPregunta.findMany({ where, take, skip, orderBy: { createdAt: params.order }, include: { respuestas: { where: { estado: "ACTIVO" }, orderBy: { createdAt: "asc" } } } }),
       db.tiendaPregunta.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   // ─── Favoritos y Seguimiento ───────────────────────────────────────────────
@@ -171,13 +179,16 @@ export class TiendaSocialPrismaRepository implements ITiendaSocialRepository {
     return db.tiendaSeguidor.count({ where: { tiendaId } })
   }
 
-  async listarFavoritosTiendasUsuario(userId: string, params: { take: number; skip: number }): Promise<PaginatedResult<TiendaFavoritoRaw>> {
+  async listarFavoritosTiendasUsuario(userId: string, params: { take: number; page: number }): Promise<PaginatedResult<TiendaFavoritoRaw>> {
+    const take = Math.min(100, Math.max(1, params.take))
+    const page = Math.max(1, params.page)
+    const skip = (page - 1) * take
     const where = { userId }
     const [data, total] = await Promise.all([
-      db.tiendaFavorito.findMany({ where, take: params.take, skip: params.skip, orderBy: { createdAt: "desc" }, include: { tienda: true } }),
+      db.tiendaFavorito.findMany({ where, take, skip, orderBy: { createdAt: "desc" }, include: { tienda: true } }),
       db.tiendaFavorito.count({ where }),
     ])
-    return { data, total }
+    return paginate(data, total, { take, skip })
   }
 
   async ocultarPreguntaTienda(preguntaId: string, tiendaId: string): Promise<TiendaPreguntaRaw> {

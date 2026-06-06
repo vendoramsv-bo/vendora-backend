@@ -1,16 +1,16 @@
-import type { IConsultorioSocialRepository } from "../../domain/ports/IConsultorioSocialRepository.js"
+﻿import type { IConsultorioSocialRepository } from "../../domain/ports/IConsultorioSocialRepository.js"
 import { ConsultorioSocialNoActivoError } from "../../domain/consultorio-social.errors.js"
 
 export class ListarPreguntasConsultorioUseCase {
   constructor(private readonly repo: IConsultorioSocialRepository) {}
 
-  async ejecutar(slug: string, params: { take: number; cursor?: string; order?: "asc" | "desc"; incluirInactivas?: boolean }) {
+  async ejecutar(slug: string, params: { take: number; page?: number; order?: "asc" | "desc"; incluirInactivas?: boolean }) {
     let info: { consultorioId: string; tenantId: string }
     try {
       info = await this.repo.resolveConsultorioInfo(slug)
     } catch {
       throw new ConsultorioSocialNoActivoError(slug)
     }
-    return this.repo.listarPreguntas(info.consultorioId, { take: params.take, cursor: params.cursor, order: params.order ?? "desc", incluirInactivas: params.incluirInactivas })
+    return this.repo.listarPreguntas(info.consultorioId, { take: params.take, page: params.page, order: params.order ?? "desc", incluirInactivas: params.incluirInactivas })
   }
 }

@@ -28,10 +28,10 @@ publicRestauranteSocialRouter.get("/:slug/reacciones", async (c) => {
 publicRestauranteSocialRouter.get("/:slug/comentarios", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarComentariosRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order })
+    const result = await new ListarComentariosRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -39,10 +39,10 @@ publicRestauranteSocialRouter.get("/:slug/comentarios", async (c) => {
 publicRestauranteSocialRouter.get("/:slug/valoraciones", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarValoracionesRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order, orderBy: q.orderBy })
+    const result = await new ListarValoracionesRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order, orderBy: q.orderBy })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -50,10 +50,10 @@ publicRestauranteSocialRouter.get("/:slug/valoraciones", async (c) => {
 publicRestauranteSocialRouter.get("/:slug/preguntas", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   try {
-    const result = await new ListarPreguntasRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order })
+    const result = await new ListarPreguntasRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
@@ -62,17 +62,17 @@ publicRestauranteSocialRouter.get("/:slug/seguidores/count", async (c) => {
   try {
     const repo = makeRepo()
     const { restauranteId } = await repo.resolveRestauranteInfo(c.req.param("slug"))
-    const result = await repo.listarSeguidores(restauranteId, { take: 0 })
-    return c.json({ count: result.meta.total })
+    const result = await repo.listarSeguidores(restauranteId, { take: 1, page: 1 })
+    return c.json({ count: result.total })
   } catch (err) { return handleError(err, c) as Response }
 })
 
 publicRestauranteSocialRouter.get("/:slug/publicaciones", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   try {
-    const result = await new ListarPublicacionesRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor })
+    const result = await new ListarPublicacionesRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })

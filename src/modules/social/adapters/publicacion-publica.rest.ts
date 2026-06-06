@@ -24,15 +24,15 @@ publicacionPublicaRouter.get("/:slug/publicaciones", async (c) => {
 
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   const result = await new ListarPublicacionesUseCase(makeRepo()).ejecutar(
     tenantId,
-    { take, skip, order, etiqueta: q.etiqueta },
+    { take, page, order, etiqueta: q.etiqueta },
     true,
   )
-  return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+  return c.json(result)
 })
 
 publicacionPublicaRouter.get("/:slug/publicaciones/:id", async (c) => {

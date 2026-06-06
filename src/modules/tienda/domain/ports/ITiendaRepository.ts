@@ -54,6 +54,7 @@ export interface DirectorioQueryDTO {
   ordenarPor?: "puntuacion" | "seguidores" | "createdAt" | "distancia"
   orden?: "asc" | "desc"
   page?: number
+  take?: number
   limit?: number
 }
 
@@ -61,7 +62,7 @@ export interface DirectorioResultDTO {
   data: DirectorioItemDTO[]
   total: number
   page: number
-  limit: number
+  take: number
   totalPaginas: number
   hayPaginaSiguiente: boolean
   hayPaginaAnterior: boolean

@@ -18,7 +18,7 @@ export class ValorarConsultorioUseCase {
     }
     const valoracion = await this.repo.upsertValoracion({ consultorioId: info.consultorioId, userId, puntuacion, resena })
     const promedio = await this.repo.getPromedioValoraciones(info.consultorioId)
-    const total = (await this.repo.listarValoraciones(info.consultorioId, { take: 1, order: "desc" })).meta.total
+    const total = (await this.repo.listarValoraciones(info.consultorioId, { take: 1, order: "desc" })).total
     this.notificador.emitirNuevaValoracion(info.tenantId, { consultorioSlug: slug, promedio, total })
     return { id: valoracion.id, puntuacion: valoracion.puntuacion, resena: valoracion.resena, promedio }
   }

@@ -226,23 +226,23 @@ publicTiendaSocialRouter.get("/:slug/reacciones", async (c) => {
 publicTiendaSocialRouter.get("/:slug/comentarios", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   try {
-    const result = await new ListarComentariosTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, skip, order })
-    return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+    const result = await new ListarComentariosTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
+    return c.json(result)
   } catch (err) { return handleSocialError(err, c) as Response }
 })
 
 publicTiendaSocialRouter.get("/:slug/valoraciones", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   try {
-    const result = await new ListarValoracionesTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, skip, order, orderBy: q.orderBy })
+    const result = await new ListarValoracionesTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order, orderBy: q.orderBy })
     return c.json(result)
   } catch (err) { return handleSocialError(err, c) as Response }
 })
@@ -250,12 +250,12 @@ publicTiendaSocialRouter.get("/:slug/valoraciones", async (c) => {
 publicTiendaSocialRouter.get("/:slug/preguntas", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   try {
-    const result = await new ListarPreguntasTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, skip, order })
-    return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+    const result = await new ListarPreguntasTiendaUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order })
+    return c.json(result)
   } catch (err) { return handleSocialError(err, c) as Response }
 })
 

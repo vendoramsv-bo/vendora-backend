@@ -194,16 +194,16 @@ publicProductoSocialRouter.get("/:slug/productos/:productoId/comentarios", async
 
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   const soloRaiz = q.soloRaiz === "true"
 
   const result = await new ListarComentariosProductoUseCase(makeRepo()).ejecutar(
     c.req.param("productoId"),
     tenantId,
-    { take, skip, order, soloRaiz },
+    { take, page, order, soloRaiz },
   )
-  return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+  return c.json(result)
 })
 
 publicProductoSocialRouter.get("/:slug/productos/:productoId/valoraciones", async (c) => {
@@ -212,13 +212,13 @@ publicProductoSocialRouter.get("/:slug/productos/:productoId/valoraciones", asyn
 
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   const result = await new ListarValoracionesProductoUseCase(makeRepo()).ejecutar(
     c.req.param("productoId"),
     tenantId,
-    { take, skip, order, orderBy: q.orderBy },
+    { take, page, order, orderBy: q.orderBy },
   )
   return c.json(result)
 })
@@ -229,13 +229,13 @@ publicProductoSocialRouter.get("/:slug/productos/:productoId/preguntas", async (
 
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const skip = Number(q.skip ?? 0)
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   const result = await new ListarPreguntasProductoUseCase(makeRepo()).ejecutar(
     c.req.param("productoId"),
     tenantId,
-    { take, skip, order },
+    { take, page, order },
   )
-  return c.json({ data: result.data, meta: { total: result.total, hasMore: skip + result.data.length < result.total } })
+  return c.json(result)
 })

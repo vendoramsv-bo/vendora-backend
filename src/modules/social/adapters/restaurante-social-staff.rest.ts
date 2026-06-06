@@ -29,11 +29,11 @@ restauranteSocialStaffRouter.use("*", requireAuth)
 restauranteSocialStaffRouter.get("/:slug/preguntas", async (c) => {
   const q = c.req.query()
   const take = Math.min(Number(q.take ?? 20), 100)
-  const cursor = q.cursor
+  const page = Number(q.page ?? 1)
   const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
   const incluirInactivas = q.incluirInactivas === "true"
   try {
-    const result = await new ListarPreguntasRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, cursor, order, incluirInactivas })
+    const result = await new ListarPreguntasRestauranteUseCase(makeRepo()).ejecutar(c.req.param("slug"), { take, page, order, incluirInactivas })
     return c.json(result)
   } catch (err) { return handleError(err, c) as Response }
 })
