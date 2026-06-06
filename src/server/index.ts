@@ -31,6 +31,13 @@ import { RestaurantePublicoSocketNotificador } from "../modules/restaurante/infr
 import { setRestaurantePublicoNotificador } from "../modules/restaurante/infrastructure/restaurante-publico.notificador.provider.js"
 import { tiendaStaffRouter } from "../modules/tienda/adapters/tienda-staff.rest.js"
 import { tiendaPublicaRouter } from "../modules/tienda/adapters/tienda-publica.rest.js"
+import { ConsultorioPublicoSocketNotificador } from "../modules/consultorio/infrastructure/consultorio-publico.socket.notificador.js"
+import { setConsultorioPublicoNotificador } from "../modules/consultorio/infrastructure/consultorio-publico.notificador.provider.js"
+import { ConsultorioSocialSocketNotificador } from "../modules/social/infrastructure/consultorio-social.socket.notificador.js"
+import { setConsultorioSocialNotificador } from "../modules/social/infrastructure/consultorio-social.notificador.provider.js"
+import { consultorioPublicaRouter } from "../modules/consultorio/adapters/consultorio-publica.rest.js"
+import { consultorioConsumerCitasRouter } from "../modules/consultorio/adapters/consultorio-consumer-citas.rest.js"
+import { consultorioStaffPublicoRouter } from "../modules/consultorio/adapters/consultorio-staff-publico.rest.js"
 import "../workers/recordatorio-cita.worker.js"
 import "../workers/expirar-recetas.worker.js"
 import "../modules/restaurante/infrastructure/publicacion-rrss.bullmq.worker.js"
@@ -52,6 +59,11 @@ app.route("/api/tenant", tenantRouter)
 // TuTienda — staff (configuración, destacados) y directorio público
 app.route("/api/tenant", tiendaStaffRouter)
 app.route("/api/public/tiendas", tiendaPublicaRouter)
+
+// TuConsultorio — perfil público, directorio y citas online
+app.route("/api/public/consultorios", consultorioPublicaRouter)
+app.route("/api/consumer/consultorios", consultorioConsumerCitasRouter)
+app.route("/api/consultorio", consultorioStaffPublicoRouter)
 
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 
@@ -131,6 +143,12 @@ setRestaurantePublicoNotificador(new RestaurantePublicoSocketNotificador(io))
 
 // RestauranteSocialSocketNotificador — emite eventos restaurante:* al room tenant:{id}:restaurante
 setRestauranteSocialNotificador(new RestauranteSocialSocketNotificador(io))
+
+// ConsultorioPublicoSocketNotificador — emite eventos consultorio:* al room tenant:{id}:consultorio
+setConsultorioPublicoNotificador(new ConsultorioPublicoSocketNotificador(io))
+
+// ConsultorioSocialSocketNotificador — emite eventos consultorio:* al room tenant:{id}:consultorio
+setConsultorioSocialNotificador(new ConsultorioSocialSocketNotificador(io))
 
 // T045 — middleware de autenticación Socket.IO
 io.use(async (socket, next) => {
