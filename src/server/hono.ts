@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
+import { swaggerUI } from "@hono/swagger-ui"
 import pino from "pino"
 import type { Variables } from "../core/hono-context.js"
 import { consultorioApp } from "../modules/consultorio/adapters/consultorio-router.js"
@@ -61,11 +62,18 @@ export function crearApp() {
   app.route("/api/social", socialApp)
   app.route("/api/public/social", publicSocialApp)
 
-  // Spec OpenAPI (T049)
+  // Register bearerAuth security scheme so all createRoute security declarations resolve
+  app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
+    type: "http",
+    scheme: "bearer",
+  })
+
+  // Spec OpenAPI + Swagger UI
   app.doc("/api/openapi.json", {
     openapi: "3.1.0",
     info: { title: "Vendora API", version: "0.1.0" },
   })
+  app.get("/api/docs", swaggerUI({ url: "/api/openapi.json" }))
 
   return app
 }

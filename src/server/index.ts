@@ -88,7 +88,7 @@ const pubClient = new Redis(redisUrl, {
   lazyConnect: true,
   ...(redisUrl.startsWith("rediss://") ? { tls: {} } : {}),
 })
-const subClient = pubClient.duplicate()
+const subClient = pubClient.duplicate({ enableReadyCheck: false })
 
 // Conectar Redis en background (no bloqueante al arranque)
 Promise.all([pubClient.connect(), subClient.connect()]).catch((err) => {

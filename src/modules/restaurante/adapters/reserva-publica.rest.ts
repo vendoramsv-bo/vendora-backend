@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { prismaBase } from "../../../core/prisma-scoped.js"
 import { ReservaPrismaRepository } from "../infrastructure/reserva.prisma.repository.js"
@@ -8,8 +8,9 @@ import { ListarReservasClienteUseCase } from "../application/reserva/listar-rese
 import { getRestauranteNotificador } from "../infrastructure/restaurante.notificador.provider.js"
 import { ReservaPublicaCreateSchema } from "./restaurante.schema.js"
 import { ItemNoDisponible } from "../domain/restaurante.errors.js"
+import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
 
-export const reservaPublicaRouter = new Hono<HonoEnv>()
+export const reservaPublicaRouter = new OpenAPIHono<HonoEnv>()
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prismaBase as any
@@ -25,69 +26,94 @@ async function resolverRestaurantePorSlug(slug: string): Promise<{ restauranteId
   return { restauranteId: restaurante.id, tenantId: tenant.id }
 }
 
-reservaPublicaRouter.post("/:slug/reservas", async (c) => {
-  const slug = c.req.param("slug")
-  const body = await c.req.json()
-  const parsed = ReservaPublicaCreateSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+reservaPublicaRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/{slug}/reservas",
+    operationId: "restaurante_publico_crear_reserva",
+    tags: ["Restaurante Público"],
+    request: { params: z.object({ slug: z.string() }) },
+    responses: {
+      201: createdResponse("Reserva creada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const slug = c.req.param("slug")
+    const body = await c.req.json()
+    const parsed = ReservaPublicaCreateSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
 
-  const ctx = await resolverRestaurantePorSlug(slug)
-  if (!ctx) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
+    const ctx = await resolverRestaurantePorSlug(slug)
+    if (!ctx) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
 
-  // Look up registered client by email (optional)
-  let clienteId: string | null = null
-  if (parsed.data.clienteEmail) {
-    const cliente = await db.cliente.findFirst({
-      where: { email: parsed.data.clienteEmail },
-      select: { id: true },
-    })
-    clienteId = cliente?.id ?? null
-  }
+    let clienteId: string | null = null
+    if (parsed.data.clienteEmail) {
+      const cliente = await db.cliente.findFirst({
+        where: { email: parsed.data.clienteEmail },
+        select: { id: true },
+      })
+      clienteId = cliente?.id ?? null
+    }
 
-  try {
-    const reserva = await new CrearReservaPublicaUseCase(
-      new ReservaPrismaRepository(),
-      new MenuItemPrismaRepository(),
-      getRestauranteNotificador(),
-    ).ejecutar({
-      restauranteId: ctx.restauranteId,
-      tenantId: ctx.tenantId,
-      menuId: parsed.data.menuId ?? null,
-      clienteNombre: parsed.data.clienteNombre,
-      clienteTelefono: parsed.data.clienteTelefono ?? null,
-      clienteEmail: parsed.data.clienteEmail ?? null,
-      clienteId,
-      fechaLlegada: new Date(parsed.data.fechaLlegada),
-      numeroComensales: parsed.data.numeroComensales,
-      observaciones: parsed.data.observaciones ?? null,
-      canalOrigen: parsed.data.canalOrigen ?? "WEB",
-      items: parsed.data.items.map((i) => ({
-        menuItemId: i.menuItemId,
-        cantidad: i.cantidad,
-        observacion: i.observacion ?? null,
-      })),
-    })
-    return c.json({ codigo: reserva.codigo, estado: reserva.estado, fechaLlegada: reserva.fechaLlegada }, 201)
-  } catch (err) {
-    if (err instanceof ItemNoDisponible) return c.json({ error: err.code, message: err.message }, 422)
-    throw err
-  }
-})
+    try {
+      const reserva = await new CrearReservaPublicaUseCase(
+        new ReservaPrismaRepository(),
+        new MenuItemPrismaRepository(),
+        getRestauranteNotificador(),
+      ).ejecutar({
+        restauranteId: ctx.restauranteId,
+        tenantId: ctx.tenantId,
+        menuId: parsed.data.menuId ?? null,
+        clienteNombre: parsed.data.clienteNombre,
+        clienteTelefono: parsed.data.clienteTelefono ?? null,
+        clienteEmail: parsed.data.clienteEmail ?? null,
+        clienteId,
+        fechaLlegada: new Date(parsed.data.fechaLlegada),
+        numeroComensales: parsed.data.numeroComensales,
+        observaciones: parsed.data.observaciones ?? null,
+        canalOrigen: parsed.data.canalOrigen ?? "WEB",
+        items: parsed.data.items.map((i) => ({
+          menuItemId: i.menuItemId,
+          cantidad: i.cantidad,
+          observacion: i.observacion ?? null,
+        })),
+      })
+      return c.json({ codigo: reserva.codigo, estado: reserva.estado, fechaLlegada: reserva.fechaLlegada }, 201)
+    } catch (err) {
+      if (err instanceof ItemNoDisponible) return c.json({ error: err.code, message: err.message }, 422)
+      throw err
+    }
+  },
+)
 
-reservaPublicaRouter.get("/:slug/mis-reservas", async (c) => {
-  const slug = c.req.param("slug")
-  const email = c.req.query("email")
-  const codigo = c.req.query("codigo")
+reservaPublicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/{slug}/mis-reservas",
+    operationId: "restaurante_publico_mis_reservas",
+    tags: ["Restaurante Público"],
+    request: { params: z.object({ slug: z.string() }) },
+    responses: {
+      200: okResponse("Mis reservas", z.object({ data: z.array(z.record(z.string(), z.unknown())), meta: z.object({ total: z.number() }) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const slug = c.req.param("slug")
+    const email = c.req.query("email")
+    const codigo = c.req.query("codigo")
 
-  if (!email) return c.json({ error: "VALIDACION", message: "Se requiere el parámetro email" }, 400)
+    if (!email) return c.json({ error: "VALIDACION", message: "Se requiere el parámetro email" }, 400)
 
-  const ctx = await resolverRestaurantePorSlug(slug)
-  if (!ctx) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
+    const ctx = await resolverRestaurantePorSlug(slug)
+    if (!ctx) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
 
-  const reservas = await new ListarReservasClienteUseCase(new ReservaPrismaRepository()).ejecutar(
-    ctx.restauranteId,
-    email,
-    codigo,
-  )
-  return c.json({ data: reservas.map((r) => r.toJSON()), meta: { total: reservas.length } })
-})
+    const reservas = await new ListarReservasClienteUseCase(new ReservaPrismaRepository()).ejecutar(
+      ctx.restauranteId,
+      email,
+      codigo,
+    )
+    return c.json({ data: reservas.map((r) => r.toJSON()), meta: { total: reservas.length } })
+  },
+)

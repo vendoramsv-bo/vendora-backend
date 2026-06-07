@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono } from "@hono/zod-openapi"
 import { requireAuth, requireTenantActivo, requireRestaurante, type HonoEnv } from "../../../core/hono-context.js"
 import { restaurantePerfilRouter } from "./restaurante.rest.js"
 import { tiempoComidaRouter } from "./tiempo-comida.rest.js"
@@ -13,7 +13,7 @@ import { publicoRestauranteRouter, consumerRestauranteRouter, consumerMisReserva
 
 // ─── Staff router (auth required) ────────────────────────────────────────────
 
-const restauranteApp = new Hono<HonoEnv>()
+const restauranteApp = new OpenAPIHono<HonoEnv>()
 
 restauranteApp.use("*", requireAuth, requireTenantActivo, requireRestaurante)
 
@@ -27,24 +27,24 @@ restauranteApp.route("/", publicacionRRSSRouter)
 
 // ─── Public router (no auth) — legacy /api/public/restaurante ────────────────
 
-const publicRestauranteApp = new Hono<HonoEnv>()
+const publicRestauranteApp = new OpenAPIHono<HonoEnv>()
 
 publicRestauranteApp.route("/", publicMenuRouter)
 publicRestauranteApp.route("/", reservaPublicaRouter)
 
 // ─── Nuevo directorio público /api/public/restaurantes ────────────────────────
 
-const publicosRestaurantesApp = new Hono<HonoEnv>()
+const publicosRestaurantesApp = new OpenAPIHono<HonoEnv>()
 publicosRestaurantesApp.route("/", publicoRestauranteRouter)
 
 // ─── Staff perfil público /api/staff/restaurante/perfil ───────────────────────
 
-const staffPerfilPublicoApp = new Hono<HonoEnv>()
+const staffPerfilPublicoApp = new OpenAPIHono<HonoEnv>()
 staffPerfilPublicoApp.route("/", restauranteStaffPublicoRouter)
 
 // ─── Consumer /api/consumer — reservas y social autenticados ─────────────────
 
-const consumerApp = new Hono<HonoEnv>()
+const consumerApp = new OpenAPIHono<HonoEnv>()
 consumerApp.route("/restaurantes", consumerRestauranteRouter)
 consumerApp.route("/mis-reservas", consumerMisReservasRouter)
 

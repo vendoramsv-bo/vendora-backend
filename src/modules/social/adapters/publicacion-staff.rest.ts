@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import { requireAuth, requireTenantActivo, type HonoEnv } from "../../../core/hono-context.js"
 import { PublicacionPrismaRepository } from "../infrastructure/publicacion.prisma.repository.js"
 import { getSocialNotificador } from "../infrastructure/social.notificador.provider.js"
@@ -21,6 +21,7 @@ import {
   SoloPropietarioAdmin,
   EstadoPublicacionInvalido,
 } from "../domain/social.errors.js"
+import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
 
 function makeRepo() { return new PublicacionPrismaRepository() }
 
@@ -39,155 +40,291 @@ function handleError(err: unknown, c: { json: (v: unknown, s: number) => Respons
   throw err
 }
 
-export const publicacionStaffRouter = new Hono<HonoEnv>()
+export const publicacionStaffRouter = new OpenAPIHono<HonoEnv>()
 publicacionStaffRouter.use("*", requireAuth, requireTenantActivo)
 
-publicacionStaffRouter.get("/publicaciones", async (c) => {
-  const tenantId = c.get("tenantId")
-  const q = c.req.query()
-  const take = Math.min(Number(q.take ?? 20), 100)
-  const page = Number(q.page ?? 1)
-  const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/publicaciones",
+    operationId: "social_listar_publicaciones",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de publicaciones", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const q = c.req.query()
+    const take = Math.min(Number(q.take ?? 20), 100)
+    const page = Number(q.page ?? 1)
+    const order = (q.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
-  const result = await new ListarPublicacionesUseCase(makeRepo()).ejecutar(tenantId, { take, page, order, estado: q.estado, etiqueta: q.etiqueta })
-  return c.json(result)
-})
-
-publicacionStaffRouter.post("/publicaciones", async (c) => {
-  const tenantId = c.get("tenantId")
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = CrearPublicacionSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-
-  try {
-    const pub = await new CrearPublicacionUseCase(makeRepo()).ejecutar(tenantId, session.user.id, getRol(c), {
-      titulo: parsed.data.titulo,
-      contenido: parsed.data.contenido,
-      tipo: parsed.data.tipo,
-      etiquetas: parsed.data.etiquetas ?? [],
-      medios: parsed.data.medios ?? [],
-    })
-    return c.json(pub, 201)
-  } catch (err) { return handleError(err, c) as Response }
-})
-
-publicacionStaffRouter.put("/publicaciones/:id", async (c) => {
-  const tenantId = c.get("tenantId")
-  const body = await c.req.json()
-  const parsed = ActualizarPublicacionSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-
-  try {
-    const pub = await new ActualizarPublicacionUseCase(makeRepo()).ejecutar(c.req.param("id"), tenantId, getRol(c), parsed.data)
-    return c.json(pub)
-  } catch (err) { return handleError(err, c) as Response }
-})
-
-publicacionStaffRouter.patch("/publicaciones/:id/estado", async (c) => {
-  const tenantId = c.get("tenantId")
-  const body = await c.req.json()
-  const parsed = EstadoPublicacionSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-
-  try {
-    const pub = await new CambiarEstadoPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
-      c.req.param("id"),
-      tenantId,
-      getRol(c),
-      parsed.data.estado,
-    )
-    return c.json(pub)
-  } catch (err) { return handleError(err, c) as Response }
-})
-
-publicacionStaffRouter.delete("/publicaciones/:id", async (c) => {
-  const tenantId = c.get("tenantId")
-  try {
-    const raw = await makeRepo().findById(c.req.param("id"), tenantId)
-    if (!raw) return c.json({ error: "PUBLICACION_NO_ENCONTRADA" }, 404)
-    if (raw.estado === "PUBLICADO") return c.json({ error: "ESTADO_PUBLICACION_INVALIDO", message: "No se puede eliminar una publicación publicada" }, 422)
-    await makeRepo().delete(c.req.param("id"), tenantId)
-    return c.json({ deleted: true })
-  } catch (err) { return handleError(err, c) as Response }
-})
-
-// Interacciones sobre publicaciones (cualquier usuario autenticado)
-
-publicacionStaffRouter.post("/publicaciones/:id/reaccionar", async (c) => {
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = ReaccionTipoSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-
-  try {
-    const result = await new ReaccionarPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
-      c.req.param("id"),
-      session.user.id,
-      parsed.data.tipo,
-    )
+    const result = await new ListarPublicacionesUseCase(makeRepo()).ejecutar(tenantId, { take, page, order, estado: q.estado, etiqueta: q.etiqueta })
     return c.json(result)
-  } catch (err) { return handleError(err, c) as Response }
-})
+  },
+)
 
-publicacionStaffRouter.post("/publicaciones/:id/comentarios", async (c) => {
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = ComentarioSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/publicaciones",
+    operationId: "social_crear_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      201: createdResponse("Publicación creada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = CrearPublicacionSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
 
-  try {
-    const comentario = await new ComentarPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
-      c.req.param("id"),
-      session.user.id,
-      parsed.data.contenido,
-      parsed.data.padreId,
-    )
-    return c.json(comentario, 201)
-  } catch (err) { return handleError(err, c) as Response }
-})
+    try {
+      const pub = await new CrearPublicacionUseCase(makeRepo()).ejecutar(tenantId, session.user.id, getRol(c), {
+        titulo: parsed.data.titulo,
+        contenido: parsed.data.contenido,
+        tipo: parsed.data.tipo,
+        etiquetas: parsed.data.etiquetas ?? [],
+        medios: parsed.data.medios ?? [],
+      })
+      return c.json(pub, 201)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
 
-publicacionStaffRouter.put("/comentarios/publicacion/:comentarioId", async (c) => {
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = ComentarioSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "put",
+    path: "/publicaciones/{id}",
+    operationId: "social_actualizar_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Publicación actualizada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const body = await c.req.json()
+    const parsed = ActualizarPublicacionSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
 
-  try {
-    const comentario = await new EditarComentarioPublicacionUseCase(makeRepo()).ejecutar(
-      c.req.param("comentarioId"),
-      session.user.id,
-      parsed.data.contenido,
-      getRol(c),
-    )
-    return c.json(comentario)
-  } catch (err) { return handleError(err, c) as Response }
-})
+    try {
+      const pub = await new ActualizarPublicacionUseCase(makeRepo()).ejecutar(c.req.param("id"), tenantId, getRol(c), parsed.data)
+      return c.json(pub)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
 
-publicacionStaffRouter.delete("/comentarios/publicacion/:comentarioId", async (c) => {
-  const session = c.get("session")
-  try {
-    const result = await new EliminarComentarioPublicacionUseCase(makeRepo()).ejecutar(
-      c.req.param("comentarioId"),
-      session.user.id,
-      getRol(c),
-    )
-    return c.json(result)
-  } catch (err) { return handleError(err, c) as Response }
-})
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/publicaciones/{id}/estado",
+    operationId: "social_cambiar_estado_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Estado actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const body = await c.req.json()
+    const parsed = EstadoPublicacionSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
 
-publicacionStaffRouter.post("/publicaciones/:id/compartir", async (c) => {
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = CompartirSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const pub = await new CambiarEstadoPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
+        c.req.param("id"),
+        tenantId,
+        getRol(c),
+        parsed.data.estado,
+      )
+      return c.json(pub)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
 
-  try {
-    const compartido = await new CompartirPublicacionUseCase(makeRepo()).ejecutar(
-      c.req.param("id"),
-      session.user.id,
-      parsed.data.plataforma,
-    )
-    return c.json(compartido, 201)
-  } catch (err) { return handleError(err, c) as Response }
-})
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/publicaciones/{id}",
+    operationId: "social_eliminar_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Publicación eliminada", z.object({ deleted: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      const raw = await makeRepo().findById(c.req.param("id"), tenantId)
+      if (!raw) return c.json({ error: "PUBLICACION_NO_ENCONTRADA" }, 404)
+      if (raw.estado === "PUBLICADO") return c.json({ error: "ESTADO_PUBLICACION_INVALIDO", message: "No se puede eliminar una publicación publicada" }, 422)
+      await makeRepo().delete(c.req.param("id"), tenantId)
+      return c.json({ deleted: true })
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
+
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/publicaciones/{id}/reaccionar",
+    operationId: "social_reaccionar_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Reacción registrada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = ReaccionTipoSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+
+    try {
+      const result = await new ReaccionarPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
+        c.req.param("id"),
+        session.user.id,
+        parsed.data.tipo,
+      )
+      return c.json(result)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
+
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/publicaciones/{id}/comentarios",
+    operationId: "social_comentar_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      201: createdResponse("Comentario creado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = ComentarioSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+
+    try {
+      const comentario = await new ComentarPublicacionUseCase(makeRepo(), getSocialNotificador()).ejecutar(
+        c.req.param("id"),
+        session.user.id,
+        parsed.data.contenido,
+        parsed.data.padreId,
+      )
+      return c.json(comentario, 201)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
+
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "put",
+    path: "/comentarios/publicacion/{comentarioId}",
+    operationId: "social_editar_comentario_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ comentarioId: z.string() }) },
+    responses: {
+      200: okResponse("Comentario editado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = ComentarioSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+
+    try {
+      const comentario = await new EditarComentarioPublicacionUseCase(makeRepo()).ejecutar(
+        c.req.param("comentarioId"),
+        session.user.id,
+        parsed.data.contenido,
+        getRol(c),
+      )
+      return c.json(comentario)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
+
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/comentarios/publicacion/{comentarioId}",
+    operationId: "social_eliminar_comentario_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ comentarioId: z.string() }) },
+    responses: {
+      200: okResponse("Comentario eliminado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    try {
+      const result = await new EliminarComentarioPublicacionUseCase(makeRepo()).ejecutar(
+        c.req.param("comentarioId"),
+        session.user.id,
+        getRol(c),
+      )
+      return c.json(result)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)
+
+publicacionStaffRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/publicaciones/{id}/compartir",
+    operationId: "social_compartir_publicacion",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      201: createdResponse("Publicación compartida", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = CompartirSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+
+    try {
+      const compartido = await new CompartirPublicacionUseCase(makeRepo()).ejecutar(
+        c.req.param("id"),
+        session.user.id,
+        parsed.data.plataforma,
+      )
+      return c.json(compartido, 201)
+    } catch (err) { return handleError(err, c) as Response }
+  },
+)

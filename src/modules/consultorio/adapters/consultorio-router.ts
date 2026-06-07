@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono } from "@hono/zod-openapi"
 import { requireAuth, requireTenantActivo, requireConsultorio, type HonoEnv } from "../../../core/hono-context.js"
 import { consultorioPerfilRouter } from "./consultorio.rest.js"
 import { medicoRouter } from "./medico.rest.js"
@@ -10,7 +10,7 @@ import { atencionMedicaRouter } from "./atencion-medica.rest.js"
 import { recetaMedicaRouter } from "./receta-medica.rest.js"
 import { vacunacionRouter } from "./vacunacion.rest.js"
 
-const consultorioApp = new Hono<HonoEnv>()
+const consultorioApp = new OpenAPIHono<HonoEnv>()
 
 consultorioApp.use("*", requireAuth, requireTenantActivo, requireConsultorio)
 

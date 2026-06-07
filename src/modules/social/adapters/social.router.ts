@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono } from "@hono/zod-openapi"
 import { requireAuth, type HonoEnv } from "../../../core/hono-context.js"
 import { productoSocialRouter, publicProductoSocialRouter } from "./producto-social.rest.js"
 import { tiendaSocialRouter, publicTiendaSocialRouter } from "./tienda-social.rest.js"
@@ -13,7 +13,7 @@ import { consultorioSocialPublicaRouter } from "./consultorio-social-publica.res
 
 // ─── Rutas autenticadas (/api/social) ─────────────────────────────────────────
 
-export const socialApp = new Hono<HonoEnv>()
+export const socialApp = new OpenAPIHono<HonoEnv>()
 
 socialApp.use("*", requireAuth)
 
@@ -27,7 +27,7 @@ socialApp.route("/staff/consultorios", consultorioSocialStaffRouter)
 
 // ─── Rutas públicas (/api/public/social) ──────────────────────────────────────
 
-export const publicSocialApp = new Hono<HonoEnv>()
+export const publicSocialApp = new OpenAPIHono<HonoEnv>()
 
 publicSocialApp.route("/", publicProductoSocialRouter)
 publicSocialApp.route("/", publicTiendaSocialRouter)
