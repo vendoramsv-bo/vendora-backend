@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
@@ -20,8 +20,9 @@ import {
   ClienteEmailDuplicadoError,
 } from "../domain/ventas.errors.js"
 import { getVentasNotificador } from "../infrastructure/ventas.notificador.provider.js"
+import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
 
-export const clienteRouter = new Hono<HonoEnv>()
+export const clienteRouter = new OpenAPIHono<HonoEnv>()
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -31,92 +32,186 @@ function makeRepo() {
 }
 
 // GET /clientes
-clienteRouter.get("/", async (c) => {
-  const tenantId = c.get("tenantId")
-  const params = QueryParamsClienteSchema.parse(c.req.query())
-  const estado = c.req.query("estado")
-  const result = await new ListarClientesUseCase(makeRepo()).execute(tenantId, params, estado)
-  return c.json(result)
-})
+clienteRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/",
+    operationId: "ventas_listar_clientes",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de clientes", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const params = QueryParamsClienteSchema.parse(c.req.query())
+    const estado = c.req.query("estado")
+    const result = await new ListarClientesUseCase(makeRepo()).execute(tenantId, params, estado)
+    return c.json(result)
+  },
+)
 
 // POST /clientes
-clienteRouter.post("/", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
-  const tenantId = c.get("tenantId")
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = CrearClienteSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-  try {
-    const result = await new CrearClienteUseCase(makeRepo(), getVentasNotificador()).execute({
-      tenantId,
-      nombre: parsed.data.nombre,
-      email: parsed.data.email,
-      telefono: parsed.data.telefono,
-      direccion: parsed.data.direccion,
-      diaNacimiento: parsed.data.diaNacimiento,
-      mesNacimiento: parsed.data.mesNacimiento,
-      createdById: session.user.id,
-    })
-    return c.json(result, 201)
-  } catch (err) {
-    if (err instanceof ClienteNombreDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
-    if (err instanceof ClienteEmailDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
-    throw err
-  }
-})
+clienteRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/",
+    operationId: "ventas_crear_cliente",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    request: {
+      body: {
+        content: {
+          "application/json": { schema: CrearClienteSchema },
+        },
+      },
+    },
+    responses: {
+      201: createdResponse("Cliente creado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = CrearClienteSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const result = await new CrearClienteUseCase(makeRepo(), getVentasNotificador()).execute({
+        tenantId,
+        nombre: parsed.data.nombre,
+        email: parsed.data.email,
+        telefono: parsed.data.telefono,
+        direccion: parsed.data.direccion,
+        diaNacimiento: parsed.data.diaNacimiento,
+        mesNacimiento: parsed.data.mesNacimiento,
+        createdById: session.user.id,
+      })
+      return c.json(result, 201)
+    } catch (err) {
+      if (err instanceof ClienteNombreDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof ClienteEmailDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
 
 // GET /clientes/:id
-clienteRouter.get("/:id", async (c) => {
-  const tenantId = c.get("tenantId")
-  try {
-    const result = await new ObtenerClienteUseCase(makeRepo()).execute(c.req.param("id"), tenantId)
-    return c.json(result)
-  } catch (err) {
-    if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
-    throw err
-  }
-})
+clienteRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/{id}",
+    operationId: "ventas_obtener_cliente",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ id: z.string() }),
+    },
+    responses: {
+      200: okResponse("Cliente encontrado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      const result = await new ObtenerClienteUseCase(makeRepo()).execute(c.req.param("id"), tenantId)
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
 
 // PATCH /clientes/:id
-clienteRouter.patch("/:id", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
-  const tenantId = c.get("tenantId")
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = ActualizarClienteSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-  try {
-    const result = await new ActualizarClienteUseCase(makeRepo(), getVentasNotificador()).execute({
-      id: c.req.param("id"),
-      tenantId,
-      ...parsed.data,
-      updatedById: session.user.id,
-    })
-    return c.json(result)
-  } catch (err) {
-    if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
-    if (err instanceof ClienteNombreDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
-    if (err instanceof ClienteEmailDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
-    throw err
-  }
-})
+clienteRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/{id}",
+    operationId: "ventas_actualizar_cliente",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    request: {
+      params: z.object({ id: z.string() }),
+      body: {
+        content: {
+          "application/json": { schema: ActualizarClienteSchema },
+        },
+      },
+    },
+    responses: {
+      200: okResponse("Cliente actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = ActualizarClienteSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const result = await new ActualizarClienteUseCase(makeRepo(), getVentasNotificador()).execute({
+        id: c.req.param("id"),
+        tenantId,
+        ...parsed.data,
+        updatedById: session.user.id,
+      })
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof ClienteNombreDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof ClienteEmailDuplicadoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
 
 // PATCH /clientes/:id/estado
-clienteRouter.patch("/:id/estado", requireRol(["PROPIETARIO", "ADMIN"]), async (c) => {
-  const tenantId = c.get("tenantId")
-  const session = c.get("session")
-  const body = await c.req.json()
-  const parsed = CambiarEstadoSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
-  try {
-    const result = await new CambiarEstadoClienteUseCase(makeRepo()).execute(
-      c.req.param("id"),
-      tenantId,
-      parsed.data.estado,
-      session.user.id,
-    )
-    return c.json(result)
-  } catch (err) {
-    if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
-    throw err
-  }
-})
+clienteRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/{id}/estado",
+    operationId: "ventas_cambiar_estado_cliente",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    request: {
+      params: z.object({ id: z.string() }),
+      body: {
+        content: {
+          "application/json": { schema: CambiarEstadoSchema },
+        },
+      },
+    },
+    responses: {
+      200: okResponse("Estado de cliente actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = await c.req.json()
+    const parsed = CambiarEstadoSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const result = await new CambiarEstadoClienteUseCase(makeRepo()).execute(
+        c.req.param("id"),
+        tenantId,
+        parsed.data.estado,
+        session.user.id,
+      )
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)

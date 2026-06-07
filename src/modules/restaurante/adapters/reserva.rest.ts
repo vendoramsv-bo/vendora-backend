@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { ReservaPrismaRepository } from "../infrastructure/reserva.prisma.repository.js"
@@ -17,46 +17,85 @@ import {
   RolSinPermiso,
 } from "../domain/restaurante.errors.js"
 import { resolverRestauranteId } from "./restaurante.rest.js"
+import { errorResponses, okResponse } from "../../../core/openapi-responses.js"
 
-export const reservaRouter = new Hono<HonoEnv>()
+export const reservaRouter = new OpenAPIHono<HonoEnv>()
 
 function makeRepo() {
   return new ReservaPrismaRepository()
 }
 
-reservaRouter.get("/reservas", async (c) => {
-  const tenantId = c.get("tenantId")
-  const restauranteId = await resolverRestauranteId(tenantId)
-  if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
+reservaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/reservas",
+    operationId: "restaurante_listar_reservas",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de reservas", z.object({ data: z.array(z.record(z.string(), z.unknown())), meta: z.object({ total: z.number() }) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const restauranteId = await resolverRestauranteId(tenantId)
+    if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
 
-  const q = c.req.query()
-  const reservas = await new ListarReservasUseCase(makeRepo()).ejecutar(restauranteId, {
-    estado: q.estado,
-    fecha: q.fecha ? new Date(q.fecha) : undefined,
-    search: q.search,
-    page: q.page ? Number(q.page) : undefined,
-    limit: q.limit ? Number(q.limit) : undefined,
-  })
-  return c.json({ data: reservas.map((r) => r.toJSON()), meta: { total: reservas.length } })
-})
+    const q = c.req.query()
+    const reservas = await new ListarReservasUseCase(makeRepo()).ejecutar(restauranteId, {
+      estado: q.estado,
+      fecha: q.fecha ? new Date(q.fecha) : undefined,
+      search: q.search,
+      page: q.page ? Number(q.page) : undefined,
+      limit: q.limit ? Number(q.limit) : undefined,
+    })
+    return c.json({ data: reservas.map((r) => r.toJSON()), meta: { total: reservas.length } })
+  },
+)
 
-reservaRouter.get("/reservas/:id", async (c) => {
-  const tenantId = c.get("tenantId")
-  const restauranteId = await resolverRestauranteId(tenantId)
-  if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
+reservaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/reservas/{id}",
+    operationId: "restaurante_obtener_reserva",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Reserva", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const restauranteId = await resolverRestauranteId(tenantId)
+    if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
 
-  try {
-    const { reserva, detalles } = await new ObtenerReservaUseCase(makeRepo()).ejecutar(c.req.param("id"), restauranteId)
-    return c.json({ ...reserva.toJSON(), detalles: detalles.map((d) => d.toJSON()) })
-  } catch (err) {
-    if (err instanceof ReservaNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
-    throw err
-  }
-})
+    try {
+      const { reserva, detalles } = await new ObtenerReservaUseCase(makeRepo()).ejecutar(c.req.param("id"), restauranteId)
+      return c.json({ ...reserva.toJSON(), detalles: detalles.map((d) => d.toJSON()) })
+    } catch (err) {
+      if (err instanceof ReservaNoEncontrada) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
 
-reservaRouter.patch(
-  "/reservas/:id/estado",
-  requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "MESERO"]),
+reservaRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/reservas/{id}/estado",
+    operationId: "restaurante_cambiar_estado_reserva",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "MESERO"]),
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Estado de reserva actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
   async (c) => {
     const tenantId = c.get("tenantId")
     const session = c.get("session")
@@ -87,9 +126,20 @@ reservaRouter.patch(
   },
 )
 
-reservaRouter.post(
-  "/reservas/:id/pagar",
-  requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "MESERO"]),
+reservaRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/reservas/{id}/pagar",
+    operationId: "restaurante_pagar_reserva",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "MESERO"]),
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Reserva pagada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
   async (c) => {
     const tenantId = c.get("tenantId")
     const session = c.get("session")

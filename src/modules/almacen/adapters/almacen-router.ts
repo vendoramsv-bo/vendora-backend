@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireAuth, requireTenantActivo } from "../../../core/hono-context.js"
 import { inventarioRouter } from "./inventario.rest.js"
@@ -6,7 +6,7 @@ import { insumoRouter } from "./insumo.rest.js"
 import { almacenOperacionesRouter } from "./almacen-operaciones.rest.js"
 import { recetaRouter } from "./receta.rest.js"
 
-const almacenApp = new Hono<HonoEnv>()
+const almacenApp = new OpenAPIHono<HonoEnv>()
 almacenApp.use("*", requireAuth, requireTenantActivo)
 almacenApp.route("/", inventarioRouter)
 almacenApp.route("/insumos", insumoRouter)

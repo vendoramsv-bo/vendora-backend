@@ -1,11 +1,11 @@
-import { Hono } from "hono"
+import { OpenAPIHono } from "@hono/zod-openapi"
 import { requireAuth, requireTenantActivo, type HonoEnv } from "../../../core/hono-context.js"
 import { actividadEconomicaRouter } from "./actividad-economica.rest.js"
 import { unidadMedidaRouter } from "./unidad-medida.rest.js"
 import { categoriaRouter } from "./categoria.rest.js"
 import { productoRouter } from "./producto.rest.js"
 
-const catalogoApp = new Hono<HonoEnv>()
+const catalogoApp = new OpenAPIHono<HonoEnv>()
 
 catalogoApp.use("*", requireAuth, requireTenantActivo)
 

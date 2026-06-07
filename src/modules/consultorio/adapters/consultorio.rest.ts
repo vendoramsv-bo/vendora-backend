@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
@@ -9,31 +9,55 @@ import { ActualizarConsultorioUseCase } from "../application/consultorio/actuali
 import { ConsultorioPerfilSchema, QueryParamsConsultorioSchema } from "./consultorio.schema.js"
 import { ConsultorioNoEncontrado } from "../domain/consultorio.errors.js"
 import { paginate } from "../../../core/query-params.js"
+import { errorResponses, okResponse } from "../../../core/openapi-responses.js"
 
-export const consultorioPerfilRouter = new Hono<HonoEnv>()
+export const consultorioPerfilRouter = new OpenAPIHono<HonoEnv>()
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
 
-consultorioPerfilRouter.get("/perfil", async (c) => {
-  const tenantId = c.get("tenantId")
-  const session = c.get("session")
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const repo = new ConsultorioPrismaRepository(prisma as any)
-  const useCase = new ObtenerConsultorioUseCase(repo)
-  try {
-    const consultorio = await useCase.ejecutar(tenantId)
-    return c.json(consultorio.toJSON())
-  } catch (err) {
-    if (err instanceof ConsultorioNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
-    throw err
-  }
-  void session
-})
+consultorioPerfilRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/perfil",
+    operationId: "consultorio_get_perfil",
+    tags: ["Consultorio"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Perfil del consultorio", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const repo = new ConsultorioPrismaRepository(prisma as any)
+    const useCase = new ObtenerConsultorioUseCase(repo)
+    try {
+      const consultorio = await useCase.ejecutar(tenantId)
+      return c.json(consultorio.toJSON())
+    } catch (err) {
+      if (err instanceof ConsultorioNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+    void session
+  },
+)
 
-consultorioPerfilRouter.get(
-  "/auditoria",
-  requireRol(["PROPIETARIO", "ADMIN"]),
+consultorioPerfilRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/auditoria",
+    operationId: "consultorio_get_auditoria",
+    tags: ["Consultorio"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "ADMIN"])],
+    responses: {
+      200: okResponse("Lista de auditoría", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
   async (c) => {
     const tenantId = c.get("tenantId")
     const cResult = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true } })
@@ -45,9 +69,19 @@ consultorioPerfilRouter.get(
   },
 )
 
-consultorioPerfilRouter.put(
-  "/perfil",
-  requireRol(["PROPIETARIO", "ADMIN"]),
+consultorioPerfilRouter.openapi(
+  createRoute({
+    method: "put",
+    path: "/perfil",
+    operationId: "consultorio_put_perfil",
+    tags: ["Consultorio"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "ADMIN"])],
+    responses: {
+      200: okResponse("Perfil actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
   async (c) => {
     const tenantId = c.get("tenantId")
     const session = c.get("session")

@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol } from "../../../core/hono-context.js"
 import { ReservaPrismaRepository } from "../infrastructure/reserva.prisma.repository.js"
@@ -13,27 +13,53 @@ import {
   RolSinPermiso,
 } from "../domain/restaurante.errors.js"
 import { resolverRestauranteId } from "./restaurante.rest.js"
+import { errorResponses, okResponse } from "../../../core/openapi-responses.js"
 
-export const cocinaRouter = new Hono<HonoEnv>()
+export const cocinaRouter = new OpenAPIHono<HonoEnv>()
 
-cocinaRouter.get("/cocina", requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "CHEF", "MESERO"]), async (c) => {
-  const tenantId = c.get("tenantId")
-  const restauranteId = await resolverRestauranteId(tenantId)
-  if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
+cocinaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/cocina",
+    operationId: "restaurante_panel_cocina",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "CHEF", "MESERO"]),
+    responses: {
+      200: okResponse("Panel de cocina", z.object({ data: z.array(z.record(z.string(), z.unknown())), meta: z.object({ total: z.number() }) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const restauranteId = await resolverRestauranteId(tenantId)
+    if (!restauranteId) return c.json({ error: "RESTAURANTE_NO_ENCONTRADO" }, 404)
 
-  const panel = await new ListarPanelCocinaUseCase(new ReservaPrismaRepository()).ejecutar(restauranteId)
-  return c.json({
-    data: panel.map(({ reserva, detalles }) => ({
-      ...reserva.toJSON(),
-      detalles: detalles.map((d) => d.toJSON()),
-    })),
-    meta: { total: panel.length },
-  })
-})
+    const panel = await new ListarPanelCocinaUseCase(new ReservaPrismaRepository()).ejecutar(restauranteId)
+    return c.json({
+      data: panel.map(({ reserva, detalles }) => ({
+        ...reserva.toJSON(),
+        detalles: detalles.map((d) => d.toJSON()),
+      })),
+      meta: { total: panel.length },
+    })
+  },
+)
 
-cocinaRouter.patch(
-  "/cocina/items/:detalleId/estado",
-  requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "CHEF", "MESERO"]),
+cocinaRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/cocina/items/{detalleId}/estado",
+    operationId: "restaurante_actualizar_estado_cocina",
+    tags: ["Restaurante"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN", "ENCARGADO", "CHEF", "MESERO"]),
+    request: { params: z.object({ detalleId: z.string() }) },
+    responses: {
+      200: okResponse("Estado cocina actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
   async (c) => {
     const tenantId = c.get("tenantId")
     const session = c.get("session")
