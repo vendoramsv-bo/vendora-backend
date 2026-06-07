@@ -111,14 +111,14 @@ Un consumidor interactúa con el consultorio como entidad: reacciona, comenta, v
 
 - **FR-001**: El sistema DEBE permitir al propietario o admin activar el perfil público del consultorio mediante el flag `esConsultorio`.
 - **FR-002**: El sistema DEBE permitir al propietario o admin desactivar el perfil público sin afectar la operación clínica interna ni las citas vigentes.
-- **FR-003**: El sistema DEBE permitir configurar la información pública del consultorio: nombre comercial, descripción, logo, fotos, especialidades, número de registro/habilitación, horarios por día y especialidad, información de contacto pública.
+- **FR-003**: El sistema DEBE permitir configurar la información pública del consultorio: nombre comercial, descripción, logo, fotos, especialidades, número de registro/habilitación, información de contacto pública. Los horarios públicos se exponen desde la entidad de horarios existente del módulo consultorio mediante el flag `esPublico: boolean`; no se crea un modelo de horarios separado.
 - **FR-004**: El sistema DEBE permitir marcar médicos del equipo como visibles públicamente, con nombre, especialidad, foto y descripción profesional breve.
 - **FR-005**: El sistema DEBE guardar auditoría (creado por, modificado por) en la configuración del perfil público.
 
 **Directorio público**
 
 - **FR-006**: El sistema DEBE exponer un directorio público de consultorios con `esConsultorio=true`, consultable sin autenticación.
-- **FR-007**: El directorio DEBE soportar búsqueda geográfica por proximidad usando las localizaciones del tenant.
+- **FR-007**: El directorio DEBE soportar búsqueda geográfica por proximidad usando PostGIS (`ST_DWithin` + `ST_Distance`) sobre una columna `GEOGRAPHY(POINT)` con índice GIST en `ConsultorioPerfil`. El consumidor proporciona latitud y longitud; el radio de búsqueda por defecto es 10 km.
 - **FR-008**: El directorio DEBE soportar filtros por especialidad médica y por tipo de servicio (presencial, teleconsulta, ambos).
 - **FR-009**: El directorio DEBE soportar ordenamiento por puntuación promedio, cercanía, número de seguidores y fecha de incorporación.
 - **FR-010**: El perfil público del consultorio DEBE incluir: nombre, descripción, logo, fotos, especialidades, médicos visibles, horarios, ubicación y servicios públicos.
@@ -132,7 +132,7 @@ Un consumidor interactúa con el consultorio como entidad: reacciona, comenta, v
 
 **Agendamiento de citas**
 
-- **FR-015**: El sistema DEBE calcular y exponer los slots disponibles de un médico para un servicio dado y un rango de fechas. Los slots se derivan del horario registrado del médico menos las citas ya agendadas, usando la duración estimada del servicio seleccionado como intervalo entre slots. El consumidor debe elegir el servicio antes de consultar la disponibilidad.
+- **FR-015**: El sistema DEBE calcular y exponer los slots disponibles de un médico para un servicio dado y un rango de fechas. Los slots se derivan de los horarios del módulo consultorio con `esPublico=true` del médico, menos las citas ya agendadas, usando la duración estimada del servicio seleccionado como intervalo entre slots. El consumidor debe elegir el servicio antes de consultar la disponibilidad.
 - **FR-016**: Un consumidor autenticado DEBE poder solicitar una cita eligiendo médico, servicio, fecha y hora disponible; la cita se crea en el modelo `Cita` existente con estado PENDIENTE y `origenOnline=true`, apareciendo inmediatamente en la agenda interna del staff.
 - **FR-017**: El sistema DEBE notificar al propietario en tiempo real cuando se crea una solicitud de cita en línea.
 - **FR-018**: Un consumidor DEBE poder listar todas sus propias citas en cualquier estado, con un parámetro de filtro opcional por estado (PENDIENTE, CONFIRMADA, ATENDIDA, CANCELADA_CLIENTE, RECHAZADA). Por defecto, sin filtro, se devuelve el historial completo ordenado por fecha descendente.
@@ -155,7 +155,7 @@ Un consumidor interactúa con el consultorio como entidad: reacciona, comenta, v
 **Notificaciones y tiempo real**
 
 - **FR-031**: El sistema DEBE notificar al propietario en tiempo real cuando el consultorio recibe una nueva valoración, comentario, pregunta, seguidor o solicitud de cita en línea.
-- **FR-032**: Los usuarios conectados DEBEN ver actualizaciones de perfil, valoraciones, comentarios y nuevos seguidores en tiempo real sin recargar la página.
+- **FR-032**: Los consumidores autenticados conectados vía socket (JWT requerido) DEBEN recibir actualizaciones de perfil, valoraciones, comentarios y nuevos seguidores en tiempo real sin recargar la página. Los visitantes anónimos no reciben eventos en tiempo real.
 
 **Consultas parametrizables**
 
@@ -164,7 +164,7 @@ Un consumidor interactúa con el consultorio como entidad: reacciona, comenta, v
 
 ### Key Entities
 
-- **ConsultorioPerfil**: Configuración pública del consultorio del tenant. Atributos: nombre, descripción, logo, fotos, especialidades, número de registro, horarios, contacto público, tipo de servicio (presencial/teleconsulta/ambos). Referenciado por `tenantId`.
+- **ConsultorioPerfil**: Configuración pública del consultorio del tenant. Atributos: nombre, descripción, logo, fotos, especialidades, número de registro, horarios, contacto público, tipo de servicio (presencial/teleconsulta/ambos), `ubicacion GEOGRAPHY(POINT)` (índice GIST) para búsqueda geográfica. Referenciado por `tenantId`.
 - **MédicoVisible**: Miembro del equipo marcado como visible públicamente. Atributos: nombre, especialidad, foto, descripción profesional breve, orden de visualización.
 - **ServicioPublico**: Servicio del catálogo del consultorio con visibilidad pública activada. Atributos: nombre, descripción, especialidad, duración estimada, precio (opcional), estado.
 - **SlotDisponible**: Intervalo horario libre calculado para un médico + servicio en una fecha. La duración del intervalo es la `duracionEstimada` del servicio seleccionado. Se deriva del horario registrado del médico menos las citas ya agendadas. No persiste; se calcula dinámicamente en cada consulta.
@@ -196,6 +196,12 @@ Un consumidor interactúa con el consultorio como entidad: reacciona, comenta, v
 - Q: ¿La solicitud de cita en línea crea un registro en el modelo `Cita` existente o en un modelo separado? → A: Mismo modelo `Cita` con campo `origenOnline=true`; la cita aparece directamente en la agenda del staff con estado PENDIENTE.
 - Q: ¿Los slots de disponibilidad tienen granularidad fija o derivada del servicio? → A: Derivada del servicio — el consumidor elige el servicio primero y los slots se calculan según la duración estimada de ese servicio.
 - Q: ¿El consumidor ve solo citas activas o el historial completo? → A: Historial completo — todos los estados visibles con parámetro de filtro opcional por estado (PENDIENTE, CONFIRMADA, ATENDIDA, CANCELADA_CLIENTE, RECHAZADA).
+
+### Session 2026-06-07
+
+- Q: ¿Qué estrategia de búsqueda geográfica se usa para el directorio (FR-007)? → A: PostGIS — columna `GEOGRAPHY(POINT)` con índice GIST en `ConsultorioPerfil`, queries con `ST_DWithin` + `ST_Distance`, radio por defecto 10 km.
+- Q: ¿Los eventos en tiempo real (FR-032) aplican a visitantes anónimos o solo a consumidores autenticados? → A: Solo consumidores autenticados con JWT válido reciben eventos via socket; visitantes anónimos no tienen acceso al socket en tiempo real.
+- Q: ¿Los horarios del perfil público (FR-003) y los horarios usados para calcular slots (FR-015) son el mismo modelo o entidades separadas? → A: Un solo modelo — se reutiliza la entidad de horarios existente del módulo consultorio agregando el flag `esPublico: boolean`; no se crea un modelo de horarios separado.
 
 ## Assumptions
 
