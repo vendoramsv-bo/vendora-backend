@@ -259,7 +259,10 @@ export const auth: any = betterAuth({
   },
 
   // ── Seguridad ─────────────────────────────────────────────────────────────
-  trustedOrigins: [process.env.APP_URL!],
+  trustedOrigins: [
+    process.env.APP_URL!,
+    ...(process.env.FRONTEND_URLS?.split(",").map((u) => u.trim()).filter(Boolean) ?? []),
+  ],
   secret:  process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.APP_URL!,
 })
