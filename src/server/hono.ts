@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
 import { swaggerUI } from "@hono/swagger-ui"
+import { cors } from "hono/cors"
 import pino from "pino"
 import type { Variables } from "../core/hono-context.js"
 import { consultorioApp } from "../modules/consultorio/adapters/consultorio-router.js"
@@ -11,8 +12,28 @@ import { socialApp, publicSocialApp } from "../modules/social/adapters/social.ro
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
+function getAllowedOrigins(): string[] {
+  const origins: string[] = []
+  if (process.env.APP_URL) origins.push(process.env.APP_URL)
+  if (process.env.FRONTEND_URLS) {
+    origins.push(...process.env.FRONTEND_URLS.split(",").map((u) => u.trim()).filter(Boolean))
+  }
+  return origins
+}
+
 export function crearApp() {
   const app = new OpenAPIHono<{ Variables: Variables }>()
+
+  // CORS — orígenes permitidos desde APP_URL + FRONTEND_URLS
+  app.use(
+    "*",
+    cors({
+      origin: getAllowedOrigins(),
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization"],
+      credentials: true,
+    }),
+  )
 
   // Logging HTTP básico con Pino
   app.use("*", async (c, next) => {

@@ -95,8 +95,13 @@ Promise.all([pubClient.connect(), subClient.connect()]).catch((err) => {
   logger.warn({ err }, "[redis] No se pudo conectar — Socket.IO funcionará sin adaptador Redis")
 })
 
+const allowedOrigins = [
+  process.env.APP_URL,
+  ...(process.env.FRONTEND_URLS?.split(",").map((u) => u.trim()).filter(Boolean) ?? []),
+].filter(Boolean) as string[]
+
 export const io = new Server(httpServer as never, {
-  cors: { origin: process.env.APP_URL, credentials: true },
+  cors: { origin: allowedOrigins, credentials: true },
 })
 
 pubClient.on("connect", () => {

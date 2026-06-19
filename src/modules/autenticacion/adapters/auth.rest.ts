@@ -5,11 +5,16 @@ import { errorResponses } from "../../../core/openapi-responses.js"
 
 export const authRouter = new OpenAPIHono<HonoEnv>()
 
-// Stub documentativo — el handler real sigue siendo el catch-all de Better-Auth
+// Handler real de Better-Auth — debe ir ANTES del stub openapi para evitar
+// que la validación Zod intercepte las peticiones con path params vacíos.
+authRouter.all("/auth/*", (c) => auth.handler(c.req.raw))
+
+// Stub documentativo — solo contribuye al spec OpenAPI; nunca se ejecuta
+// porque el all() de arriba captura primero.
 authRouter.openapi(
   createRoute({
     method: "get",
-    path: "/auth/{...path}",
+    path: "/auth/{path}",
     operationId: "auth_catch_all_better_auth",
     tags: ["Autenticación"],
     description:
