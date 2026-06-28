@@ -53,11 +53,12 @@ export const recordatorioCitaWorker = new Worker(
     }
   },
   {
-    connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379" },
+    connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379", enableReadyCheck: false, maxRetriesPerRequest: null },
     concurrency: 5,
   },
 )
 
+recordatorioCitaWorker.on("error", (err) => logger.warn({ err }, "[recordatorio] error de conexión Redis"))
 recordatorioCitaWorker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "[recordatorio] Job fallido")
 })

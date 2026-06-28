@@ -84,6 +84,12 @@ export const auth: any = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mapProfileToUser: (profile: any) => ({
+        userName: profile.email.split("@")[0],
+        firstName: profile.given_name ?? "",
+        lastName: profile.family_name ?? "",
+      }),
     },
   },
 

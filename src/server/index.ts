@@ -86,9 +86,14 @@ expirarRecetasQueue
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379"
 const pubClient = new Redis(redisUrl, {
   lazyConnect: true,
+  enableReadyCheck: false,
+  maxRetriesPerRequest: null,
   ...(redisUrl.startsWith("rediss://") ? { tls: {} } : {}),
 })
-const subClient = pubClient.duplicate({ enableReadyCheck: false })
+const subClient = pubClient.duplicate({ enableReadyCheck: false, maxRetriesPerRequest: null })
+
+pubClient.on("error", (err) => logger.warn({ err }, "[redis:pub] error"))
+subClient.on("error", (err) => logger.warn({ err }, "[redis:sub] error"))
 
 // Conectar Redis en background (no bloqueante al arranque)
 Promise.all([pubClient.connect(), subClient.connect()]).catch((err) => {

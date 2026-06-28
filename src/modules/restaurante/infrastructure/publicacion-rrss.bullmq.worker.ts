@@ -21,11 +21,12 @@ export const restauranteRRSSWorker = new Worker<RRSSJobData>(
     ).ejecutar(publicacionId, "SISTEMA")
   },
   {
-    connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379" },
+    connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379", enableReadyCheck: false, maxRetriesPerRequest: null },
     concurrency: 2,
   },
 )
 
+restauranteRRSSWorker.on("error", (err) => logger.warn({ err }, "[rrss-worker] error de conexión Redis"))
 restauranteRRSSWorker.on("completed", (job) => {
   logger.info({ publicacionId: job.data.publicacionId, jobId: job.id }, "[rrss-worker] publicación completada")
 })
