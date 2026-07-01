@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireAuth, requireTenantActivo, requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { TiendaPrismaRepository } from "../infrastructure/tienda.prisma.repository.js"
 import { getTiendaNotificador } from "../infrastructure/tienda.notificador.provider.js"
@@ -27,6 +27,8 @@ import {
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
 
 export const tiendaStaffRouter = new OpenAPIHono<HonoEnv>()
+
+tiendaStaffRouter.use("*", requireAuth, requireTenantActivo)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
