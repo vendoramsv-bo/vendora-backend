@@ -259,11 +259,6 @@ export const auth: any = betterAuth({
     },
   },
 
-  // ── Performance ───────────────────────────────────────────────────────────
-  experimental: {
-    joins: true,
-  },
-
   // ── Seguridad ─────────────────────────────────────────────────────────────
   trustedOrigins: [
     process.env.APP_URL!,
