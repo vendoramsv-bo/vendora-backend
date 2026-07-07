@@ -6,6 +6,7 @@ import { Redis } from "ioredis"
 import { crearApp } from "./hono.js"
 import { authRouter } from "../modules/autenticacion/adapters/auth.rest.js"
 import { tenantRouter } from "../modules/tenant/adapters/tenant.rest.js"
+import { wizardRouter } from "../modules/tenant/adapters/wizard.rest.js"
 import { auth, prisma } from "../modules/autenticacion/infrastructure/better-auth.setup.js"
 import { TenantSocketNotificador } from "../modules/tenant/infrastructure/tenant.socket.notificador.js"
 import { ConsultorioSocketNotificador } from "../modules/consultorio/infrastructure/consultorio.socket.notificador.js"
@@ -55,6 +56,9 @@ app.route("/api", authRouter)
 
 // T029 — router de tenant (endpoints de lectura scoped)
 app.route("/api/tenant", tenantRouter)
+
+// Wizard de creación de negocio (endpoints de configuración + bulk)
+app.route("/api/tenant", wizardRouter)
 
 // TuTienda — staff (configuración, destacados) y directorio público
 app.route("/api/tenant", tiendaStaffRouter)

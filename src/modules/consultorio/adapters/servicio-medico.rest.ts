@@ -24,6 +24,42 @@ async function getConsultorioId(tenantId: string): Promise<string | null> {
   return r?.id ?? null
 }
 
+// ─── POST /api/consultorio/salas/bulk ─────────────────────────────────────────
+
+servicioMedicoRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/salas/bulk",
+    operationId: "consultorio_bulk_salas",
+    tags: ["Consultorio"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "owner", "ADMIN"]),
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: z.object({ salas: z.array(z.object({ nombre: z.string(), capacidad: z.number().optional() })) }),
+          },
+        },
+      },
+    },
+    responses: {
+      201: createdResponse("Salas guardadas", z.object({ ok: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const { salas } = await c.req.json()
+    const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+    if (consultorio) {
+      const contacto = (consultorio.contactoPublico as Record<string, unknown>) ?? {}
+      await db.consultorio.update({ where: { tenantId }, data: { contactoPublico: { ...contacto, salas } } })
+    }
+    return c.json({ ok: true }, 201)
+  },
+)
+
 servicioMedicoRouter.openapi(
   createRoute({
     method: "get",

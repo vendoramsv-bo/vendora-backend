@@ -259,6 +259,18 @@ export const auth: any = betterAuth({
     },
   },
 
+  // ── Enlace de cuentas ─────────────────────────────────────────────────────
+  // Permite unir automáticamente una cuenta OAuth al usuario existente si el
+  // email coincide (ej. usuario registrado con email/pass que luego usa Google).
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+      // Google ya verifica el email: no exigir que la cuenta local esté verificada
+      requireLocalEmailVerified: false,
+    },
+  },
+
   // ── Seguridad ─────────────────────────────────────────────────────────────
   trustedOrigins: [
     process.env.APP_URL!,

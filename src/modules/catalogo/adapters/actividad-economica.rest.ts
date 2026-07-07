@@ -20,6 +20,209 @@ function makeRepo() {
   return new ActividadEconomicaPrismaRepository(db)
 }
 
+// ─── Alias /actividades-economicas → /cla-actividades (para compatibilidad wizard) ───
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/actividades-economicas",
+    operationId: "catalogo_listar_actividades_economicas_alias",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de clasificadores de actividades (alias wizard)", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const repo = makeRepo()
+    const clasificadores = await repo.listarClasificadores()
+    return c.json({ data: clasificadores })
+  },
+)
+
+// ─── Catálogos globales fijos para el wizard ──────────────────────────────────
+
+const TURNOS_GLOBALES = [
+  { id: "MANANA", nombre: "Mañana", descripcion: "Turno de la mañana (6:00 - 12:00)" },
+  { id: "TARDE", nombre: "Tarde", descripcion: "Turno de la tarde (12:00 - 18:00)" },
+  { id: "NOCHE", nombre: "Noche", descripcion: "Turno de la noche (18:00 - 24:00)" },
+  { id: "MADRUGADA", nombre: "Madrugada", descripcion: "Turno de madrugada (0:00 - 6:00)" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/turnos",
+    operationId: "catalogo_listar_turnos_globales",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de turnos de atención globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: TURNOS_GLOBALES }),
+)
+
+const PROVEEDORES_GLOBALES = [
+  { id: "ALICORP", nombre: "Alicorp Bolivia" },
+  { id: "COCA_COLA", nombre: "Coca Cola Bolivia" },
+  { id: "PACEÑA", nombre: "Cervecería Boliviana Nacional" },
+  { id: "SOBOCE", nombre: "SOBOCE" },
+  { id: "COBOCE", nombre: "COBOCE" },
+  { id: "DELIZIA", nombre: "Delizia" },
+  { id: "PIL_ANDINA", nombre: "PIL Andina" },
+  { id: "FRITZ", nombre: "Fritz Bolivia" },
+  { id: "IMBA", nombre: "IMBA" },
+  { id: "INSUMOS_MEDICOS", nombre: "Insumos Médicos Bolivia" },
+  { id: "FARMACORP", nombre: "Farmacorp" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/proveedores",
+    operationId: "catalogo_listar_proveedores_globales",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de proveedores globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: PROVEEDORES_GLOBALES }),
+)
+
+const SERVICIOS_MEDICOS_GLOBALES = [
+  { id: "CONSULTA_GENERAL", nombre: "Consulta General" },
+  { id: "CONSULTA_ESPECIALIZADA", nombre: "Consulta Especializada" },
+  { id: "ODONTOLOGIA", nombre: "Odontología General" },
+  { id: "ENDODONCIA", nombre: "Endodoncia" },
+  { id: "ORTODONCIA", nombre: "Ortodoncia" },
+  { id: "RADIOGRAFIA", nombre: "Radiografía" },
+  { id: "LABORATORIO", nombre: "Laboratorio Clínico" },
+  { id: "ECOGRAFIA", nombre: "Ecografía" },
+  { id: "FISIOTERAPIA", nombre: "Fisioterapia" },
+  { id: "PSICOLOGIA", nombre: "Psicología" },
+  { id: "NUTRICION", nombre: "Nutrición" },
+  { id: "PEDIATRIA", nombre: "Pediatría" },
+  { id: "GINECOLOGIA", nombre: "Ginecología" },
+  { id: "DERMATOLOGIA", nombre: "Dermatología" },
+  { id: "CARDIOLOGIA", nombre: "Cardiología" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/servicios",
+    operationId: "catalogo_listar_servicios_globales",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de servicios médicos globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: SERVICIOS_MEDICOS_GLOBALES }),
+)
+
+const SEGUROS_GLOBALES = [
+  { id: "CNS", nombre: "Caja Nacional de Salud (CNS)" },
+  { id: "COSSMIL", nombre: "COSSMIL" },
+  { id: "CAJA_CORDES", nombre: "Caja de Salud CORDES" },
+  { id: "CAJA_CAMARA", nombre: "Caja de Salud de la Cámara de Comercio" },
+  { id: "CAJA_BANCARIA", nombre: "Caja Bancaria Estatal de Salud" },
+  { id: "BUPA", nombre: "BUPA Bolivia" },
+  { id: "ALIANZA", nombre: "Alianza Vida Seguros" },
+  { id: "BOLIVAR", nombre: "Seguros Bolívar" },
+  { id: "LA_BOLIVIANA", nombre: "La Boliviana Ciacruz" },
+  { id: "CRECER", nombre: "Seguros Crecer" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/seguros",
+    operationId: "catalogo_listar_seguros_globales",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de seguros médicos globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: SEGUROS_GLOBALES }),
+)
+
+const ESPECIALIDADES_GLOBALES = [
+  { id: "MEDICINA_GENERAL", nombre: "Medicina General" },
+  { id: "PEDIATRIA", nombre: "Pediatría" },
+  { id: "GINECOLOGIA", nombre: "Ginecología y Obstetricia" },
+  { id: "CARDIOLOGIA", nombre: "Cardiología" },
+  { id: "DERMATOLOGIA", nombre: "Dermatología" },
+  { id: "OFTALMOLOGIA", nombre: "Oftalmología" },
+  { id: "ORTOPEDIA", nombre: "Ortopedia y Traumatología" },
+  { id: "NEUROLOGIA", nombre: "Neurología" },
+  { id: "PSIQUIATRIA", nombre: "Psiquiatría" },
+  { id: "PSICOLOGIA", nombre: "Psicología" },
+  { id: "NUTRICION", nombre: "Nutrición y Dietética" },
+  { id: "FISIOTERAPIA", nombre: "Fisioterapia y Rehabilitación" },
+  { id: "ODONTOLOGIA", nombre: "Odontología General" },
+  { id: "ENDODONCIA", nombre: "Endodoncia" },
+  { id: "ORTODONCIA", nombre: "Ortodoncia" },
+  { id: "CIRUGIA", nombre: "Cirugía General" },
+  { id: "UROLOGIA", nombre: "Urología" },
+  { id: "GASTROENTEROLOGIA", nombre: "Gastroenterología" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/especialidades",
+    operationId: "catalogo_listar_especialidades_globales",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de especialidades médicas globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: ESPECIALIDADES_GLOBALES }),
+)
+
+const TIPOS_COCINA_GLOBALES = [
+  { id: "CRIOLLA_BOLIVIANA", nombre: "Criolla Boliviana" },
+  { id: "ITALIANA", nombre: "Italiana" },
+  { id: "CHINA", nombre: "China" },
+  { id: "JAPONESA", nombre: "Japonesa" },
+  { id: "MEXICANA", nombre: "Mexicana" },
+  { id: "PARRILLA", nombre: "Parrilla / Asados" },
+  { id: "FAST_FOOD", nombre: "Comida Rápida" },
+  { id: "MARISCOS", nombre: "Mariscos" },
+  { id: "VEGETARIANA", nombre: "Vegetariana / Vegana" },
+  { id: "POSTRES", nombre: "Postres y Repostería" },
+  { id: "PIZZERIA", nombre: "Pizzería" },
+  { id: "POLLOS", nombre: "Pollos y Broasters" },
+]
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/categorias-cocina",
+    operationId: "catalogo_listar_tipos_cocina",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de tipos de cocina para restaurante", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => c.json({ data: TIPOS_COCINA_GLOBALES }),
+)
+
+// ─── /cla-actividades (original) ─────────────────────────────────────────────
+
 actividadEconomicaRouter.openapi(
   createRoute({
     method: "get",

@@ -1,0 +1,650 @@
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
+import type { HonoEnv } from "../../../core/hono-context.js"
+import { requireAuth, requireTenantActivo, requireRol } from "../../../core/hono-context.js"
+import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
+import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
+import { AltaMasivaProductosUseCase } from "../../catalogo/application/producto/alta-masiva-productos.usecase.js"
+import { ProductoPrismaRepository } from "../../catalogo/infrastructure/producto.prisma.repository.js"
+import { getCatalogoNotificador } from "../../catalogo/infrastructure/catalogo.notificador.provider.js"
+import { AltaMasivaVacia, ClaProductoNoEncontrado } from "../../catalogo/domain/catalogo.errors.js"
+
+export const wizardRouter = new OpenAPIHono<HonoEnv>()
+
+wizardRouter.use("*", requireAuth, requireTenantActivo)
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = prisma as any
+
+function pasoToInt(paso: string): number {
+  if (paso === "FINALIZADO") return 11
+  const m = paso.match(/^PASO_(\d+)$/)
+  return m ? parseInt(m[1], 10) : 1
+}
+
+function intToPaso(n: number): string {
+  if (n >= 11) return "FINALIZADO"
+  if (n <= 0) return "PASO_1"
+  return `PASO_${n}`
+}
+
+// ─── GET /api/tenant/config ───────────────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/config",
+    operationId: "wizard_obtener_config",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Configuración del tenant para wizard", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const tenant = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logo: true,
+        nombreLargo: true,
+        descripcion: true,
+        esTienda: true,
+        esConsultorio: true,
+        esRestaurante: true,
+        plan: true,
+        estado: true,
+        ultimoPasoCreacion: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+    if (!tenant) return c.json({ error: "TENANT_NO_ENCONTRADO" }, 404)
+
+    const propietario = await db.propietario.findUnique({
+      where: { tenantId },
+      select: { id: true, nombres: true, telefono: true, domicilio: true, nombreReferencia: true, telefonoReferencia: true, imagenUrl: true },
+    })
+
+    return c.json({
+      ...tenant,
+      ultimoPasoCreacion: intToPaso(tenant.ultimoPasoCreacion),
+      propietario: propietario ?? null,
+    })
+  },
+)
+
+// ─── PATCH /api/tenant/config ─────────────────────────────────────────────────
+
+const PropietarioUpdateSchema = z.object({
+  nombres: z.string().optional(),
+  telefono: z.string().optional(),
+  domicilio: z.string().optional(),
+  nombreReferencia: z.string().optional(),
+  telefonoReferencia: z.string().optional(),
+  imagenUrl: z.string().nullable().optional(),
+}).optional()
+
+const ConfigPatchSchema = z.object({
+  ultimoPasoCreacion: z.string().optional(),
+  nombreLargo: z.string().optional(),
+  descripcion: z.string().optional(),
+  propietario: PropietarioUpdateSchema,
+  medico: z.record(z.unknown()).optional(),
+  configuracion: z.record(z.unknown()).optional(),
+  horarios: z.array(z.unknown()).optional(),
+  tipoServicio: z.string().optional(),
+  aceptaReservas: z.boolean().optional(),
+  cobraPropina: z.boolean().optional(),
+  porcentajePropina: z.number().optional(),
+}).partial()
+
+wizardRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/config",
+    operationId: "wizard_actualizar_config",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: ConfigPatchSchema } } },
+    },
+    responses: {
+      200: okResponse("Config actualizada", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = ConfigPatchSchema.parse(await c.req.json())
+
+    const tenantUpdate: Record<string, unknown> = { updatedById: session.user.id }
+    if (body.ultimoPasoCreacion !== undefined) {
+      tenantUpdate.ultimoPasoCreacion = pasoToInt(body.ultimoPasoCreacion)
+    }
+    if (body.nombreLargo !== undefined) tenantUpdate.nombreLargo = body.nombreLargo
+    if (body.descripcion !== undefined) tenantUpdate.descripcion = body.descripcion
+
+    if (Object.keys(tenantUpdate).length > 1) {
+      await db.tenant.update({ where: { id: tenantId }, data: tenantUpdate })
+    }
+
+    // Propietario upsert
+    if (body.propietario) {
+      const p = body.propietario as Record<string, unknown>
+      const existing = await db.propietario.findUnique({ where: { tenantId } })
+      if (existing) {
+        await db.propietario.update({
+          where: { tenantId },
+          data: { ...p, updatedById: session.user.id },
+        })
+      } else {
+        await db.propietario.create({
+          data: {
+            tenantId,
+            userId: session.user.id,
+            nombres: (p.nombres as string) ?? "",
+            telefono: (p.telefono as string) ?? "",
+            domicilio: (p.domicilio as string) ?? "",
+            nombreReferencia: (p.nombreReferencia as string) ?? "",
+            telefonoReferencia: (p.telefonoReferencia as string) ?? "",
+            imagenUrl: (p.imagenUrl as string | null) ?? null,
+            createdById: session.user.id,
+          },
+        })
+      }
+    }
+
+    // Consultorio updates
+    if (body.horarios !== undefined || body.configuracion || body.tipoServicio !== undefined) {
+      const consultorioExisting = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+      if (consultorioExisting) {
+        const consultorioData: Record<string, unknown> = { updatedById: session.user.id }
+        if (body.horarios !== undefined) consultorioData.horarios = body.horarios
+        if (body.tipoServicio !== undefined) consultorioData.tipoServicio = body.tipoServicio
+        if (body.configuracion) {
+          const cfg = body.configuracion as Record<string, unknown>
+          // cantidadMedicos y cantidadRecepcionistas no son campos del modelo — van a contactoPublico
+          const contacto = (consultorioExisting.contactoPublico as Record<string, unknown>) ?? {}
+          const contactoUpdate: Record<string, unknown> = { ...contacto }
+          if (cfg.cantidadMedicos !== undefined) contactoUpdate.cantidadMedicos = cfg.cantidadMedicos
+          if (cfg.cantidadRecepcionistas !== undefined) contactoUpdate.cantidadRecepcionistas = cfg.cantidadRecepcionistas
+          if (cfg.tipoConsultorio !== undefined) contactoUpdate.tipoConsultorio = cfg.tipoConsultorio
+          consultorioData.contactoPublico = contactoUpdate
+        }
+        await db.consultorio.update({ where: { tenantId }, data: consultorioData })
+      }
+    }
+
+    // Restaurante updates
+    if (body.tipoServicio !== undefined || body.aceptaReservas !== undefined || body.cobraPropina !== undefined || body.porcentajePropina !== undefined) {
+      const restauranteExisting = await db.restaurante.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+      if (restauranteExisting) {
+        const restauranteData: Record<string, unknown> = { updatedById: session.user.id }
+        if (body.tipoServicio !== undefined) restauranteData.tipoServicio = body.tipoServicio
+        // aceptaReservas, cobraPropina y porcentajePropina no son campos directos del modelo → van a contactoPublico
+        if (body.aceptaReservas !== undefined || body.cobraPropina !== undefined || body.porcentajePropina !== undefined) {
+          const contacto = (restauranteExisting.contactoPublico as Record<string, unknown>) ?? {}
+          if (body.aceptaReservas !== undefined) contacto.aceptaReservas = body.aceptaReservas
+          if (body.cobraPropina !== undefined) contacto.cobraPropina = body.cobraPropina
+          if (body.porcentajePropina !== undefined) contacto.porcentajePropina = body.porcentajePropina
+          restauranteData.contactoPublico = contacto
+        }
+        await db.restaurante.update({ where: { tenantId }, data: restauranteData })
+      }
+    }
+
+    // Tienda configuracion updates
+    if (body.configuracion && !body.horarios && !body.tipoServicio) {
+      const tienda = await db.tienda.findUnique({ where: { tenantId }, select: { id: true } })
+      if (tienda) {
+        const cfg = body.configuracion as Record<string, unknown>
+        await db.configuracion.upsert({
+          where: { tiendaId: tienda.id },
+          create: {
+            tiendaId: tienda.id,
+            tipoDeTienda: (cfg.tipoDeTienda as string) ?? "PEQUENA",
+            cantidadPuntosDeVenta: (cfg.cantidadPuntosDeVenta as number) ?? 1,
+            cantidadVendedores: (cfg.cantidadVendedores as number) ?? 1,
+            tema: (cfg.tema as string) ?? "clay",
+            tipoDespliegueVentas: (cfg.tipoDespliegueVentas as string) ?? "BARRA_LATERAL",
+            tipoLineado: (cfg.tipoLineado as string) ?? "curvedLine",
+          },
+          update: {
+            ...(cfg.tipoDeTienda !== undefined ? { tipoDeTienda: cfg.tipoDeTienda as string } : {}),
+            ...(cfg.cantidadPuntosDeVenta !== undefined ? { cantidadPuntosDeVenta: cfg.cantidadPuntosDeVenta as number } : {}),
+            ...(cfg.cantidadVendedores !== undefined ? { cantidadVendedores: cfg.cantidadVendedores as number } : {}),
+            ...(cfg.tema !== undefined ? { tema: cfg.tema as string } : {}),
+            ...(cfg.tipoDespliegueVentas !== undefined ? { tipoDespliegueVentas: cfg.tipoDespliegueVentas as string } : {}),
+            ...(cfg.tipoLineado !== undefined ? { tipoLineado: cfg.tipoLineado as string } : {}),
+          },
+        })
+      }
+    }
+
+    return c.json({ ok: true })
+  },
+)
+
+// ─── POST /api/tenant/actividades-economicas/bulk ────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/actividades-economicas/bulk",
+    operationId: "wizard_bulk_actividades",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1) }) } } },
+    },
+    responses: {
+      201: createdResponse("Actividades creadas", z.object({ creadas: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const { ids } = await c.req.json()
+    const result = await db.actividadEconomica.createMany({
+      data: ids.map((claActividadId: string) => ({ tenantId, claActividadId, createdById: session.user.id })),
+      skipDuplicates: true,
+    })
+    return c.json({ creadas: result.count }, 201)
+  },
+)
+
+// ─── POST /api/tenant/catalogo/productos/bulk ─────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/catalogo/productos/bulk",
+    operationId: "wizard_bulk_productos",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1) }) } } },
+    },
+    responses: {
+      201: createdResponse("Productos creados desde clasificador", z.object({ total: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const { ids } = await c.req.json()
+    try {
+      const repo = new ProductoPrismaRepository(db)
+      const resultado = await new AltaMasivaProductosUseCase(repo, getCatalogoNotificador()).ejecutar(
+        ids,
+        tenantId,
+        session.user.id,
+      )
+      return c.json({ total: resultado.creados.length }, 201)
+    } catch (err) {
+      if (err instanceof AltaMasivaVacia) return c.json({ error: err.code, message: err.message }, 400)
+      if (err instanceof ClaProductoNoEncontrado) return c.json({ error: err.code, message: err.message, ids: err.ids }, 404)
+      throw err
+    }
+  },
+)
+
+// ─── POST /api/tenant/catalogo/servicios/bulk ─────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/catalogo/servicios/bulk",
+    operationId: "wizard_bulk_servicios",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Servicios médicos creados", z.object({ creados: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const { ids } = await c.req.json()
+    const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true } })
+    if (!consultorio) return c.json({ creados: 0 }, 201)
+    const result = await db.servicioMedico.createMany({
+      data: ids.map((nombre: string) => ({ consultorioId: consultorio.id, nombre, createdById: session.user.id })),
+      skipDuplicates: true,
+    })
+    return c.json({ creados: result.count }, 201)
+  },
+)
+
+// ─── POST /api/tenant/proveedores/bulk ────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/proveedores/bulk",
+    operationId: "wizard_bulk_proveedores",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Proveedores creados", z.object({ creados: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const { ids } = await c.req.json()
+    const result = await db.proveedor.createMany({
+      data: ids.map((nombre: string) => ({ tenantId, nombre, createdById: session.user.id })),
+      skipDuplicates: true,
+    })
+    return c.json({ creados: result.count }, 201)
+  },
+)
+
+// ─── POST /api/tenant/turnos/bulk ─────────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/turnos/bulk",
+    operationId: "wizard_bulk_turnos",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Turnos de atención creados", z.object({ creados: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const { ids } = await c.req.json()
+    const result = await db.turnosDeAtencion.createMany({
+      data: ids.map((turno: string) => ({ tenantId, turno, createdById: session.user.id })),
+      skipDuplicates: true,
+    })
+    return c.json({ creados: result.count }, 201)
+  },
+)
+
+// ─── POST /api/tenant/seguros/bulk ────────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/seguros/bulk",
+    operationId: "wizard_bulk_seguros",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Seguros guardados", z.object({ ok: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const { ids } = await c.req.json()
+    const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+    if (consultorio) {
+      const contacto = (consultorio.contactoPublico as Record<string, unknown>) ?? {}
+      await db.consultorio.update({
+        where: { tenantId },
+        data: { contactoPublico: { ...contacto, seguros: ids } },
+      })
+    }
+    return c.json({ ok: true }, 201)
+  },
+)
+
+// ─── POST /api/tenant/especialidades/bulk ────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/especialidades/bulk",
+    operationId: "wizard_bulk_especialidades",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Especialidades guardadas", z.object({ ok: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const { ids } = await c.req.json()
+    const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true } })
+    if (consultorio) {
+      await db.consultorio.update({ where: { tenantId }, data: { especialidades: ids } })
+    }
+    return c.json({ ok: true }, 201)
+  },
+)
+
+// ─── POST /api/tenant/categorias/bulk ────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/categorias/bulk",
+    operationId: "wizard_bulk_categorias",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    },
+    responses: {
+      201: createdResponse("Tipos de cocina guardados", z.object({ ok: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const { ids } = await c.req.json()
+    const restaurante = await db.restaurante.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+    if (restaurante) {
+      const contacto = (restaurante.contactoPublico as Record<string, unknown>) ?? {}
+      await db.restaurante.update({
+        where: { tenantId },
+        data: { contactoPublico: { ...contacto, tiposCocina: ids } },
+      })
+    }
+    return c.json({ ok: true }, 201)
+  },
+)
+
+// ─── POST /api/tenant/zonas/bulk ──────────────────────────────────────────────
+
+const ZonaMesaSchema = z.object({
+  nombre: z.string(),
+  mesas: z.array(z.object({ numero: z.number() })),
+})
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/zonas/bulk",
+    operationId: "wizard_bulk_zonas",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: z.object({ zonas: z.array(ZonaMesaSchema) }) } } },
+    },
+    responses: {
+      201: createdResponse("Zonas guardadas", z.object({ ok: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const { zonas } = await c.req.json()
+    const restaurante = await db.restaurante.findUnique({ where: { tenantId }, select: { id: true, contactoPublico: true } })
+    if (restaurante) {
+      const contacto = (restaurante.contactoPublico as Record<string, unknown>) ?? {}
+      await db.restaurante.update({
+        where: { tenantId },
+        data: { contactoPublico: { ...contacto, zonas } },
+      })
+    }
+    return c.json({ ok: true }, 201)
+  },
+)
+
+// ─── GET /api/tenant/puntos-de-venta ─────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/puntos-de-venta",
+    operationId: "wizard_listar_pdv",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Lista de puntos de venta", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const pdv = await db.puntosDeVenta.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "asc" },
+    })
+    return c.json({ data: pdv })
+  },
+)
+
+// ─── POST /api/tenant/puntos-de-venta ────────────────────────────────────────
+
+const PdvCreateSchema = z.object({
+  nombre: z.string().min(1),
+  direccion: z.string().optional(),
+  telefono: z.string().optional(),
+  sucursal: z.string().optional(),
+  tipo: z.string().optional(),
+})
+
+wizardRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/puntos-de-venta",
+    operationId: "wizard_crear_pdv",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      body: { content: { "application/json": { schema: PdvCreateSchema } } },
+    },
+    responses: {
+      201: createdResponse("Punto de venta creado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const body = PdvCreateSchema.parse(await c.req.json())
+    try {
+      const pdv = await db.puntosDeVenta.create({
+        data: { tenantId, ...body, createdById: session.user.id },
+      })
+      return c.json(pdv, 201)
+    } catch {
+      return c.json({ error: "PDV_DUPLICADO", message: "Ya existe un punto de venta con ese nombre." }, 409)
+    }
+  },
+)
+
+// ─── PATCH /api/tenant/puntos-de-venta/{id} ──────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/puntos-de-venta/{id}",
+    operationId: "wizard_actualizar_pdv",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: {
+      params: z.object({ id: z.string() }),
+      body: { content: { "application/json": { schema: PdvCreateSchema.partial() } } },
+    },
+    responses: {
+      200: okResponse("Punto de venta actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    const id = c.req.param("id")
+    const body = PdvCreateSchema.partial().parse(await c.req.json())
+    const pdv = await db.puntosDeVenta.findFirst({ where: { id, tenantId } })
+    if (!pdv) return c.json({ error: "PDV_NO_ENCONTRADO", message: "Punto de venta no encontrado." }, 404)
+    const updated = await db.puntosDeVenta.update({
+      where: { id },
+      data: { ...body, updatedById: session.user.id },
+    })
+    return c.json(updated)
+  },
+)
+
+// ─── DELETE /api/tenant/puntos-de-venta/{id} ─────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/puntos-de-venta/{id}",
+    operationId: "wizard_eliminar_pdv",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Punto de venta eliminado", z.object({ deleted: z.boolean() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const id = c.req.param("id")
+    const pdv = await db.puntosDeVenta.findFirst({ where: { id, tenantId } })
+    if (!pdv) return c.json({ error: "PDV_NO_ENCONTRADO", message: "Punto de venta no encontrado." }, 404)
+    await db.puntosDeVenta.delete({ where: { id } })
+    return c.json({ deleted: true })
+  },
+)
