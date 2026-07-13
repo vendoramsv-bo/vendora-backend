@@ -458,7 +458,7 @@ export class ProductoPrismaRepository implements IProductoRepository {
 
   async altaMasiva(claProductoIds: string[], tenantId: string, userId: string): Promise<AltaMasivaResult> {
     return this.db.$transaction(async (tx: typeof this.db) => {
-      const plantillas = await this.db.claProducto.findMany({
+      const plantillas = await tx.claProducto.findMany({
         where: { id: { in: claProductoIds } },
         include: { claActividadEconomica: true, claCategoria: true, claUnidadMedida: true },
       })
@@ -504,14 +504,27 @@ export class ProductoPrismaRepository implements IProductoRepository {
               {
                 tenantId,
                 claUnidadId: plantilla.claUnidadId,
-                unidad: plantilla.claUnidadMedida.nombre,
-                sigla: plantilla.claUnidadMedida.sigla ?? plantilla.claUnidadMedida.nombre.slice(0, 3).toUpperCase(),
-                descripcion: plantilla.claUnidadMedida.descripcion ?? plantilla.claUnidadMedida.nombre,
+                unidad: plantilla.claUnidadMedida.unidad,
+                sigla: plantilla.claUnidadMedida.sigla,
+                descripcion: plantilla.claUnidadMedida.descripcion ?? plantilla.claUnidadMedida.unidad,
               },
               userId,
             ),
           })
           unidadesMedidaCreadas++
+        }
+
+        const yaExiste = await tx.producto.findFirst({
+          where: { tenantId, actividadId: actividadTenant.id, categoriaId: categoriaTenant.id, codigo: plantilla.codigo },
+          include: {
+            ...PRODUCTO_INCLUDE,
+            productosOfertas: { where: ofertasVigentesWhere() },
+            preciosVolumen: { where: { estado: "ACTIVO" } },
+          },
+        })
+        if (yaExiste) {
+          creados.push(ProductoEntity.fromPrisma(yaExiste as ProductoRaw))
+          continue
         }
 
         const raw = await tx.producto.create({
@@ -543,6 +556,6 @@ export class ProductoPrismaRepository implements IProductoRepository {
       }
 
       return { creados, categoriasCreadas, unidadesMedidaCreadas }
-    })
+    }, { timeout: 30000, maxWait: 10000 })
   }
 }

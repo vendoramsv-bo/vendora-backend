@@ -221,6 +221,32 @@ actividadEconomicaRouter.openapi(
   async (c) => c.json({ data: TIPOS_COCINA_GLOBALES }),
 )
 
+// ─── GET /api/catalogo/cla-productos?claActividadId=X ────────────────────────
+
+actividadEconomicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/cla-productos",
+    operationId: "catalogo_listar_cla_productos",
+    tags: ["Catálogo"],
+    security: [{ bearerAuth: [] }],
+    request: { query: z.object({ claActividadId: z.string().optional() }) },
+    responses: {
+      200: okResponse("Productos del clasificador global", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const { claActividadId } = c.req.query()
+    const productos = await db.claProducto.findMany({
+      where: claActividadId ? { claActividadId } : undefined,
+      select: { id: true, nombre: true, codigo: true, precio: true },
+      orderBy: { nombre: "asc" },
+    })
+    return c.json({ data: productos })
+  },
+)
+
 // ─── /cla-actividades (original) ─────────────────────────────────────────────
 
 actividadEconomicaRouter.openapi(

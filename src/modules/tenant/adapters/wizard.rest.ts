@@ -231,6 +231,35 @@ wizardRouter.openapi(
   },
 )
 
+// ─── GET /api/tenant/actividades-economicas ──────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/actividades-economicas",
+    operationId: "wizard_listar_actividades_tenant",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse(
+        "Actividades económicas del tenant",
+        z.object({ data: z.array(z.object({ id: z.string(), nombre: z.string() })) }),
+      ),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const actividades = await db.actividadEconomica.findMany({
+      where: { tenantId },
+      select: { claActividadId: true, claActividadEconomica: { select: { nombre: true } } },
+    })
+    return c.json({
+      data: actividades.map((a: any) => ({ id: a.claActividadId, nombre: a.claActividadEconomica?.nombre ?? "" })),
+    })
+  },
+)
+
 // ─── POST /api/tenant/actividades-economicas/bulk ────────────────────────────
 
 wizardRouter.openapi(
@@ -253,11 +282,84 @@ wizardRouter.openapi(
     const tenantId = c.get("tenantId")
     const session = c.get("session")
     const { ids } = await c.req.json()
-    const result = await db.actividadEconomica.createMany({
-      data: ids.map((claActividadId: string) => ({ tenantId, claActividadId, createdById: session.user.id })),
-      skipDuplicates: true,
+    const uniqueIds: string[] = [...new Set<string>(ids)]
+
+    // Sincronizar: agregar las nuevas, eliminar las que se de-seleccionaron
+    const existentes = await db.actividadEconomica.findMany({
+      where: { tenantId },
+      select: { claActividadId: true },
     })
-    return c.json({ creadas: result.count }, 201)
+    const existentesIds: string[] = existentes.map((e: any) => e.claActividadId)
+    const paraAgregar = uniqueIds.filter((id) => !existentesIds.includes(id))
+    const paraEliminar = existentesIds.filter((id) => !uniqueIds.includes(id))
+
+    await db.$transaction(async (tx: any) => {
+      if (paraEliminar.length > 0) {
+        await tx.actividadEconomica.deleteMany({ where: { tenantId, claActividadId: { in: paraEliminar } } })
+      }
+      if (paraAgregar.length > 0) {
+        await tx.actividadEconomica.createMany({
+          data: paraAgregar.map((claActividadId) => ({ tenantId, claActividadId, createdById: session.user.id })),
+        })
+      }
+    })
+    return c.json({ creadas: uniqueIds.length }, 201)
+  },
+)
+
+// ─── GET /api/tenant/catalogo/productos-seleccionados ────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/catalogo/productos-seleccionados",
+    operationId: "wizard_listar_productos_seleccionados",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse(
+        "Productos ya guardados en el tenant, con sus claProductoId y claActividadId",
+        z.object({ data: z.array(z.object({ claActividadId: z.string(), claProductoId: z.string(), nombre: z.string() })) }),
+      ),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+
+    const productos = await db.producto.findMany({
+      where: { tenantId },
+      select: { codigo: true, nombre: true, actividadId: true },
+    })
+
+    if (productos.length === 0) return c.json({ data: [] })
+
+    const actividadIds: string[] = [...new Set<string>(productos.map((p: any) => p.actividadId))]
+    const actividades = await db.actividadEconomica.findMany({
+      where: { id: { in: actividadIds } },
+      select: { id: true, claActividadId: true },
+    })
+    const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
+
+    const productosConCla = productos
+      .map((p: any) => ({ codigo: p.codigo, nombre: p.nombre, claActividadId: actividadMap.get(p.actividadId) ?? null }))
+      .filter((p: any) => p.claActividadId !== null)
+
+    if (productosConCla.length === 0) return c.json({ data: [] })
+
+    const claProductos = await db.claProducto.findMany({
+      where: { OR: productosConCla.map((p: any) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
+      select: { id: true, codigo: true, claActividadId: true },
+    })
+
+    const result = productosConCla
+      .map((p: any) => {
+        const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
+        return cla ? { claActividadId: p.claActividadId, claProductoId: cla.id, nombre: p.nombre } : null
+      })
+      .filter(Boolean)
+
+    return c.json({ data: result })
   },
 )
 
