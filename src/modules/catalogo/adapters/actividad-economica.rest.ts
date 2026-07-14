@@ -43,13 +43,6 @@ actividadEconomicaRouter.openapi(
 
 // ─── Catálogos globales fijos para el wizard ──────────────────────────────────
 
-const TURNOS_GLOBALES = [
-  { id: "MANANA", nombre: "Mañana", descripcion: "Turno de la mañana (6:00 - 12:00)" },
-  { id: "TARDE", nombre: "Tarde", descripcion: "Turno de la tarde (12:00 - 18:00)" },
-  { id: "NOCHE", nombre: "Noche", descripcion: "Turno de la noche (18:00 - 24:00)" },
-  { id: "MADRUGADA", nombre: "Madrugada", descripcion: "Turno de madrugada (0:00 - 6:00)" },
-]
-
 actividadEconomicaRouter.openapi(
   createRoute({
     method: "get",
@@ -58,26 +51,18 @@ actividadEconomicaRouter.openapi(
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
     responses: {
-      200: okResponse("Lista de turnos de atención globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      200: okResponse("Lista de turnos del clasificador global", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,
     },
   }),
-  async (c) => c.json({ data: TURNOS_GLOBALES }),
+  async (c) => {
+    const turnos = await db.claTurnosDeAtencion.findMany({
+      select: { id: true, turno: true, descripcion: true },
+      orderBy: { createdAt: "asc" },
+    })
+    return c.json({ data: turnos.map((t: any) => ({ id: t.id, nombre: t.turno, descripcion: t.descripcion })) })
+  },
 )
-
-const PROVEEDORES_GLOBALES = [
-  { id: "ALICORP", nombre: "Alicorp Bolivia" },
-  { id: "COCA_COLA", nombre: "Coca Cola Bolivia" },
-  { id: "PACEÑA", nombre: "Cervecería Boliviana Nacional" },
-  { id: "SOBOCE", nombre: "SOBOCE" },
-  { id: "COBOCE", nombre: "COBOCE" },
-  { id: "DELIZIA", nombre: "Delizia" },
-  { id: "PIL_ANDINA", nombre: "PIL Andina" },
-  { id: "FRITZ", nombre: "Fritz Bolivia" },
-  { id: "IMBA", nombre: "IMBA" },
-  { id: "INSUMOS_MEDICOS", nombre: "Insumos Médicos Bolivia" },
-  { id: "FARMACORP", nombre: "Farmacorp" },
-]
 
 actividadEconomicaRouter.openapi(
   createRoute({
@@ -87,11 +72,17 @@ actividadEconomicaRouter.openapi(
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
     responses: {
-      200: okResponse("Lista de proveedores globales", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      200: okResponse("Lista de proveedores del clasificador global", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,
     },
   }),
-  async (c) => c.json({ data: PROVEEDORES_GLOBALES }),
+  async (c) => {
+    const proveedores = await db.claProveedor.findMany({
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    })
+    return c.json({ data: proveedores })
+  },
 )
 
 const SERVICIOS_MEDICOS_GLOBALES = [

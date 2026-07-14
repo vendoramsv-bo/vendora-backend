@@ -64,15 +64,34 @@ wizardRouter.openapi(
     })
     if (!tenant) return c.json({ error: "TENANT_NO_ENCONTRADO" }, 404)
 
-    const propietario = await db.propietario.findUnique({
-      where: { tenantId },
-      select: { id: true, nombres: true, telefono: true, domicilio: true, nombreReferencia: true, telefonoReferencia: true, imagenUrl: true },
-    })
+    const [propietario, tienda] = await Promise.all([
+      db.propietario.findUnique({
+        where: { tenantId },
+        select: { id: true, nombres: true, telefono: true, domicilio: true, nombreReferencia: true, telefonoReferencia: true, imagenUrl: true },
+      }),
+      db.tienda.findUnique({
+        where: { tenantId },
+        select: {
+          id: true,
+          configuracion: {
+            select: {
+              tipoDeTienda: true,
+              cantidadPuntosDeVenta: true,
+              cantidadVendedores: true,
+              tema: true,
+              tipoDespliegueVentas: true,
+              tipoLineado: true,
+            },
+          },
+        },
+      }),
+    ])
 
     return c.json({
       ...tenant,
       ultimoPasoCreacion: intToPaso(tenant.ultimoPasoCreacion),
       propietario: propietario ?? null,
+      configuracion: tienda?.configuracion ?? null,
     })
   },
 )
@@ -204,25 +223,55 @@ wizardRouter.openapi(
       const tienda = await db.tienda.findUnique({ where: { tenantId }, select: { id: true } })
       if (tienda) {
         const cfg = body.configuracion as Record<string, unknown>
-        await db.configuracion.upsert({
-          where: { tiendaId: tienda.id },
-          create: {
-            tiendaId: tienda.id,
-            tipoDeTienda: (cfg.tipoDeTienda as string) ?? "PEQUENA",
-            cantidadPuntosDeVenta: (cfg.cantidadPuntosDeVenta as number) ?? 1,
-            cantidadVendedores: (cfg.cantidadVendedores as number) ?? 1,
-            tema: (cfg.tema as string) ?? "clay",
-            tipoDespliegueVentas: (cfg.tipoDespliegueVentas as string) ?? "BARRA_LATERAL",
-            tipoLineado: (cfg.tipoLineado as string) ?? "curvedLine",
-          },
-          update: {
-            ...(cfg.tipoDeTienda !== undefined ? { tipoDeTienda: cfg.tipoDeTienda as string } : {}),
-            ...(cfg.cantidadPuntosDeVenta !== undefined ? { cantidadPuntosDeVenta: cfg.cantidadPuntosDeVenta as number } : {}),
-            ...(cfg.cantidadVendedores !== undefined ? { cantidadVendedores: cfg.cantidadVendedores as number } : {}),
-            ...(cfg.tema !== undefined ? { tema: cfg.tema as string } : {}),
-            ...(cfg.tipoDespliegueVentas !== undefined ? { tipoDespliegueVentas: cfg.tipoDespliegueVentas as string } : {}),
-            ...(cfg.tipoLineado !== undefined ? { tipoLineado: cfg.tipoLineado as string } : {}),
-          },
+        const cantidadPuntosDeVenta = cfg.cantidadPuntosDeVenta as number | undefined
+
+        await db.$transaction(async (tx: any) => {
+          await tx.configuracion.upsert({
+            where: { tiendaId: tienda.id },
+            create: {
+              tiendaId: tienda.id,
+              tipoDeTienda: (cfg.tipoDeTienda as string) ?? "PEQUENA",
+              cantidadPuntosDeVenta: cantidadPuntosDeVenta ?? 1,
+              cantidadVendedores: (cfg.cantidadVendedores as number) ?? 1,
+              tema: (cfg.tema as string) ?? "clay",
+              tipoDespliegueVentas: (cfg.tipoDespliegueVentas as string) ?? "BARRA_LATERAL",
+              tipoLineado: (cfg.tipoLineado as string) ?? "curvedLine",
+            },
+            update: {
+              ...(cfg.tipoDeTienda !== undefined ? { tipoDeTienda: cfg.tipoDeTienda as string } : {}),
+              ...(cantidadPuntosDeVenta !== undefined ? { cantidadPuntosDeVenta } : {}),
+              ...(cfg.cantidadVendedores !== undefined ? { cantidadVendedores: cfg.cantidadVendedores as number } : {}),
+              ...(cfg.tema !== undefined ? { tema: cfg.tema as string } : {}),
+              ...(cfg.tipoDespliegueVentas !== undefined ? { tipoDespliegueVentas: cfg.tipoDespliegueVentas as string } : {}),
+              ...(cfg.tipoLineado !== undefined ? { tipoLineado: cfg.tipoLineado as string } : {}),
+            },
+          })
+
+          // Al definir la cantidad de puntos de venta se completan o quitan los que corresponda hasta llegar a esa cantidad
+          if (cantidadPuntosDeVenta !== undefined) {
+            const existentes = await tx.puntosDeVenta.count({ where: { tenantId } })
+            if (cantidadPuntosDeVenta > existentes) {
+              await tx.puntosDeVenta.createMany({
+                data: Array.from({ length: cantidadPuntosDeVenta - existentes }, (_, i) => ({
+                  tenantId,
+                  nombre: `Punto de Venta ${existentes + i + 1}`,
+                  createdById: session.user.id,
+                })),
+              })
+            } else if (cantidadPuntosDeVenta < existentes) {
+              // Solo se eliminan los últimos puntos de venta sin ventas ni aperturas de caja registradas,
+              // para no perder historial si el punto de venta ya fue usado
+              const eliminables = await tx.puntosDeVenta.findMany({
+                where: { tenantId, ventas: { none: {} }, aperturasCierresDeCaja: { none: {} } },
+                orderBy: { createdAt: "desc" },
+                take: existentes - cantidadPuntosDeVenta,
+                select: { id: true },
+              })
+              if (eliminables.length > 0) {
+                await tx.puntosDeVenta.deleteMany({ where: { id: { in: eliminables.map((p: any) => p.id) } } })
+              }
+            }
+          }
         })
       }
     }
@@ -433,6 +482,30 @@ wizardRouter.openapi(
   },
 )
 
+// ─── GET /api/tenant/proveedores ─────────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/proveedores",
+    operationId: "wizard_listar_proveedores_tenant",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Proveedores guardados del tenant", z.object({ data: z.array(z.object({ nombre: z.string() })) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const proveedores = await db.proveedor.findMany({
+      where: { tenantId, claProveedorId: { not: null } },
+      select: { claProveedorId: true, nombre: true },
+    })
+    return c.json({ data: proveedores.map((p: any) => ({ claProveedorId: p.claProveedorId, nombre: p.nombre })) })
+  },
+)
+
 // ─── POST /api/tenant/proveedores/bulk ────────────────────────────────────────
 
 wizardRouter.openapi(
@@ -455,11 +528,69 @@ wizardRouter.openapi(
     const tenantId = c.get("tenantId")
     const session = c.get("session")
     const { ids } = await c.req.json()
-    const result = await db.proveedor.createMany({
-      data: ids.map((nombre: string) => ({ tenantId, nombre, createdById: session.user.id })),
-      skipDuplicates: true,
+    const uniqueIds: string[] = [...new Set<string>(ids)]
+
+    // Obtener nombre real desde ClaProveedor
+    const claProveedores = await db.claProveedor.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, nombre: true, direccion: true, telefono: true },
     })
-    return c.json({ creados: result.count }, 201)
+    const claMap = new Map<string, any>(claProveedores.map((p: any) => [p.id, p]))
+
+    // Diff: proveedores del tenant que vinieron del clasificador
+    const existentes = await db.proveedor.findMany({
+      where: { tenantId, claProveedorId: { not: null } },
+      select: { claProveedorId: true },
+    })
+    const existentesIds: string[] = existentes.map((p: any) => p.claProveedorId)
+    const paraAgregar = uniqueIds.filter((id) => !existentesIds.includes(id))
+    const paraEliminar = existentesIds.filter((id) => !uniqueIds.includes(id))
+
+    await db.$transaction(async (tx: any) => {
+      if (paraEliminar.length > 0) {
+        await tx.proveedor.deleteMany({ where: { tenantId, claProveedorId: { in: paraEliminar } } })
+      }
+      if (paraAgregar.length > 0) {
+        await tx.proveedor.createMany({
+          data: paraAgregar.map((claProveedorId) => {
+            const cla = claMap.get(claProveedorId)
+            return {
+              tenantId,
+              claProveedorId,
+              nombre: cla?.nombre ?? claProveedorId,
+              direccion: cla?.direccion ?? undefined,
+              telefono: cla?.telefono ?? undefined,
+              createdById: session.user.id,
+            }
+          }),
+        })
+      }
+    })
+    return c.json({ creados: uniqueIds.length }, 201)
+  },
+)
+
+// ─── GET /api/tenant/turnos ───────────────────────────────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/turnos",
+    operationId: "wizard_listar_turnos_tenant",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Turnos del tenant", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const turnos = await db.turnosDeAtencion.findMany({
+      where: { tenantId, claTurnoId: { not: null } },
+      select: { claTurnoId: true, turno: true },
+    })
+    return c.json({ data: turnos.map((t: any) => ({ claTurnoId: t.claTurnoId, nombre: t.turno })) })
   },
 )
 
@@ -477,7 +608,7 @@ wizardRouter.openapi(
       body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
     },
     responses: {
-      201: createdResponse("Turnos de atención creados", z.object({ creados: z.number() })),
+      201: createdResponse("Turnos de atención sincronizados", z.object({ creados: z.number() })),
       ...errorResponses,
     },
   }),
@@ -485,11 +616,40 @@ wizardRouter.openapi(
     const tenantId = c.get("tenantId")
     const session = c.get("session")
     const { ids } = await c.req.json()
-    const result = await db.turnosDeAtencion.createMany({
-      data: ids.map((turno: string) => ({ tenantId, turno, createdById: session.user.id })),
-      skipDuplicates: true,
+    const uniqueIds: string[] = [...new Set<string>(ids)]
+
+    // Obtener nombre real desde ClaTurnosDeAtencion
+    const claTurnos = await db.claTurnosDeAtencion.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, turno: true },
     })
-    return c.json({ creados: result.count }, 201)
+    const claMap = new Map<string, string>(claTurnos.map((t: any) => [t.id, t.turno]))
+
+    // Diff contra los turnos del tenant que vinieron del clasificador
+    const existentes = await db.turnosDeAtencion.findMany({
+      where: { tenantId, claTurnoId: { not: null } },
+      select: { claTurnoId: true },
+    })
+    const existentesIds: string[] = existentes.map((t: any) => t.claTurnoId)
+    const paraAgregar = uniqueIds.filter((id) => !existentesIds.includes(id))
+    const paraEliminar = existentesIds.filter((id) => !uniqueIds.includes(id))
+
+    await db.$transaction(async (tx: any) => {
+      if (paraEliminar.length > 0) {
+        await tx.turnosDeAtencion.deleteMany({ where: { tenantId, claTurnoId: { in: paraEliminar } } })
+      }
+      if (paraAgregar.length > 0) {
+        await tx.turnosDeAtencion.createMany({
+          data: paraAgregar.map((claTurnoId) => ({
+            tenantId,
+            claTurnoId,
+            turno: claMap.get(claTurnoId) ?? claTurnoId,
+            createdById: session.user.id,
+          })),
+        })
+      }
+    })
+    return c.json({ creados: uniqueIds.length }, 201)
   },
 )
 

@@ -457,75 +457,93 @@ export class ProductoPrismaRepository implements IProductoRepository {
   // ─── Alta masiva desde catálogo maestro ──────────────────────────────────────
 
   async altaMasiva(claProductoIds: string[], tenantId: string, userId: string): Promise<AltaMasivaResult> {
+    // ── Fase 1: todas las lecturas en batch, fuera de transacción ─────────────
+    const plantillas = await this.db.claProducto.findMany({
+      where: { id: { in: claProductoIds } },
+      include: { claActividadEconomica: true, claCategoria: true, claUnidadMedida: true },
+    })
+
+    const encontradosIds = new Set(plantillas.map((p: any) => p.id))
+    const noEncontrados = claProductoIds.filter((id) => !encontradosIds.has(id))
+    if (noEncontrados.length > 0) throw new ClaProductoNoEncontrado(noEncontrados)
+
+    const claActividadIds = [...new Set<string>(plantillas.map((p: any) => p.claActividadId))]
+    const claCategoriaIds = [...new Set<string>(plantillas.map((p: any) => p.claCategoriaId))]
+    const claUnidadIds = [...new Set<string>(plantillas.map((p: any) => p.claUnidadId))]
+
+    const [actividadesExistentes, categoriasExistentes, unidadesExistentes] = await Promise.all([
+      this.db.actividadEconomica.findMany({ where: { tenantId, claActividadId: { in: claActividadIds } } }),
+      this.db.categoria.findMany({ where: { tenantId, claCategoriaId: { in: claCategoriaIds } } }),
+      this.db.unidadMedida.findMany({ where: { tenantId, claUnidadId: { in: claUnidadIds } } }),
+    ])
+
+    const actividadMap = new Map<string, any>(actividadesExistentes.map((a: any) => [a.claActividadId, a]))
+    const categoriaMap = new Map<string, any>(categoriasExistentes.map((c: any) => [c.claCategoriaId, c]))
+    const unidadMap = new Map<string, any>(unidadesExistentes.map((u: any) => [u.claUnidadId, u]))
+
+    for (const plantilla of plantillas) {
+      if (!actividadMap.has((plantilla as any).claActividadId)) {
+        throw new Error(`Actividad económica no activada para el tenant: ${(plantilla as any).claActividadEconomica.nombre}`)
+      }
+    }
+
+    // Pre-cargar productos existentes para detectar duplicados sin query dentro de tx
+    const actividadIdsDelTenant = actividadesExistentes.map((a: any) => a.id)
+    const productosExistentes = await this.db.producto.findMany({
+      where: { tenantId, actividadId: { in: actividadIdsDelTenant } },
+      select: { actividadId: true, codigo: true },
+    })
+    const productosExistentesSet = new Set<string>(
+      productosExistentes.map((p: any) => `${p.actividadId}:${p.codigo}`),
+    )
+
+    // ── Fase 2: solo escrituras dentro de la transacción ─────────────────────
     return this.db.$transaction(async (tx: typeof this.db) => {
-      const plantillas = await tx.claProducto.findMany({
-        where: { id: { in: claProductoIds } },
-        include: { claActividadEconomica: true, claCategoria: true, claUnidadMedida: true },
-      })
-
-      const encontradosIds = new Set(plantillas.map((p: { id: string }) => p.id))
-      const noEncontrados = claProductoIds.filter((id) => !encontradosIds.has(id))
-      if (noEncontrados.length > 0) throw new ClaProductoNoEncontrado(noEncontrados)
-
       let categoriasCreadas = 0
       let unidadesMedidaCreadas = 0
       const creados: ProductoEntity[] = []
 
       for (const plantilla of plantillas) {
-        const actividadTenant = await tx.actividadEconomica.findFirst({
-          where: { tenantId, claActividadId: plantilla.claActividadId },
-        })
-        if (!actividadTenant) throw new Error(`Actividad económica no activada para el tenant: ${plantilla.claActividadEconomica.nombre}`)
+        const actividadTenant = actividadMap.get((plantilla as any).claActividadId)!
 
-        let categoriaTenant = await tx.categoria.findFirst({
-          where: { tenantId, claCategoriaId: plantilla.claCategoriaId },
-        })
-        if (!categoriaTenant) {
-          categoriaTenant = await tx.categoria.create({
+        if (!categoriaMap.has((plantilla as any).claCategoriaId)) {
+          const nueva = await tx.categoria.create({
             data: withAudit(
               {
                 tenantId,
                 actividadId: actividadTenant.id,
-                nombre: plantilla.claCategoria.nombre,
-                claCategoriaId: plantilla.claCategoriaId,
+                nombre: (plantilla as any).claCategoria.nombre,
+                claCategoriaId: (plantilla as any).claCategoriaId,
               },
               userId,
             ),
           })
+          categoriaMap.set((plantilla as any).claCategoriaId, nueva)
           categoriasCreadas++
         }
+        const categoriaTenant = categoriaMap.get((plantilla as any).claCategoriaId)!
 
-        let unidadTenant = await tx.unidadMedida.findFirst({
-          where: { tenantId, claUnidadId: plantilla.claUnidadId },
-        })
-        if (!unidadTenant) {
-          unidadTenant = await tx.unidadMedida.create({
+        if (!unidadMap.has((plantilla as any).claUnidadId)) {
+          const nueva = await tx.unidadMedida.create({
             data: withAudit(
               {
                 tenantId,
-                claUnidadId: plantilla.claUnidadId,
-                unidad: plantilla.claUnidadMedida.unidad,
-                sigla: plantilla.claUnidadMedida.sigla,
-                descripcion: plantilla.claUnidadMedida.descripcion ?? plantilla.claUnidadMedida.unidad,
+                claUnidadId: (plantilla as any).claUnidadId,
+                unidad: (plantilla as any).claUnidadMedida.unidad,
+                sigla: (plantilla as any).claUnidadMedida.sigla,
+                descripcion: (plantilla as any).claUnidadMedida.descripcion ?? (plantilla as any).claUnidadMedida.unidad,
               },
               userId,
             ),
           })
+          unidadMap.set((plantilla as any).claUnidadId, nueva)
           unidadesMedidaCreadas++
         }
+        const unidadTenant = unidadMap.get((plantilla as any).claUnidadId)!
 
-        const yaExiste = await tx.producto.findFirst({
-          where: { tenantId, actividadId: actividadTenant.id, categoriaId: categoriaTenant.id, codigo: plantilla.codigo },
-          include: {
-            ...PRODUCTO_INCLUDE,
-            productosOfertas: { where: ofertasVigentesWhere() },
-            preciosVolumen: { where: { estado: "ACTIVO" } },
-          },
-        })
-        if (yaExiste) {
-          creados.push(ProductoEntity.fromPrisma(yaExiste as ProductoRaw))
-          continue
-        }
+        // Saltar si el producto ya existe (detectado en fase 1 sin query)
+        const productKey = `${actividadTenant.id}:${(plantilla as any).codigo}`
+        if (productosExistentesSet.has(productKey)) continue
 
         const raw = await tx.producto.create({
           data: withAudit(
@@ -534,12 +552,12 @@ export class ProductoPrismaRepository implements IProductoRepository {
               actividadId: actividadTenant.id,
               categoriaId: categoriaTenant.id,
               unidadId: unidadTenant.id,
-              codigo: plantilla.codigo,
-              nombre: plantilla.nombre,
-              descripcion: plantilla.descripcion ?? undefined,
-              imagenUrl: plantilla.imagenUrl ?? undefined,
-              tipoProducto: plantilla.tipoProducto,
-              precio: Number(plantilla.precio),
+              codigo: (plantilla as any).codigo,
+              nombre: (plantilla as any).nombre,
+              descripcion: (plantilla as any).descripcion ?? undefined,
+              imagenUrl: (plantilla as any).imagenUrl ?? undefined,
+              tipoProducto: (plantilla as any).tipoProducto,
+              precio: Number((plantilla as any).precio),
               cantidadStock: 0,
               stockMinimo: 0,
               tipoDescuento: "SIN_DESCUENTO",
@@ -553,6 +571,7 @@ export class ProductoPrismaRepository implements IProductoRepository {
           },
         })
         creados.push(ProductoEntity.fromPrisma(raw as ProductoRaw))
+        productosExistentesSet.add(productKey)
       }
 
       return { creados, categoriasCreadas, unidadesMedidaCreadas }
