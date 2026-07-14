@@ -17,9 +17,9 @@
 
 **Purpose**: Install dependencies and create shared helpers required by all module migrations.
 
-- [ ] T001 Install `@hono/swagger-ui` dependency via `npm install @hono/swagger-ui` and verify entry in `package.json`
-- [ ] T002 Create `src/core/openapi-responses.ts` with `okResponse`, `createdResponse`, `errorResponses` (400/401/403/404/409/422), `ErrorResponseSchema`, and `PaginatedMetaSchema` per `contracts/migration-pattern.md`
-- [ ] T003 Add `bearerAuth` HTTP Bearer security scheme to `components.securitySchemes` inside the `app.doc()` config object in `src/server/hono.ts` so all `security: [{ bearerAuth: [] }]` route declarations resolve correctly
+- [x] T001 Install `@hono/swagger-ui` dependency via `npm install @hono/swagger-ui` and verify entry in `package.json`
+- [x] T002 Create `src/core/openapi-responses.ts` with `okResponse`, `createdResponse`, `errorResponses` (400/401/403/404/409/422), `ErrorResponseSchema`, and `PaginatedMetaSchema` per `contracts/migration-pattern.md`
+- [x] T003 Add `bearerAuth` HTTP Bearer security scheme to `components.securitySchemes` inside the `app.doc()` config object in `src/server/hono.ts` so all `security: [{ bearerAuth: [] }]` route declarations resolve correctly
 
 ---
 
@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: Write the test first so it fails while migrations are pending; it becomes the acceptance gate for US1.
 
-- [ ] T004 Create `tests/integration/openapi.spec.ts` with two Vitest tests: (1) `GET /api/openapi.json` returns >100 entries in `paths`, (2) all `operationId` values across every path item are globally unique — import `crearApp()` from `src/server/hono.ts` directly (no server needed) per `contracts/migration-pattern.md`
+- [x] T004 Create `tests/integration/openapi.spec.ts` with two Vitest tests: (1) `GET /api/openapi.json` returns >100 entries in `paths`, (2) all `operationId` values across every path item are globally unique — import `crearApp()` from `src/server/hono.ts` directly (no server needed) per `contracts/migration-pattern.md`
 
 **Checkpoint**: Foundation ready — module-by-module US1 migration can now begin.
 
@@ -43,89 +43,89 @@
 
 ### Grupo 1 — Tenant
 
-- [ ] T005 [US1] Migrate `src/modules/tenant/adapters/tenant.rest.ts` → `OpenAPIHono<HonoEnv>`, convert 4 routes (`GET /`, `GET /actual`, `GET /miembros`, `GET /invitaciones`) using `createRoute` with `operationId` pattern `tenant_{verbo}_{recurso}`, tag `Tenant`, `security: [{ bearerAuth: [] }]`, import helpers from `src/core/openapi-responses.ts`; run `npx tsc --noEmit` after
+- [x] T005 [US1] Migrate `src/modules/tenant/adapters/tenant.rest.ts` → `OpenAPIHono<HonoEnv>`, convert 4 routes (`GET /`, `GET /actual`, `GET /miembros`, `GET /invitaciones`) using `createRoute` with `operationId` pattern `tenant_{verbo}_{recurso}`, tag `Tenant`, `security: [{ bearerAuth: [] }]`, import helpers from `src/core/openapi-responses.ts`; run `npx tsc --noEmit` after
 
 ### Grupo 2 — Autenticación
 
-- [ ] T006 [US1] Migrate `src/modules/autenticacion/adapters/auth.rest.ts` → `OpenAPIHono<HonoEnv>`; add stub catch-all `GET /auth/{...path}` with `operationId: "auth_catch_all_better_auth"` tag `Autenticación` and `DELETE /user` with `operationId: "auth_eliminar_usuario"`, `security: [{ bearerAuth: [] }]`, per the Better-Auth pattern in `contracts/migration-pattern.md`; run `npx tsc --noEmit` after
+- [x] T006 [US1] Migrate `src/modules/autenticacion/adapters/auth.rest.ts` → `OpenAPIHono<HonoEnv>`; add stub catch-all `GET /auth/{...path}` with `operationId: "auth_catch_all_better_auth"` tag `Autenticación` and `DELETE /user` with `operationId: "auth_eliminar_usuario"`, `security: [{ bearerAuth: [] }]`, per the Better-Auth pattern in `contracts/migration-pattern.md`; run `npx tsc --noEmit` after
 
 ### Grupo 3 — Catálogo
 
-- [ ] T007 [P] [US1] Migrate `src/modules/catalogo/adapters/catalogo-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged) per aggregator pattern in `contracts/migration-pattern.md`
-- [ ] T008 [P] [US1] Migrate `src/modules/catalogo/adapters/actividad-economica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T009 [P] [US1] Migrate `src/modules/catalogo/adapters/unidad-medida.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T010 [P] [US1] Migrate `src/modules/catalogo/adapters/categoria.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T011 [P] [US1] Migrate `src/modules/catalogo/adapters/producto.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T007-T011
+- [x] T007 [P] [US1] Migrate `src/modules/catalogo/adapters/catalogo-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged) per aggregator pattern in `contracts/migration-pattern.md`
+- [x] T008 [P] [US1] Migrate `src/modules/catalogo/adapters/actividad-economica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T009 [P] [US1] Migrate `src/modules/catalogo/adapters/unidad-medida.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T010 [P] [US1] Migrate `src/modules/catalogo/adapters/categoria.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T011 [P] [US1] Migrate `src/modules/catalogo/adapters/producto.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Catálogo`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T007-T011
 
 ### Grupo 4 — Almacén
 
-- [ ] T012 [P] [US1] Migrate `src/modules/almacen/adapters/almacen-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
-- [ ] T013 [P] [US1] Migrate `src/modules/almacen/adapters/almacen-operaciones.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T014 [P] [US1] Migrate `src/modules/almacen/adapters/inventario.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T015 [P] [US1] Migrate `src/modules/almacen/adapters/receta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T016 [P] [US1] Migrate `src/modules/almacen/adapters/insumo.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T012-T016
+- [x] T012 [P] [US1] Migrate `src/modules/almacen/adapters/almacen-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
+- [x] T013 [P] [US1] Migrate `src/modules/almacen/adapters/almacen-operaciones.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T014 [P] [US1] Migrate `src/modules/almacen/adapters/inventario.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T015 [P] [US1] Migrate `src/modules/almacen/adapters/receta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T016 [P] [US1] Migrate `src/modules/almacen/adapters/insumo.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Almacén`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T012-T016
 
 ### Grupo 5 — Ventas
 
-- [ ] T017 [P] [US1] Migrate `src/modules/ventas/adapters/ventas-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
-- [ ] T018 [P] [US1] Migrate `src/modules/ventas/adapters/cliente.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T019 [P] [US1] Migrate `src/modules/ventas/adapters/proveedor.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T020 [P] [US1] Migrate `src/modules/ventas/adapters/compra.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T021 [P] [US1] Migrate `src/modules/ventas/adapters/punto-venta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T022 [P] [US1] Migrate `src/modules/ventas/adapters/turno-atencion.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T023 [P] [US1] Migrate `src/modules/ventas/adapters/caja.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T024 [P] [US1] Migrate `src/modules/ventas/adapters/gastos.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T025 [P] [US1] Migrate `src/modules/ventas/adapters/pedido.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T026 [P] [US1] Migrate `src/modules/ventas/adapters/venta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T017-T026
+- [x] T017 [P] [US1] Migrate `src/modules/ventas/adapters/ventas-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
+- [x] T018 [P] [US1] Migrate `src/modules/ventas/adapters/cliente.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T019 [P] [US1] Migrate `src/modules/ventas/adapters/proveedor.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T020 [P] [US1] Migrate `src/modules/ventas/adapters/compra.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T021 [P] [US1] Migrate `src/modules/ventas/adapters/punto-venta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T022 [P] [US1] Migrate `src/modules/ventas/adapters/turno-atencion.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T023 [P] [US1] Migrate `src/modules/ventas/adapters/caja.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T024 [P] [US1] Migrate `src/modules/ventas/adapters/gastos.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T025 [P] [US1] Migrate `src/modules/ventas/adapters/pedido.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T026 [P] [US1] Migrate `src/modules/ventas/adapters/venta.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Ventas`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file; run `npx tsc --noEmit` after T017-T026
 
 ### Grupo 6 — Consultorio
 
-- [ ] T027 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
-- [ ] T028 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T029 [P] [US1] Migrate `src/modules/consultorio/adapters/medico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T030 [P] [US1] Migrate `src/modules/consultorio/adapters/paciente.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T031 [P] [US1] Migrate `src/modules/consultorio/adapters/cita.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T032 [P] [US1] Migrate `src/modules/consultorio/adapters/historia-clinica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T033 [P] [US1] Migrate `src/modules/consultorio/adapters/atencion-medica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T034 [P] [US1] Migrate `src/modules/consultorio/adapters/receta-medica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T035 [P] [US1] Migrate `src/modules/consultorio/adapters/servicio-medico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T036 [P] [US1] Migrate `src/modules/consultorio/adapters/vacunacion.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T037 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, NO `security` field (public routes per FR-004), reuse existing schemas
-- [ ] T038 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-consumer-citas.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, apply `security: [{ bearerAuth: [] }]` only to routes that use `requireAuth`, reuse existing schemas
-- [ ] T039 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-staff-publico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, NO `security` for routes under `/api/public/**` per FR-004, reuse existing schemas; run `npx tsc --noEmit` after T027-T039
+- [x] T027 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-router.ts` → `OpenAPIHono<HonoEnv>` (constructor change only; `.use()` and `.route()` calls unchanged)
+- [x] T028 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T029 [P] [US1] Migrate `src/modules/consultorio/adapters/medico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T030 [P] [US1] Migrate `src/modules/consultorio/adapters/paciente.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T031 [P] [US1] Migrate `src/modules/consultorio/adapters/cita.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T032 [P] [US1] Migrate `src/modules/consultorio/adapters/historia-clinica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T033 [P] [US1] Migrate `src/modules/consultorio/adapters/atencion-medica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T034 [P] [US1] Migrate `src/modules/consultorio/adapters/receta-medica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T035 [P] [US1] Migrate `src/modules/consultorio/adapters/servicio-medico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T036 [P] [US1] Migrate `src/modules/consultorio/adapters/vacunacion.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T037 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, NO `security` field (public routes per FR-004), reuse existing schemas
+- [x] T038 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-consumer-citas.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, apply `security: [{ bearerAuth: [] }]` only to routes that use `requireAuth`, reuse existing schemas
+- [x] T039 [P] [US1] Migrate `src/modules/consultorio/adapters/consultorio-staff-publico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Consultorio Público`, NO `security` for routes under `/api/public/**` per FR-004, reuse existing schemas; run `npx tsc --noEmit` after T027-T039
 
 ### Grupo 7 — Restaurante
 
-- [ ] T040 [US1] Migrate `src/modules/restaurante/adapters/restaurante.router.ts` → change all 5 internal `Hono<HonoEnv>` instances to `OpenAPIHono<HonoEnv>` (keep every `.use()`, `.route()`, and `.all()` call unchanged)
-- [ ] T041 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T042 [P] [US1] Migrate `src/modules/restaurante/adapters/tiempo-comida.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T043 [P] [US1] Migrate `src/modules/restaurante/adapters/menu.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T044 [P] [US1] Migrate `src/modules/restaurante/adapters/menu-item.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T045 [P] [US1] Migrate `src/modules/restaurante/adapters/reserva.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T046 [P] [US1] Migrate `src/modules/restaurante/adapters/reserva-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, NO `security` (public route per FR-004), reuse existing schemas
-- [ ] T047 [P] [US1] Migrate `src/modules/restaurante/adapters/cocina.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T048 [P] [US1] Migrate `src/modules/restaurante/adapters/publicacion-rrss.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T049 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, NO `security` (public routes per FR-004), reuse existing schemas
-- [ ] T050 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante-staff-publico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, apply `security: [{ bearerAuth: [] }]` only to routes that use `requireAuth`, reuse existing schemas; run `npx tsc --noEmit` after T040-T050
+- [x] T040 [US1] Migrate `src/modules/restaurante/adapters/restaurante.router.ts` → change all 5 internal `Hono<HonoEnv>` instances to `OpenAPIHono<HonoEnv>` (keep every `.use()`, `.route()`, and `.all()` call unchanged)
+- [x] T041 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T042 [P] [US1] Migrate `src/modules/restaurante/adapters/tiempo-comida.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T043 [P] [US1] Migrate `src/modules/restaurante/adapters/menu.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T044 [P] [US1] Migrate `src/modules/restaurante/adapters/menu-item.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T045 [P] [US1] Migrate `src/modules/restaurante/adapters/reserva.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T046 [P] [US1] Migrate `src/modules/restaurante/adapters/reserva-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, NO `security` (public route per FR-004), reuse existing schemas
+- [x] T047 [P] [US1] Migrate `src/modules/restaurante/adapters/cocina.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T048 [P] [US1] Migrate `src/modules/restaurante/adapters/publicacion-rrss.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T049 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, NO `security` (public routes per FR-004), reuse existing schemas
+- [x] T050 [P] [US1] Migrate `src/modules/restaurante/adapters/restaurante-staff-publico.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Restaurante Público`, apply `security: [{ bearerAuth: [] }]` only to routes that use `requireAuth`, reuse existing schemas; run `npx tsc --noEmit` after T040-T050
 
 ### Grupo 8 — Tienda
 
-- [ ] T051 [P] [US1] Migrate `src/modules/tienda/adapters/tienda-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Tienda`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
-- [ ] T052 [P] [US1] Migrate `src/modules/tienda/adapters/tienda-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Tienda Pública`, NO `security` (public routes per FR-004), reuse existing schemas; run `npx tsc --noEmit` after T051-T052
+- [x] T051 [P] [US1] Migrate `src/modules/tienda/adapters/tienda-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Tienda`, `security: [{ bearerAuth: [] }]`, reuse existing schemas from the corresponding `*.schema.ts` file
+- [x] T052 [P] [US1] Migrate `src/modules/tienda/adapters/tienda-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Tienda Pública`, NO `security` (public routes per FR-004), reuse existing schemas; run `npx tsc --noEmit` after T051-T052
 
 ### Grupo 9 — Social
 
-- [ ] T053 [US1] Migrate `src/modules/social/adapters/social.router.ts` → change both internal `Hono<HonoEnv>` instances to `OpenAPIHono<HonoEnv>` (keep every `.use()` and `.route()` call unchanged)
-- [ ] T054 [P] [US1] Migrate `src/modules/social/adapters/producto-social.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, apply `security` per individual route's auth requirement, reuse existing schemas
-- [ ] T055 [P] [US1] Migrate `src/modules/social/adapters/tienda-social.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, apply `security` per individual route's auth requirement, reuse existing schemas
-- [ ] T056 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-consumer.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
-- [ ] T057 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
-- [ ] T058 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas
-- [ ] T059 [P] [US1] Migrate `src/modules/social/adapters/publicacion-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
-- [ ] T060 [P] [US1] Migrate `src/modules/social/adapters/publicacion-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas
-- [ ] T061 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-consumer.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
-- [ ] T062 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
-- [ ] T063 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas; run `npx tsc --noEmit` after T053-T063
+- [x] T053 [US1] Migrate `src/modules/social/adapters/social.router.ts` → change both internal `Hono<HonoEnv>` instances to `OpenAPIHono<HonoEnv>` (keep every `.use()` and `.route()` call unchanged)
+- [x] T054 [P] [US1] Migrate `src/modules/social/adapters/producto-social.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, apply `security` per individual route's auth requirement, reuse existing schemas
+- [x] T055 [P] [US1] Migrate `src/modules/social/adapters/tienda-social.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, apply `security` per individual route's auth requirement, reuse existing schemas
+- [x] T056 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-consumer.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
+- [x] T057 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
+- [x] T058 [P] [US1] Migrate `src/modules/social/adapters/restaurante-social-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas
+- [x] T059 [P] [US1] Migrate `src/modules/social/adapters/publicacion-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
+- [x] T060 [P] [US1] Migrate `src/modules/social/adapters/publicacion-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas
+- [x] T061 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-consumer.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
+- [x] T062 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-staff.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, `security: [{ bearerAuth: [] }]`, reuse existing schemas
+- [x] T063 [P] [US1] Migrate `src/modules/social/adapters/consultorio-social-publica.rest.ts` → `OpenAPIHono<HonoEnv>`, convert all routes with `createRoute`, tag `Social`, NO `security` (public routes), reuse existing schemas; run `npx tsc --noEmit` after T053-T063
 
 **Checkpoint**: All ~55 routers and 6 aggregators migrated. `GET /api/openapi.json` must return >100 paths. The integration test from T004 must pass.
 
@@ -137,7 +137,7 @@
 
 **Independent Test**: Open `/api/docs` in a browser; Swagger UI loads, shows all modules grouped by tag with no parse errors, and can execute a test request against a live endpoint.
 
-- [ ] T064 [US2] Add `import { swaggerUI } from "@hono/swagger-ui"` and `app.get("/api/docs", swaggerUI({ url: "/api/openapi.json" }))` to `src/server/hono.ts` after the `app.doc(...)` call per `contracts/migration-pattern.md`; run `npx tsc --noEmit`
+- [x] T064 [US2] Add `import { swaggerUI } from "@hono/swagger-ui"` and `app.get("/api/docs", swaggerUI({ url: "/api/openapi.json" }))` to `src/server/hono.ts` after the `app.doc(...)` call per `contracts/migration-pattern.md`; run `npx tsc --noEmit`
 
 **Checkpoint**: `/api/docs` renders Swagger UI with full spec. US1 and US2 both functional.
 
@@ -159,8 +159,8 @@
 
 **Purpose**: Final verification that the full migration satisfies all success criteria.
 
-- [ ] T066 Run `npx tsc --noEmit` across the full project and fix all remaining TypeScript errors from the migration; target 0 errors per SC-003
-- [ ] T067 Run `npm run test:integration` and confirm T004 test passes: >100 entries in `paths`, zero duplicate `operationId` values — verifying SC-001 and SC-008
+- [x] T066 Run `npx tsc --noEmit` across the full project and fix all remaining TypeScript errors from the migration; target 0 errors per SC-003
+- [x] T067 Run `npm run test:integration` and confirm T004 test passes: >100 entries in `paths`, zero duplicate `operationId` values — verifying SC-001 and SC-008
 
 ---
 
@@ -278,3 +278,10 @@ Each dev runs `npx tsc --noEmit` after their group; all merge → T065 + T066–
 - Public endpoints (no `requireAuth` guard) MUST NOT have `security: [{ bearerAuth: [] }]` per FR-004
 - All `operationId` values follow `{módulo}_{verbo}_{recurso}` camelCase pattern per `data-model.md`
 - Never modify handlers, use-cases, repositories, or domain logic — changes are routing-layer only per FR-009
+
+## Estado verificado (2026-07-13)
+
+- **US1 (T005–T063) confirmado**: los 54 `*.rest.ts` (53 del listado original + `wizard.rest.ts`, agregado luego del plan) y los 6 agregadores ya usan `OpenAPIHono<HonoEnv>`; `grep -c "new Hono<"` = 0 en todos.
+- **T001–T004, T064, T066 confirmados** por inspección directa del código (`package.json`, `src/core/openapi-responses.ts`, `src/server/hono.ts`, `npx tsc --noEmit` sin errores).
+- **T067 confirmado**: `npx vitest run tests/integration/openapi.test.ts` (el archivo real de T004, con nombre `.test.ts` en vez de `.spec.ts`) pasa: >100 paths, `operationId` únicos.
+- **T065 sigue pendiente**: 46 archivos `*.rest.ts` todavía validan con `Schema.parse(await c.req.json())` en vez de `c.req.valid("json")`. No se tocó como parte de esta revisión — falta hacer el audit y la migración fila por fila.

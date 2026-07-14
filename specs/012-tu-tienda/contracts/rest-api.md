@@ -7,6 +7,103 @@ Capability guard: `requireCapabilidad("esTienda")` en endpoints de staff
 
 ---
 
+## Módulo: Wizard de Creación de Tenant (Staff)
+
+Implementado en `src/modules/tenant/adapters/wizard.rest.ts`, montado en `/api/tenant`. Es genérico para los tres tipos de negocio (tienda, consultorio, restaurante); esta sección documenta el subconjunto relevante para TuTienda — configuración de tienda y puntos de venta. Todas las rutas requieren `requireAuth` + `requireTenantActivo`; las de escritura además exigen rol `PROPIETARIO | owner | ADMIN`.
+
+### GET /api/tenant/config
+🔒 Cualquier miembro autenticado del tenant  
+Devuelve el estado del wizard: datos del tenant, propietario y `configuracion` de tienda (si el tenant es tienda).
+
+**Response 200**:
+```json
+{
+  "id": "string", "name": "string", "slug": "string", "logo": "string",
+  "nombreLargo": "string", "descripcion": "string",
+  "esTienda": true, "esConsultorio": false, "esRestaurante": false,
+  "plan": "string", "estado": "string",
+  "ultimoPasoCreacion": "PASO_1 | ... | FINALIZADO",
+  "propietario": { "id": "string", "nombres": "string", "telefono": "string", "domicilio": "string", "nombreReferencia": "string", "telefonoReferencia": "string", "imagenUrl": "string" },
+  "configuracion": {
+    "tipoDeTienda": "PEQUENA | MEDIANA | EMPRESARIAL",
+    "cantidadPuntosDeVenta": 1,
+    "cantidadVendedores": 1,
+    "tema": "string",
+    "tipoDespliegueVentas": "BARRA_LATERAL | BARRA_SUPERIOR | BARRA_INFERIOR",
+    "tipoLineado": "string"
+  }
+}
+```
+
+---
+
+### PATCH /api/tenant/config
+🔒 PROPIETARIO | owner | ADMIN  
+Endpoint genérico de guardado incremental del wizard. Acepta cualquier subconjunto de campos; solo actualiza lo enviado. Para TuTienda, el campo relevante es `configuracion`.
+
+**Request Body** (subconjunto tienda):
+```json
+{
+  "ultimoPasoCreacion": "PASO_3",
+  "nombreLargo": "string",
+  "descripcion": "string",
+  "propietario": { "nombres": "string", "telefono": "string", "domicilio": "string", "nombreReferencia": "string", "telefonoReferencia": "string", "imagenUrl": "string | null" },
+  "configuracion": {
+    "tipoDeTienda": "PEQUENA | MEDIANA | EMPRESARIAL",
+    "cantidadPuntosDeVenta": 2,
+    "cantidadVendedores": 3,
+    "tema": "string",
+    "tipoDespliegueVentas": "BARRA_LATERAL",
+    "tipoLineado": "string"
+  }
+}
+```
+
+**Response 200**: `{ "ok": true }`
+
+**Efecto secundario — Puntos de Venta**: al enviar `configuracion.cantidadPuntosDeVenta`, se hace `upsert` de `Configuracion` y además se sincroniza la tabla `PuntosDeVenta` del tenant dentro de la misma transacción:
+- Si `cantidadPuntosDeVenta` > cantidad actual de PDV del tenant → crea los que faltan (`Punto de Venta N+1`, `N+2`, ...).
+- Si `cantidadPuntosDeVenta` < cantidad actual → elimina los últimos PDV creados (`orderBy createdAt desc`), pero **solo los que no tienen `ventas` ni `aperturasCierresDeCaja` asociadas** (evita perder historial ya operado). Si no hay suficientes candidatos "seguros", no fuerza el resto de la baja.
+
+---
+
+### GET /api/tenant/puntos-de-venta
+🔒 Cualquier miembro autenticado del tenant  
+Lista los puntos de venta del tenant, ordenados por fecha de creación.
+
+**Response 200**: `{ "data": [{ "id": "string", "tenantId": "string", "nombre": "string", "direccion": "string", "telefono": "string", "sucursal": "string", "tipo": "CAJA | ...", "estado": "ACTIVO | INACTIVO", "createdAt": "date" }] }`
+
+---
+
+### POST /api/tenant/puntos-de-venta
+🔒 PROPIETARIO | owner | ADMIN  
+Crea un punto de venta manualmente (fuera del flujo automático de `cantidadPuntosDeVenta`).
+
+**Request Body**: `{ "nombre": "string (requerido)", "direccion": "string?", "telefono": "string?", "sucursal": "string?", "tipo": "string?" }`
+
+**Response 201**: punto de venta creado  
+**Errors**: 409 `PDV_DUPLICADO` si ya existe un PDV con ese nombre en el tenant (`@@unique([tenantId, nombre])`)
+
+---
+
+### PATCH /api/tenant/puntos-de-venta/:id
+🔒 PROPIETARIO | owner | ADMIN  
+Actualiza un punto de venta existente (campos parciales del mismo schema que el POST).
+
+**Response 200**: punto de venta actualizado  
+**Errors**: 404 `PDV_NO_ENCONTRADO`
+
+---
+
+### DELETE /api/tenant/puntos-de-venta/:id
+🔒 PROPIETARIO | owner | ADMIN  
+Elimina un punto de venta manualmente. **No valida** ventas/aperturas asociadas — a diferencia del ajuste automático por `cantidadPuntosDeVenta`, el cascade del schema (`onDelete: Cascade` en `Venta.puntoVenta` y `AperturaCierreDeCaja.puntoVenta`) borra su historial.
+
+**Response 200**: `{ "deleted": true }`  
+**Errors**: 404 `PDV_NO_ENCONTRADO`
+
+---
+
 ## Módulo: Perfil y Configuración de Tienda (Staff)
 
 ### PATCH /api/tenant/tienda/activar

@@ -64,6 +64,8 @@ Configuracion {
 }
 ```
 
+**Relación derivada con `PuntosDeVenta` (`@@schema("ventas")`)**: `cantidadPuntosDeVenta` no tiene FK directa — es sincronizada por el handler `PATCH /api/tenant/config` (ver `contracts/rest-api.md#módulo-wizard-de-creación-de-tenant-staff`), que crea o elimina filas de `PuntosDeVenta` (`tenantId`, `nombre` único) para calzar la cantidad configurada. La eliminación automática respeta el historial: solo borra PDV sin `ventas` ni `aperturasCierresDeCaja` asociadas, porque ambas relaciones tienen `onDelete: Cascade` hacia `PuntosDeVenta`.
+
 ### TiendaComentario (`@@schema("social")`) — EXISTE, sin cambios estructurales
 ```
 TiendaComentario {
