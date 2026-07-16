@@ -36,6 +36,11 @@ export class UnidadMedidaPrismaRepository implements IUnidadMedidaRepository {
   }
 
   async listarClasificadores(): Promise<Array<{ id: string; nombre: string; sigla: string }>> {
-    return this.db.claUnidadMedida.findMany({ orderBy: { nombre: "asc" } })
+    const rows = await this.db.claUnidadMedida.findMany({ orderBy: { unidad: "asc" } })
+    return rows.map((r: { id: string; unidad: string; sigla: string }) => ({
+      id: r.id,
+      nombre: r.unidad,
+      sigla: r.sigla,
+    }))
   }
 }
