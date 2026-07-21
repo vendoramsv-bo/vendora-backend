@@ -15,6 +15,7 @@ import type {
   ConfirmarVarianteItemDTO,
   PropuestaVarianteItem,
   AltaMasivaResult,
+  SincronizarSeleccionResult,
 } from "../domain/ports/IProductoRepository.js"
 import { ProductoEntity, type ProductoRaw } from "../domain/producto.entity.js"
 import type { QueryParams } from "../../../core/query-params.js"
@@ -347,6 +348,18 @@ export class ProductoPrismaRepository implements IProductoRepository {
     await this.db.producto.delete({ where: { id, tenantId } })
   }
 
+  async tieneUsoOperativo(productoId: string): Promise<boolean> {
+    const producto = await this.db.producto.findUnique({
+      where: { id: productoId },
+      select: {
+        _count: { select: { ventasDetalle: true, movimientosInventario: true, reservaDetalles: true } },
+      },
+    })
+    if (!producto) return false
+    const { ventasDetalle, movimientosInventario, reservaDetalles } = producto._count
+    return ventasDetalle > 0 || movimientosInventario > 0 || reservaDetalles > 0
+  }
+
   // ─── Integración con inventario (cross-schema almacen) ───────────────────────
 
   async registrarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number, userId: string): Promise<void> {
@@ -576,5 +589,84 @@ export class ProductoPrismaRepository implements IProductoRepository {
 
       return { creados, categoriasCreadas, unidadesMedidaCreadas }
     }, { timeout: 30000, maxWait: 10000 })
+  }
+
+  // ─── Sincronización de selección (wizard) ────────────────────────────────────
+
+  async sincronizarSeleccion(claProductoIds: string[], tenantId: string, userId: string): Promise<SincronizarSeleccionResult> {
+    // Resolver la selección actualmente guardada para el tenant — mismo criterio
+    // de identidad que GET /catalogo/productos-seleccionados: (actividadId, codigo)
+    // se mapea a claProductoId vía el catálogo maestro ClaProducto.
+    const productosTenant = await this.db.producto.findMany({
+      where: { tenantId },
+      select: { id: true, codigo: true, actividadId: true },
+    })
+
+    const actividadIds = [...new Set<string>(productosTenant.map((p: any) => p.actividadId))]
+    const actividades = actividadIds.length > 0
+      ? await this.db.actividadEconomica.findMany({
+          where: { id: { in: actividadIds } },
+          select: { id: true, claActividadId: true },
+        })
+      : []
+    const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
+
+    const conCla = productosTenant
+      .map((p: any) => ({ productoId: p.id, codigo: p.codigo, claActividadId: actividadMap.get(p.actividadId) ?? null }))
+      .filter((p: any) => p.claActividadId !== null)
+
+    const claProductos = conCla.length > 0
+      ? await this.db.claProducto.findMany({
+          where: { OR: conCla.map((p: any) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
+          select: { id: true, codigo: true, claActividadId: true },
+        })
+      : []
+
+    const existentes = conCla
+      .map((p: any) => {
+        const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
+        return cla ? { productoId: p.productoId as string, claProductoId: cla.id as string } : null
+      })
+      .filter((x: any): x is { productoId: string; claProductoId: string } => x !== null)
+
+    const seleccionSet = new Set(claProductoIds)
+    const existentesSet = new Set(existentes.map((e: { claProductoId: string }) => e.claProductoId))
+    const paraAgregar = claProductoIds.filter((id) => !existentesSet.has(id))
+    const paraEliminarCandidatos = existentes.filter((e: { claProductoId: string }) => !seleccionSet.has(e.claProductoId))
+
+    // Agregar — reutiliza altaMasiva, que ya valida catálogo y evita duplicados.
+    // Corre en su propia transacción (altaMasiva ya la maneja internamente).
+    let creados: ProductoEntity[] = []
+    let categoriasCreadas = 0
+    let unidadesMedidaCreadas = 0
+    if (paraAgregar.length > 0) {
+      const resultado = await this.altaMasiva(paraAgregar, tenantId, userId)
+      creados = resultado.creados
+      categoriasCreadas = resultado.categoriasCreadas
+      unidadesMedidaCreadas = resultado.unidadesMedidaCreadas
+    }
+
+    // Eliminar — solo los productos deseleccionados que no tienen uso operativo real
+    let eliminados = 0
+    let protegidos = 0
+    if (paraEliminarCandidatos.length > 0) {
+      const conteos = await this.db.producto.findMany({
+        where: { id: { in: paraEliminarCandidatos.map((p: { productoId: string }) => p.productoId) } },
+        select: {
+          id: true,
+          _count: { select: { ventasDetalle: true, movimientosInventario: true, reservaDetalles: true } },
+        },
+      })
+      const eliminablesIds = conteos
+        .filter((p: any) => p._count.ventasDetalle === 0 && p._count.movimientosInventario === 0 && p._count.reservaDetalles === 0)
+        .map((p: any) => p.id as string)
+      protegidos = paraEliminarCandidatos.length - eliminablesIds.length
+      if (eliminablesIds.length > 0) {
+        await this.db.producto.deleteMany({ where: { id: { in: eliminablesIds }, tenantId } })
+        eliminados = eliminablesIds.length
+      }
+    }
+
+    return { creados, categoriasCreadas, unidadesMedidaCreadas, eliminados, protegidos }
   }
 }

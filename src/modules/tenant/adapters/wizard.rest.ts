@@ -3,10 +3,10 @@ import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireAuth, requireTenantActivo, requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
-import { AltaMasivaProductosUseCase } from "../../catalogo/application/producto/alta-masiva-productos.usecase.js"
+import { SincronizarProductosUseCase } from "../../catalogo/application/producto/sincronizar-productos-usecase.js"
 import { ProductoPrismaRepository } from "../../catalogo/infrastructure/producto.prisma.repository.js"
 import { getCatalogoNotificador } from "../../catalogo/infrastructure/catalogo.notificador.provider.js"
-import { AltaMasivaVacia, ClaProductoNoEncontrado } from "../../catalogo/domain/catalogo.errors.js"
+import { ClaProductoNoEncontrado } from "../../catalogo/domain/catalogo.errors.js"
 
 export const wizardRouter = new OpenAPIHono<HonoEnv>()
 
@@ -64,7 +64,7 @@ wizardRouter.openapi(
     })
     if (!tenant) return c.json({ error: "TENANT_NO_ENCONTRADO" }, 404)
 
-    const [propietario, tienda] = await Promise.all([
+    const [propietario, tienda, consultorio, restaurante] = await Promise.all([
       db.propietario.findUnique({
         where: { tenantId },
         select: { id: true, nombres: true, telefono: true, domicilio: true, nombreReferencia: true, telefonoReferencia: true, imagenUrl: true },
@@ -85,13 +85,30 @@ wizardRouter.openapi(
           },
         },
       }),
+      db.consultorio.findUnique({
+        where: { tenantId },
+        select: { especialidades: true, contactoPublico: true },
+      }),
+      db.restaurante.findUnique({
+        where: { tenantId },
+        select: { contactoPublico: true },
+      }),
     ])
+
+    const consultorioContacto = (consultorio?.contactoPublico as Record<string, unknown> | null) ?? {}
+    const restauranteContacto = (restaurante?.contactoPublico as Record<string, unknown> | null) ?? {}
 
     return c.json({
       ...tenant,
       ultimoPasoCreacion: intToPaso(tenant.ultimoPasoCreacion),
       propietario: propietario ?? null,
       configuracion: tienda?.configuracion ?? null,
+      consultorio: consultorio
+        ? { seguros: consultorioContacto.seguros ?? [], especialidades: consultorio.especialidades ?? [] }
+        : null,
+      restaurante: restaurante
+        ? { tiposCocina: restauranteContacto.tiposCocina ?? [], zonas: restauranteContacto.zonas ?? [] }
+        : null,
     })
   },
 )
@@ -320,10 +337,10 @@ wizardRouter.openapi(
     security: [{ bearerAuth: [] }],
     middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
     request: {
-      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1) }) } } },
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
     },
     responses: {
-      201: createdResponse("Actividades creadas", z.object({ creadas: z.number() })),
+      201: createdResponse("Actividades sincronizadas", z.object({ creadas: z.number() })),
       ...errorResponses,
     },
   }),
@@ -344,7 +361,16 @@ wizardRouter.openapi(
 
     await db.$transaction(async (tx: any) => {
       if (paraEliminar.length > 0) {
-        await tx.actividadEconomica.deleteMany({ where: { tenantId, claActividadId: { in: paraEliminar } } })
+        // No eliminar actividades cuyos productos ya registran ventas reales
+        const protegidas = await tx.actividadEconomica.findMany({
+          where: { tenantId, claActividadId: { in: paraEliminar }, producto: { some: { ventasDetalle: { some: {} } } } },
+          select: { claActividadId: true },
+        })
+        const protegidasIds = new Set(protegidas.map((p: any) => p.claActividadId))
+        const eliminables = paraEliminar.filter((id) => !protegidasIds.has(id))
+        if (eliminables.length > 0) {
+          await tx.actividadEconomica.deleteMany({ where: { tenantId, claActividadId: { in: eliminables } } })
+        }
       }
       if (paraAgregar.length > 0) {
         await tx.actividadEconomica.createMany({
@@ -423,10 +449,10 @@ wizardRouter.openapi(
     security: [{ bearerAuth: [] }],
     middleware: [requireRol(["PROPIETARIO", "owner", "ADMIN"])],
     request: {
-      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1) }) } } },
+      body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
     },
     responses: {
-      201: createdResponse("Productos creados desde clasificador", z.object({ total: z.number() })),
+      201: createdResponse("Selección de productos sincronizada", z.object({ total: z.number() })),
       ...errorResponses,
     },
   }),
@@ -436,14 +462,13 @@ wizardRouter.openapi(
     const { ids } = await c.req.json()
     try {
       const repo = new ProductoPrismaRepository(db)
-      const resultado = await new AltaMasivaProductosUseCase(repo, getCatalogoNotificador()).ejecutar(
+      const resultado = await new SincronizarProductosUseCase(repo, getCatalogoNotificador()).ejecutar(
         ids,
         tenantId,
         session.user.id,
       )
       return c.json({ total: resultado.creados.length }, 201)
     } catch (err) {
-      if (err instanceof AltaMasivaVacia) return c.json({ error: err.code, message: err.message }, 400)
       if (err instanceof ClaProductoNoEncontrado) return c.json({ error: err.code, message: err.message, ids: err.ids }, 404)
       throw err
     }
@@ -472,13 +497,73 @@ wizardRouter.openapi(
     const tenantId = c.get("tenantId")
     const session = c.get("session")
     const { ids } = await c.req.json()
+    const uniqueNombres: string[] = [...new Set<string>(ids)]
     const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true } })
     if (!consultorio) return c.json({ creados: 0 }, 201)
-    const result = await db.servicioMedico.createMany({
-      data: ids.map((nombre: string) => ({ consultorioId: consultorio.id, nombre, createdById: session.user.id })),
-      skipDuplicates: true,
+
+    // Sincronizar: agregar los nuevos, eliminar los que se de-seleccionaron
+    const existentes = await db.servicioMedico.findMany({
+      where: { consultorioId: consultorio.id },
+      select: { nombre: true },
     })
-    return c.json({ creados: result.count }, 201)
+    const existentesNombres: string[] = existentes.map((s: any) => s.nombre)
+    const paraAgregar = uniqueNombres.filter((n) => !existentesNombres.includes(n))
+    const paraEliminar = existentesNombres.filter((n) => !uniqueNombres.includes(n))
+
+    let creados = 0
+    await db.$transaction(async (tx: any) => {
+      if (paraEliminar.length > 0) {
+        // No eliminar servicios que ya tienen citas o atenciones registradas
+        const protegidos = await tx.servicioMedico.findMany({
+          where: {
+            consultorioId: consultorio.id,
+            nombre: { in: paraEliminar },
+            OR: [{ citas: { some: {} } }, { atencionesDetalle: { some: {} } }],
+          },
+          select: { nombre: true },
+        })
+        const protegidosNombres = new Set(protegidos.map((p: any) => p.nombre))
+        const eliminables = paraEliminar.filter((n) => !protegidosNombres.has(n))
+        if (eliminables.length > 0) {
+          await tx.servicioMedico.deleteMany({ where: { consultorioId: consultorio.id, nombre: { in: eliminables } } })
+        }
+      }
+      if (paraAgregar.length > 0) {
+        const result = await tx.servicioMedico.createMany({
+          data: paraAgregar.map((nombre: string) => ({ consultorioId: consultorio.id, nombre, createdById: session.user.id })),
+          skipDuplicates: true,
+        })
+        creados = result.count
+      }
+    })
+    return c.json({ creados }, 201)
+  },
+)
+
+// ─── GET /api/tenant/catalogo/servicios-seleccionados ────────────────────────
+
+wizardRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/catalogo/servicios-seleccionados",
+    operationId: "wizard_listar_servicios_seleccionados",
+    tags: ["Wizard"],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: okResponse("Servicios médicos ya guardados en el tenant", z.object({ data: z.array(z.object({ nombre: z.string() })) })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const consultorio = await db.consultorio.findUnique({ where: { tenantId }, select: { id: true } })
+    if (!consultorio) return c.json({ data: [] })
+    const servicios = await db.servicioMedico.findMany({
+      where: { consultorioId: consultorio.id },
+      select: { nombre: true },
+      orderBy: { createdAt: "asc" },
+    })
+    return c.json({ data: servicios.map((s: any) => ({ nombre: s.nombre })) })
   },
 )
 
@@ -548,7 +633,20 @@ wizardRouter.openapi(
 
     await db.$transaction(async (tx: any) => {
       if (paraEliminar.length > 0) {
-        await tx.proveedor.deleteMany({ where: { tenantId, claProveedorId: { in: paraEliminar } } })
+        // No eliminar proveedores que ya tienen compras o ingresos de almacén registrados
+        const protegidos = await tx.proveedor.findMany({
+          where: {
+            tenantId,
+            claProveedorId: { in: paraEliminar },
+            OR: [{ compras: { some: {} } }, { ingresosAlmacen: { some: {} } }],
+          },
+          select: { claProveedorId: true },
+        })
+        const protegidosIds = new Set(protegidos.map((p: any) => p.claProveedorId))
+        const eliminables = paraEliminar.filter((id) => !protegidosIds.has(id))
+        if (eliminables.length > 0) {
+          await tx.proveedor.deleteMany({ where: { tenantId, claProveedorId: { in: eliminables } } })
+        }
       }
       if (paraAgregar.length > 0) {
         await tx.proveedor.createMany({
@@ -636,7 +734,21 @@ wizardRouter.openapi(
 
     await db.$transaction(async (tx: any) => {
       if (paraEliminar.length > 0) {
-        await tx.turnosDeAtencion.deleteMany({ where: { tenantId, claTurnoId: { in: paraEliminar } } })
+        // No eliminar turnos que ya tienen ventas o aperturas de caja registradas
+        // (mismo criterio ya usado para PuntosDeVenta)
+        const protegidos = await tx.turnosDeAtencion.findMany({
+          where: {
+            tenantId,
+            claTurnoId: { in: paraEliminar },
+            OR: [{ ventas: { some: {} } }, { aperturasCierresDeCaja: { some: {} } }],
+          },
+          select: { claTurnoId: true },
+        })
+        const protegidosIds = new Set(protegidos.map((t: any) => t.claTurnoId))
+        const eliminables = paraEliminar.filter((id) => !protegidosIds.has(id))
+        if (eliminables.length > 0) {
+          await tx.turnosDeAtencion.deleteMany({ where: { tenantId, claTurnoId: { in: eliminables } } })
+        }
       }
       if (paraAgregar.length > 0) {
         await tx.turnosDeAtencion.createMany({

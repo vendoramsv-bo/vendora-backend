@@ -52,6 +52,11 @@ export interface AltaMasivaResult {
   unidadesMedidaCreadas: number
 }
 
+export interface SincronizarSeleccionResult extends AltaMasivaResult {
+  eliminados: number
+  protegidos: number
+}
+
 export interface AtributoCreateDTO {
   nombre: string
   tipo?: string
@@ -136,6 +141,7 @@ export interface IProductoRepository {
   // Verificación y eliminación
   verificarCodigo(tenantId: string, codigo: string): Promise<{ existe: boolean; producto?: { id: string; nombre: string; codigo: string } }>
   eliminar(id: string, tenantId: string): Promise<void>
+  tieneUsoOperativo(productoId: string): Promise<boolean>
 
   // Integración con inventario (cross-schema almacen)
   registrarMovimientoCreacion(productoId: string, tenantId: string, cantidadStock: number, userId: string): Promise<void>
@@ -173,4 +179,8 @@ export interface IProductoRepository {
 
   // Alta masiva desde catálogo maestro
   altaMasiva(claProductoIds: string[], tenantId: string, userId: string): Promise<AltaMasivaResult>
+
+  // Sincronización de selección (wizard): agrega lo nuevo, elimina lo deseleccionado
+  // salvo que tenga uso operativo real (ventas, movimientos de stock, reservas)
+  sincronizarSeleccion(claProductoIds: string[], tenantId: string, userId: string): Promise<SincronizarSeleccionResult>
 }
