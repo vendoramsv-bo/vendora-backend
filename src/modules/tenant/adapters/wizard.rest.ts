@@ -162,6 +162,11 @@ wizardRouter.openapi(
     const tenantUpdate: Record<string, unknown> = { updatedById: session.user.id }
     if (body.ultimoPasoCreacion !== undefined) {
       tenantUpdate.ultimoPasoCreacion = pasoToInt(body.ultimoPasoCreacion)
+      // El wizard llega a su fin: además del contador de progreso, el propio
+      // tenant pasa a estado FINALIZADO (arrancaba en PENDIENTE al crearse).
+      if (body.ultimoPasoCreacion === "FINALIZADO") {
+        tenantUpdate.estado = "FINALIZADO"
+      }
     }
     if (body.nombreLargo !== undefined) tenantUpdate.nombreLargo = body.nombreLargo
     if (body.descripcion !== undefined) tenantUpdate.descripcion = body.descripcion
@@ -268,13 +273,26 @@ wizardRouter.openapi(
           if (cantidadPuntosDeVenta !== undefined) {
             const existentes = await tx.puntosDeVenta.count({ where: { tenantId } })
             if (cantidadPuntosDeVenta > existentes) {
-              await tx.puntosDeVenta.createMany({
-                data: Array.from({ length: cantidadPuntosDeVenta - existentes }, (_, i) => ({
-                  tenantId,
-                  nombre: `Punto de Venta ${existentes + i + 1}`,
-                  createdById: session.user.id,
-                })),
-              })
+              // No asumir que los nombres "Punto de Venta 1..N" están libres:
+              // si el usuario renombró alguno en el Paso 8, o si una baja
+              // previa dejó huecos en la numeración, un índice puramente
+              // secuencial puede chocar con `@@unique([tenantId, nombre])`.
+              // Se buscan los primeros índices realmente libres.
+              const nombresExistentes = new Set<string>(
+                (await tx.puntosDeVenta.findMany({ where: { tenantId }, select: { nombre: true } })).map(
+                  (p: { nombre: string }) => p.nombre,
+                ),
+              )
+              const nuevos: Array<{ tenantId: string; nombre: string; createdById: string }> = []
+              let indice = 1
+              for (let i = 0; i < cantidadPuntosDeVenta - existentes; i++) {
+                while (nombresExistentes.has(`Punto de Venta ${indice}`)) indice++
+                const nombre = `Punto de Venta ${indice}`
+                nombresExistentes.add(nombre)
+                nuevos.push({ tenantId, nombre, createdById: session.user.id })
+                indice++
+              }
+              await tx.puntosDeVenta.createMany({ data: nuevos })
             } else if (cantidadPuntosDeVenta < existentes) {
               // Solo se eliminan los últimos puntos de venta sin ventas ni aperturas de caja registradas,
               // para no perder historial si el punto de venta ya fue usado
@@ -1018,6 +1036,18 @@ wizardRouter.openapi(
     const id = c.req.param("id")
     const pdv = await db.puntosDeVenta.findFirst({ where: { id, tenantId } })
     if (!pdv) return c.json({ error: "PDV_NO_ENCONTRADO", message: "Punto de venta no encontrado." }, 404)
+
+    // Si ya tiene ventas o aperturas/cierres de caja asociados, eliminar en
+    // cascada borraría ese historial — desactivamos en vez de eliminar.
+    const [ventasCount, aperturasCount] = await Promise.all([
+      db.venta.count({ where: { puntoVentaId: id, tenantId } }),
+      db.aperturaCierreDeCaja.count({ where: { puntoVentaId: id, tenantId } }),
+    ])
+    if (ventasCount > 0 || aperturasCount > 0) {
+      await db.puntosDeVenta.update({ where: { id }, data: { estado: "INACTIVO" } })
+      return c.json({ deleted: false })
+    }
+
     await db.puntosDeVenta.delete({ where: { id } })
     return c.json({ deleted: true })
   },

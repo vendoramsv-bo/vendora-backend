@@ -40,4 +40,6 @@ export interface IPuntoVentaRepository {
   cambiarEstado(id: string, tenantId: string, estado: string, updatedById?: string | null): Promise<PuntoVentaData>
   obtener(id: string, tenantId: string): Promise<PuntoVentaData | null>
   listar(tenantId: string, params: QueryParams): Promise<{ data: PuntoVentaData[]; total: number }>
+  eliminar(id: string, tenantId: string): Promise<void>
+  tieneMovimientos(id: string, tenantId: string): Promise<boolean>
 }

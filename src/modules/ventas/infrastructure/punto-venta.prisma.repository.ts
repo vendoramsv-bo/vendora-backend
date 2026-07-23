@@ -82,4 +82,16 @@ export class PuntoVentaPrismaRepository implements IPuntoVentaRepository {
     ])
     return { data: data.map(toPuntoVentaData), total }
   }
+
+  async eliminar(id: string, tenantId: string): Promise<void> {
+    await this.db.puntosDeVenta.delete({ where: { id, tenantId } })
+  }
+
+  async tieneMovimientos(id: string, tenantId: string): Promise<boolean> {
+    const [ventas, aperturas] = await Promise.all([
+      this.db.venta.count({ where: { puntoVentaId: id, tenantId } }),
+      this.db.aperturaCierreDeCaja.count({ where: { puntoVentaId: id, tenantId } }),
+    ])
+    return ventas > 0 || aperturas > 0
+  }
 }

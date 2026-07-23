@@ -7,6 +7,7 @@ import { CrearPuntoVentaUseCase } from "../application/puntoVenta/crear-punto-ve
 import { ActualizarPuntoVentaUseCase } from "../application/puntoVenta/actualizar-punto-venta.usecase.js"
 import { CambiarEstadoPuntoVentaUseCase } from "../application/puntoVenta/cambiar-estado-punto-venta.usecase.js"
 import { ListarPuntosVentaUseCase } from "../application/puntoVenta/listar-puntos-venta.usecase.js"
+import { EliminarPuntoVentaUseCase } from "../application/puntoVenta/eliminar-punto-venta.usecase.js"
 import {
   CrearPuntoVentaSchema,
   ActualizarPuntoVentaSchema,
@@ -175,6 +176,43 @@ puntoVentaRouter.openapi(
         id: c.req.param("id"),
         tenantId,
         estado: parsed.data.estado,
+        updatedById: session.user.id,
+      })
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof PuntoVentaNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
+
+// DELETE /puntos-venta/:id
+puntoVentaRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/{id}",
+    operationId: "ventas_eliminar_punto_venta",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    request: {
+      params: z.object({ id: z.string() }),
+    },
+    responses: {
+      200: okResponse(
+        "Punto de venta eliminado o desactivado si tiene ventas/aperturas de caja asociadas",
+        z.object({ eliminado: z.boolean() }),
+      ),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const session = c.get("session")
+    try {
+      const result = await new EliminarPuntoVentaUseCase(makeRepo()).execute({
+        id: c.req.param("id"),
+        tenantId,
         updatedById: session.user.id,
       })
       return c.json(result)
