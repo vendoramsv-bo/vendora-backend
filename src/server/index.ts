@@ -3,10 +3,14 @@ import { serve } from "@hono/node-server"
 import { Server } from "socket.io"
 import { createAdapter } from "@socket.io/redis-adapter"
 import { Redis } from "ioredis"
+import { S3Client } from "@aws-sdk/client-s3"
 import { crearApp } from "./hono.js"
 import { authRouter } from "../modules/autenticacion/adapters/auth.rest.js"
 import { tenantRouter } from "../modules/tenant/adapters/tenant.rest.js"
 import { wizardRouter } from "../modules/tenant/adapters/wizard.rest.js"
+import { tenantUploadRouter } from "../modules/tenant/adapters/tenant-upload.rest.js"
+import { R2AlmacenamientoAdapter } from "../modules/tenant/infrastructure/r2.almacenamiento.adapter.js"
+import { setAlmacenamientoPort } from "../modules/tenant/infrastructure/almacenamiento.port.provider.js"
 import { auth, prisma } from "../modules/autenticacion/infrastructure/better-auth.setup.js"
 import { TenantSocketNotificador } from "../modules/tenant/infrastructure/tenant.socket.notificador.js"
 import { ConsultorioSocketNotificador } from "../modules/consultorio/infrastructure/consultorio.socket.notificador.js"
@@ -59,6 +63,30 @@ app.route("/api/tenant", tenantRouter)
 
 // Wizard de creación de negocio (endpoints de configuración + bulk)
 app.route("/api/tenant", wizardRouter)
+
+// Subida de archivos a Cloudflare R2 con URLs prefirmadas
+app.route("/api/tenant", tenantUploadRouter)
+
+// R2AlmacenamientoAdapter — firma URLs PUT prefirmadas contra el bucket "vendora"
+if (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY) {
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  })
+  setAlmacenamientoPort(
+    new R2AlmacenamientoAdapter({
+      s3,
+      bucket: process.env.R2_BUCKET_NAME ?? "vendora",
+      publicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? "",
+    }),
+  )
+} else {
+  logger.warn("[r2] Variables de entorno de R2 no configuradas — /api/tenant/upload-url responderá 500")
+}
 
 // TuTienda — staff (configuración, destacados) y directorio público
 app.route("/api/tenant", tiendaStaffRouter)
