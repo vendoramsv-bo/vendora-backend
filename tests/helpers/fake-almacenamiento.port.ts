@@ -6,12 +6,25 @@ import type {
 
 export class FakeAlmacenamientoPort implements IAlmacenamientoPort {
   readonly llamadas: EmitirUrlSubidaInput[] = []
+  readonly eliminaciones: string[] = []
+
+  private static readonly PUBLIC_BASE_URL = "https://cdn.fake.local"
 
   async emitirUrlSubida(input: EmitirUrlSubidaInput): Promise<EmitirUrlSubidaResultado> {
     this.llamadas.push(input)
     return {
       uploadUrl: `https://fake-r2.local/vendora/${input.key}?firmado=true`,
-      publicUrl: `https://cdn.fake.local/${input.key}`,
+      publicUrl: `${FakeAlmacenamientoPort.PUBLIC_BASE_URL}/${input.key}`,
     }
+  }
+
+  async eliminarArchivo(key: string): Promise<void> {
+    this.eliminaciones.push(key)
+  }
+
+  extraerKeyDesdeUrlPublica(url: string): string | null {
+    const prefix = `${FakeAlmacenamientoPort.PUBLIC_BASE_URL}/`
+    if (!url.startsWith(prefix)) return null
+    return url.slice(prefix.length)
   }
 }

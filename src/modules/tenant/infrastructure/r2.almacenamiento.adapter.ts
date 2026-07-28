@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import type {
   EmitirUrlSubidaInput,
@@ -30,5 +30,17 @@ export class R2AlmacenamientoAdapter implements IAlmacenamientoPort {
       uploadUrl,
       publicUrl: `${this.config.publicBaseUrl}/${input.key}`,
     }
+  }
+
+  async eliminarArchivo(key: string): Promise<void> {
+    await this.config.s3.send(
+      new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }),
+    )
+  }
+
+  extraerKeyDesdeUrlPublica(url: string): string | null {
+    const prefix = `${this.config.publicBaseUrl}/`
+    if (!url.startsWith(prefix)) return null
+    return url.slice(prefix.length)
   }
 }

@@ -76,6 +76,13 @@ if (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_
       accessKeyId: process.env.R2_ACCESS_KEY_ID,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
+    // Desde @aws-sdk/client-s3 v3.729 el default es "WHEN_SUPPORTED": agrega
+    // automáticamente un checksum CRC32 (calculado sobre body vacío, ya que
+    // el contenido real no existe al momento de firmar) a toda URL PUT
+    // prefirmada. R2 no lo soporta igual que AWS S3 y la firma termina sin
+    // validar (SignatureDoesNotMatch). "WHEN_REQUIRED" restaura el
+    // comportamiento anterior (no agregarlo salvo que la operación lo exija).
+    requestChecksumCalculation: "WHEN_REQUIRED",
   })
   setAlmacenamientoPort(
     new R2AlmacenamientoAdapter({
