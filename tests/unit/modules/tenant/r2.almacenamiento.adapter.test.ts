@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest"
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { mockClient } from "aws-sdk-client-mock"
 import { R2AlmacenamientoAdapter } from "../../../../src/modules/tenant/infrastructure/r2.almacenamiento.adapter.js"
 
 // `getSignedUrl` no llama a `S3Client.send()` — calcula la firma localmente
@@ -40,5 +41,51 @@ describe("R2AlmacenamientoAdapter", () => {
 
     expect(resultado.uploadUrl).toContain("X-Amz-Signature")
     expect(resultado.publicUrl).toBe("https://cdn.vendora.app/tenants/t1/imagenesProductos/x.jpg")
+  })
+
+  describe("eliminarArchivo", () => {
+    const s3Mock = mockClient(S3Client)
+
+    beforeEach(() => {
+      s3Mock.reset()
+    })
+
+    it("llama DeleteObjectCommand con el bucket y key correctos", async () => {
+      s3Mock.on(DeleteObjectCommand).resolves({})
+
+      const adapter = new R2AlmacenamientoAdapter({
+        s3: new S3Client({ region: "auto" }),
+        bucket: "vendora",
+        publicBaseUrl: "https://cdn.vendora.app",
+      })
+
+      await adapter.eliminarArchivo("tenants/t1/imagenesProductos/x.jpg")
+
+      expect(s3Mock.commandCalls(DeleteObjectCommand)).toHaveLength(1)
+      expect(s3Mock.commandCalls(DeleteObjectCommand)[0]?.args[0].input).toMatchObject({
+        Bucket: "vendora",
+        Key: "tenants/t1/imagenesProductos/x.jpg",
+      })
+    })
+  })
+
+  describe("extraerKeyDesdeUrlPublica", () => {
+    const adapter = new R2AlmacenamientoAdapter({
+      s3: new S3Client({ region: "auto" }),
+      bucket: "vendora",
+      publicBaseUrl: "https://cdn.vendora.app",
+    })
+
+    it("quita el prefijo publicBaseUrl y devuelve la key", () => {
+      const key = adapter.extraerKeyDesdeUrlPublica(
+        "https://cdn.vendora.app/tenants/t1/imagenesProductos/x.jpg",
+      )
+      expect(key).toBe("tenants/t1/imagenesProductos/x.jpg")
+    })
+
+    it("devuelve null si la url no empieza con publicBaseUrl", () => {
+      const key = adapter.extraerKeyDesdeUrlPublica("https://otro-dominio.com/tenants/t1/x.jpg")
+      expect(key).toBeNull()
+    })
   })
 })

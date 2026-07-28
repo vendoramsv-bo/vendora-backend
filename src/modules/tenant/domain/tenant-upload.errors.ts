@@ -25,3 +25,19 @@ export class TamanoExcedido extends Error {
     this.name = "TamanoExcedido"
   }
 }
+
+export class ReferenciaArchivoInvalida extends Error {
+  readonly code = "REFERENCIA_INVALIDA"
+  constructor(url: string) {
+    super(`La referencia de archivo "${url}" no tiene un formato válido`)
+    this.name = "ReferenciaArchivoInvalida"
+  }
+}
+
+export class ArchivoNoPerteneceATenant extends Error {
+  readonly code = "ARCHIVO_NO_PERTENECE_A_TENANT"
+  constructor() {
+    super("El archivo no pertenece al tenant activo")
+    this.name = "ArchivoNoPerteneceATenant"
+  }
+}
