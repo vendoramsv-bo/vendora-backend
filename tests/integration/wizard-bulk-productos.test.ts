@@ -55,6 +55,12 @@ describe.skipIf(!hasDb)("wizard /catalogo/productos/bulk — sincronizarSeleccio
 
     const productos = await prisma.producto.findMany({ where: { tenantId: fx.tenantId, codigo: `AGREGAR-${RUN}` } })
     expect(productos.length).toBe(1)
+
+    // FIX clasificadores comunes — el Producto creado desde el catálogo maestro
+    // debe guardar claActividadId/claCategoriaId/claProductoId (antes quedaban null).
+    expect(productos[0].claActividadId).toBe(fx.claActividadId)
+    expect(productos[0].claCategoriaId).toBe(claA.claCategoriaId)
+    expect(productos[0].claProductoId).toBe(claA.id)
   })
 
   it("reenviar la misma selección no crea duplicados", async () => {

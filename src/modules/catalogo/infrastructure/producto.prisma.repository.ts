@@ -565,6 +565,13 @@ export class ProductoPrismaRepository implements IProductoRepository {
               actividadId: actividadTenant.id,
               categoriaId: categoriaTenant.id,
               unidadId: unidadTenant.id,
+              // Referencias al clasificador común (ClaProducto) — sin esto, no hay
+              // forma de identificar de qué entrada del catálogo maestro proviene
+              // este Producto, y el filtro de "ya seleccionados" del wizard tiene
+              // que adivinarlo por codigo+claActividadId (ambiguo entre categorías).
+              claActividadId: (plantilla as any).claActividadId,
+              claCategoriaId: (plantilla as any).claCategoriaId,
+              claProductoId: (plantilla as any).id,
               codigo: (plantilla as any).codigo,
               nombre: (plantilla as any).nombre,
               descripcion: (plantilla as any).descripcion ?? undefined,
@@ -591,43 +598,76 @@ export class ProductoPrismaRepository implements IProductoRepository {
     }, { timeout: 30000, maxWait: 10000 })
   }
 
+  // ─── Resolución legada de claProductoId (Producto sin el campo, pre-fix) ─────
+  //
+  // Antes del fix de clasificadores comunes, altaMasiva no guardaba claProductoId
+  // en Producto. Para esos registros existentes, se reconstruye la referencia por
+  // (claActividadId, codigo) — mismo criterio que ya usaba GET /catalogo/productos-seleccionados
+  // antes del fix. Es una heurística ambigua en teoría (ClaProducto solo garantiza
+  // codigo único por (claActividadId, claCategoriaId), no por claActividadId a
+  // secas) pero exigir claCategoriaId acá rompería el matching de Categoria
+  // creadas sin claCategoriaId vinculado (dato legado real) — se prefiere no
+  // perder la resolución existente. Los registros nuevos ya no dependen de esto:
+  // altaMasiva guarda claProductoId directo.
+  private async resolverClaProductoIdLegado(
+    productos: { id: string; codigo: string; actividadId: string }[],
+  ): Promise<{ productoId: string; claProductoId: string }[]> {
+    const actividadIds = [...new Set(productos.map((p) => p.actividadId))]
+
+    const actividades = await this.db.actividadEconomica.findMany({
+      where: { id: { in: actividadIds } },
+      select: { id: true, claActividadId: true },
+    })
+    const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
+
+    const conCla = productos
+      .map((p) => ({
+        productoId: p.id,
+        codigo: p.codigo,
+        claActividadId: actividadMap.get(p.actividadId) ?? null,
+      }))
+      .filter(
+        (p): p is { productoId: string; codigo: string; claActividadId: string } => p.claActividadId !== null,
+      )
+
+    if (conCla.length === 0) return []
+
+    const claProductos = await this.db.claProducto.findMany({
+      where: { OR: conCla.map((p) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
+      select: { id: true, codigo: true, claActividadId: true },
+    })
+
+    return conCla
+      .map((p) => {
+        const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
+        return cla ? { productoId: p.productoId, claProductoId: cla.id as string } : null
+      })
+      .filter((x): x is { productoId: string; claProductoId: string } => x !== null)
+  }
+
   // ─── Sincronización de selección (wizard) ────────────────────────────────────
 
   async sincronizarSeleccion(claProductoIds: string[], tenantId: string, userId: string): Promise<SincronizarSeleccionResult> {
-    // Resolver la selección actualmente guardada para el tenant — mismo criterio
-    // de identidad que GET /catalogo/productos-seleccionados: (actividadId, codigo)
-    // se mapea a claProductoId vía el catálogo maestro ClaProducto.
+    // Resolver la selección actualmente guardada para el tenant. Desde el fix de
+    // clasificadores comunes, altaMasiva guarda claProductoId directo en Producto
+    // — se usa ese campo cuando está presente. Los productos creados ANTES del fix
+    // (claProductoId null) se resuelven con el matching legado por
+    // (claActividadId, codigo), igual que GET /catalogo/productos-seleccionados.
     const productosTenant = await this.db.producto.findMany({
       where: { tenantId },
-      select: { id: true, codigo: true, actividadId: true },
+      select: { id: true, codigo: true, actividadId: true, claProductoId: true },
     })
 
-    const actividadIds = [...new Set<string>(productosTenant.map((p: any) => p.actividadId))]
-    const actividades = actividadIds.length > 0
-      ? await this.db.actividadEconomica.findMany({
-          where: { id: { in: actividadIds } },
-          select: { id: true, claActividadId: true },
-        })
-      : []
-    const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
+    const existentesDirectos = productosTenant
+      .filter((p: any) => p.claProductoId !== null)
+      .map((p: any) => ({ productoId: p.id as string, claProductoId: p.claProductoId as string }))
 
-    const conCla = productosTenant
-      .map((p: any) => ({ productoId: p.id, codigo: p.codigo, claActividadId: actividadMap.get(p.actividadId) ?? null }))
-      .filter((p: any) => p.claActividadId !== null)
-
-    const claProductos = conCla.length > 0
-      ? await this.db.claProducto.findMany({
-          where: { OR: conCla.map((p: any) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
-          select: { id: true, codigo: true, claActividadId: true },
-        })
+    const legado = productosTenant.filter((p: any) => p.claProductoId === null)
+    const existentesLegado = legado.length > 0
+      ? await this.resolverClaProductoIdLegado(legado)
       : []
 
-    const existentes = conCla
-      .map((p: any) => {
-        const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
-        return cla ? { productoId: p.productoId as string, claProductoId: cla.id as string } : null
-      })
-      .filter((x: any): x is { productoId: string; claProductoId: string } => x !== null)
+    const existentes = [...existentesDirectos, ...existentesLegado]
 
     const seleccionSet = new Set(claProductoIds)
     const existentesSet = new Set(existentes.map((e: { claProductoId: string }) => e.claProductoId))

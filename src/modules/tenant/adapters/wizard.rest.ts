@@ -422,37 +422,50 @@ wizardRouter.openapi(
 
     const productos = await db.producto.findMany({
       where: { tenantId },
-      select: { codigo: true, nombre: true, actividadId: true },
+      select: { codigo: true, nombre: true, actividadId: true, claActividadId: true, claProductoId: true },
     })
 
     if (productos.length === 0) return c.json({ data: [] })
 
-    const actividadIds: string[] = [...new Set<string>(productos.map((p: any) => p.actividadId))]
-    const actividades = await db.actividadEconomica.findMany({
-      where: { id: { in: actividadIds } },
-      select: { id: true, claActividadId: true },
-    })
-    const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
+    // Camino directo (fix de clasificadores comunes): altaMasiva ya guarda
+    // claActividadId/claProductoId en el Producto, no hace falta reconstruirlos.
+    const directos = productos
+      .filter((p: any) => p.claProductoId !== null && p.claActividadId !== null)
+      .map((p: any) => ({ claActividadId: p.claActividadId as string, claProductoId: p.claProductoId as string, nombre: p.nombre }))
 
-    const productosConCla = productos
-      .map((p: any) => ({ codigo: p.codigo, nombre: p.nombre, claActividadId: actividadMap.get(p.actividadId) ?? null }))
-      .filter((p: any) => p.claActividadId !== null)
+    // Camino legado: Producto creado antes del fix (claProductoId null) — se
+    // reconstruye por (claActividadId, codigo), igual que antes del fix.
+    const legado = productos.filter((p: any) => p.claProductoId === null)
+    let resultLegado: { claActividadId: string; claProductoId: string; nombre: string }[] = []
 
-    if (productosConCla.length === 0) return c.json({ data: [] })
-
-    const claProductos = await db.claProducto.findMany({
-      where: { OR: productosConCla.map((p: any) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
-      select: { id: true, codigo: true, claActividadId: true },
-    })
-
-    const result = productosConCla
-      .map((p: any) => {
-        const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
-        return cla ? { claActividadId: p.claActividadId, claProductoId: cla.id, nombre: p.nombre } : null
+    if (legado.length > 0) {
+      const actividadIds: string[] = [...new Set<string>(legado.map((p: any) => p.actividadId))]
+      const actividades = await db.actividadEconomica.findMany({
+        where: { id: { in: actividadIds } },
+        select: { id: true, claActividadId: true },
       })
-      .filter(Boolean)
+      const actividadMap = new Map<string, string>(actividades.map((a: any) => [a.id, a.claActividadId]))
 
-    return c.json({ data: result })
+      const conCla = legado
+        .map((p: any) => ({ codigo: p.codigo, nombre: p.nombre, claActividadId: actividadMap.get(p.actividadId) ?? null }))
+        .filter((p: any) => p.claActividadId !== null)
+
+      if (conCla.length > 0) {
+        const claProductos = await db.claProducto.findMany({
+          where: { OR: conCla.map((p: any) => ({ codigo: p.codigo, claActividadId: p.claActividadId })) },
+          select: { id: true, codigo: true, claActividadId: true },
+        })
+
+        resultLegado = conCla
+          .map((p: any) => {
+            const cla = claProductos.find((c: any) => c.codigo === p.codigo && c.claActividadId === p.claActividadId)
+            return cla ? { claActividadId: p.claActividadId, claProductoId: cla.id, nombre: p.nombre } : null
+          })
+          .filter(Boolean) as { claActividadId: string; claProductoId: string; nombre: string }[]
+      }
+    }
+
+    return c.json({ data: [...directos, ...resultLegado] })
   },
 )
 
