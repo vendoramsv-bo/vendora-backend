@@ -23,6 +23,8 @@
     "prisma": "prisma"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1095.0",
+    "@aws-sdk/s3-request-presigner": "^3.1095.0",
     "@hono/node-server": "^2.0.3",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^0.19.4",
@@ -45,6 +47,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
+    "aws-sdk-client-mock": "^4.1.0",
     "prisma": "^7.0.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
