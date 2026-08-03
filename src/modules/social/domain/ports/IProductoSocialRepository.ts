@@ -103,4 +103,6 @@ export interface IProductoSocialRepository {
   // Favoritos
   toggleFavoritoProducto(productoId: string, tenantId: string, userId: string): Promise<{ favorito: boolean }>
   listarFavoritosUsuario(userId: string, params: { take: number; page: number }): Promise<PaginatedResult<ProductoFavoritoRaw>>
+  /** Ids de los productos de un comercio que esta persona marcó como favoritos. */
+  listarIdsFavoritosEnTienda(tenantId: string, userId: string): Promise<string[]>
 }

@@ -31,7 +31,11 @@ const db = prismaBase as any
 function makeRepo() { return new ProductoSocialPrismaRepository() }
 
 async function resolveSlugTenantId(slug: string): Promise<string | null> {
-  const t = await db.tenant.findUnique({ where: { slug }, select: { id: true } })
+  // Un comercio con la creacion incompleta no resuelve: su social de producto no
+  // es publico hasta que el wizard llega a FINALIZADO. Sin esta condicion, las
+  // valoraciones, comentarios y preguntas de producto de una tienda a medio crear
+  // quedan expuestas (fuga del SC-012 de la spec 018).
+  const t = await db.tenant.findFirst({ where: { slug, estado: "FINALIZADO" }, select: { id: true } })
   return t?.id ?? null
 }
 
@@ -308,6 +312,34 @@ productoSocialRouter.openapi(
       )
       return c.json(result)
     } catch (err) { return handleSocialError(err, c) as Response }
+  },
+)
+
+productoSocialRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/tiendas/{slug}/productos/mis-favoritos",
+    operationId: "social_listar_mis_favoritos_producto",
+    tags: ["Social"],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ slug: z.string() }),
+    },
+    responses: {
+      200: okResponse("Ids de productos que el usuario marcó como favoritos", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = await resolveSlugTenantId(c.req.param("slug"))
+    if (!tenantId) return c.json({ error: "TIENDA_NO_ENCONTRADA" }, 404)
+
+    // Sin esta ruta la vitrina no puede pintar el corazón lleno al cargar: el
+    // toggle existía, pero no había forma de preguntar el estado, así que al
+    // recargar la página todos los corazones volvían a verse vacíos aunque el
+    // favorito siguiera guardado (spec 019 FR-038).
+    const data = await makeRepo().listarIdsFavoritosEnTienda(tenantId, c.get("session").user.id)
+    return c.json({ data })
   },
 )
 

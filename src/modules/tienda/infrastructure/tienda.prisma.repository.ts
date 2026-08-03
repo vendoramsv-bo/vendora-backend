@@ -9,6 +9,7 @@ import type {
   DirectorioItemDTO,
   AgregarDestacadoDTO,
   DestacadoItemDTO,
+  CategoriaPublicaDTO,
 } from "../domain/ports/ITiendaRepository.js"
 import {
   ConfiguracionNoEncontradaError,
@@ -21,6 +22,9 @@ import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs, paginate } from "../../../core/query-params.js"
 
 const MAX_DESTACADOS = 20
+
+/** Tope del carrusel de favoritos: mas largo que esto es una lista disfrazada. */
+const MAX_FAVORITOS_COMUNIDAD = 12
 
 // Fórmula Haversine simplificada — distancia en km entre dos puntos geográficos
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -87,7 +91,8 @@ export class TiendaPrismaRepository implements ITiendaRepository {
 
   async obtenerPerfilPublico(slug: string): Promise<PerfilPublicoDTO | null> {
     const tenant = await this.db.tenant.findFirst({
-      where: { slug, esTienda: true },
+      // Un comercio solo es publico con el wizard de creacion terminado (FR-048).
+      where: { slug, esTienda: true, estado: "FINALIZADO" },
       include: {
         tienda: {
           include: {
@@ -113,6 +118,23 @@ export class TiendaPrismaRepository implements ITiendaRepository {
     const vals = tenant.tienda.valoracionesTienda as Array<{ puntuacion: number }>
     const promedio = vals.length > 0 ? vals.reduce((s: number, v: { puntuacion: number }) => s + v.puntuacion, 0) / vals.length : 0
 
+    // Los destacados llevan el mismo agregado de valoracion que el catalogo, para
+    // que la tarjeta de producto sea UNA sola en toda la vitrina (spec 019 FR-020).
+    const destacadosConValoracion = (await this.conValoraciones(
+      tenant.tienda.productosDestacados.map((d: {
+        productoId: string
+        orden: number
+        producto: { id: string; nombre: string; precio: unknown; imagenUrl: string | null }
+      }) => ({
+        id: d.producto.id,
+        productoId: d.productoId,
+        nombre: d.producto.nombre,
+        precio: Number(d.producto.precio),
+        imagenUrl: d.producto.imagenUrl,
+        orden: d.orden,
+      })),
+    )) as PerfilPublicoDTO["productosDestacados"]
+
     return {
       tiendaId: tenant.tienda.id,
       tenantSlug: tenant.slug,
@@ -127,17 +149,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       configuracion: tenant.tienda.configuracion
         ? { tema: tenant.tienda.configuracion.tema, tipoLineado: tenant.tienda.configuracion.tipoLineado }
         : null,
-      productosDestacados: tenant.tienda.productosDestacados.map((d: {
-        productoId: string
-        orden: number
-        producto: { id: string; nombre: string; precio: unknown; imagenUrl: string | null }
-      }) => ({
-        productoId: d.productoId,
-        nombre: d.producto.nombre,
-        precio: Number(d.producto.precio),
-        imagenUrl: d.producto.imagenUrl,
-        orden: d.orden,
-      })),
+      productosDestacados: destacadosConValoracion,
       metricas: {
         puntuacionPromedio: Math.round(promedio * 10) / 10,
         totalValoraciones: vals.length,
@@ -153,7 +165,8 @@ export class TiendaPrismaRepository implements ITiendaRepository {
     const take = Math.min(100, Math.max(1, query.take ?? query.limit ?? 20))
     const skip = (page - 1) * take
 
-    const where: Record<string, unknown> = { esTienda: true }
+    // Solo comercios con la creacion completa entran al directorio (FR-048).
+    const where: Record<string, unknown> = { esTienda: true, estado: "FINALIZADO" }
     if (busqueda) where.OR = [{ name: { contains: busqueda, mode: "insensitive" } }, { descripcion: { contains: busqueda, mode: "insensitive" } }]
     if (actividadEconomicaId) where.actividadesEconomicas = { some: { id: actividadEconomicaId } }
     if (categoriaId) where.categorias = { some: { id: categoriaId } }
@@ -282,16 +295,143 @@ export class TiendaPrismaRepository implements ITiendaRepository {
     }))
   }
 
-  async listarCatalogoPublico(slug: string, params: QueryParams): Promise<{ data: unknown[]; total: number }> {
-    const tenant = await this.db.tenant.findFirst({ where: { slug, esTienda: true }, select: { id: true } })
+  async listarCatalogoPublico(slug: string, params: QueryParams, categoriaId?: string): Promise<{ data: unknown[]; total: number }> {
+    const tenant = await this.db.tenant.findFirst({ where: { slug, esTienda: true, estado: "FINALIZADO" }, select: { id: true } })
     if (!tenant) return { data: [], total: 0 }
     const prismaArgs = toPrismaArgs(params, ["nombre"])
-    const where = { ...prismaArgs.where, tenantId: tenant.id, estado: "ACTIVO" }
+    // El filtro por categoria se combina con la busqueda y el orden, no los anula
+    // (spec 019 FR-004).
+    const where = {
+      ...prismaArgs.where,
+      tenantId: tenant.id,
+      estado: "ACTIVO",
+      ...(categoriaId ? { categoriaId } : {}),
+    }
     const [data, total] = await Promise.all([
-      this.db.producto.findMany({ ...prismaArgs, where, select: { id: true, nombre: true, descripcion: true, precio: true, imagenUrl: true, estado: true } }),
+      this.db.producto.findMany({ ...prismaArgs, where, select: { id: true, nombre: true, descripcion: true, precio: true, imagenUrl: true, estado: true, categoriaId: true } }),
       this.db.producto.count({ where }),
     ])
-    const result = paginate(data, total, params)
-    return { data: result.data, total: result.total }
+    const result = paginate(data as { id: string }[], total, params)
+    return { data: await this.conValoraciones(result.data), total: result.total }
+  }
+
+  /**
+   * Agrega a cada producto el promedio de valoraciones VISIBLES y su cantidad
+   * (spec 019 FR-020).
+   *
+   * Va acá, embebido en la respuesta que ya se está armando, y no en un endpoint
+   * por producto: una grilla de doce tarjetas dispararía doce peticiones justo en
+   * el camino del LCP (research R-03). Una sola consulta agregada para toda la
+   * página.
+   */
+  private async conValoraciones<T extends { id: string }>(productos: T[]): Promise<unknown[]> {
+    if (productos.length === 0) return productos
+
+    const grupos = await this.db.productoValoracion.groupBy({
+      by: ["productoId"],
+      // Una valoración oculta no cuenta, igual que en el promedio del comercio.
+      where: { productoId: { in: productos.map((p) => p.id) }, estado: "ACTIVO" },
+      _avg: { puntuacion: true },
+      _count: { _all: true },
+    })
+
+    const porProducto = new Map<string, { promedio: number; total: number }>(
+      grupos.map((g: { productoId: string; _avg: { puntuacion: number | null }; _count: { _all: number } }) => [
+        g.productoId,
+        { promedio: g._avg.puntuacion ?? 0, total: g._count._all },
+      ]),
+    )
+
+    return productos.map((producto) => {
+      const agregado = porProducto.get(producto.id)
+      return {
+        ...producto,
+        // Sin valoraciones va 0, y la tarjeta muestra "Sin valoraciones" — nunca
+        // cinco estrellas vacías, que se leen como "calificado mal" (FR-021).
+        puntuacionPromedio: agregado ? Math.round(agregado.promedio * 10) / 10 : 0,
+        totalValoraciones: agregado?.total ?? 0,
+      }
+    })
+  }
+
+  /**
+   * Categorias que el comercio realmente usa en su catalogo publico
+   * (spec 019 FR-001).
+   *
+   * Se derivan de los productos, no de la tabla de categorias: una categoria sin
+   * productos ACTIVO no le sirve de nada a quien esta navegando la vitrina.
+   * Se aplanan a un nivel — `padreId`/`nivel` existen en el modelo pero una barra
+   * horizontal no representa jerarquia sin volverse un menu (research R-01).
+   */
+  async listarCategoriasPublicas(slug: string): Promise<CategoriaPublicaDTO[]> {
+    const tenant = await this.db.tenant.findFirst({ where: { slug, esTienda: true, estado: "FINALIZADO" }, select: { id: true } })
+    if (!tenant) return []
+
+    const grupos = await this.db.producto.groupBy({
+      by: ["categoriaId"],
+      where: { tenantId: tenant.id, estado: "ACTIVO" },
+      _count: { _all: true },
+    })
+    if (grupos.length === 0) return []
+
+    const conteoPorCategoria = new Map<string, number>(
+      grupos.map((g: { categoriaId: string; _count: { _all: number } }) => [g.categoriaId, g._count._all]),
+    )
+
+    const categorias = await this.db.categoria.findMany({
+      where: { id: { in: [...conteoPorCategoria.keys()] } },
+      select: { id: true, nombre: true },
+    })
+
+    return categorias
+      .map((c: { id: string; nombre: string }) => ({
+        id: c.id,
+        nombre: c.nombre,
+        totalProductos: conteoPorCategoria.get(c.id) ?? 0,
+      }))
+      .sort((a: CategoriaPublicaDTO, b: CategoriaPublicaDTO) => a.nombre.localeCompare(b.nombre, "es"))
+  }
+
+  /**
+   * Productos del comercio que mas personas guardaron como favoritos
+   * (spec 019 FR-024, FR-027, FR-028).
+   *
+   * Se expone el CONTEO, nunca quien lo guardo: el agregado es publico, la
+   * identidad no. Es la misma linea que la spec 018 traza para la autoria de los
+   * aportes publicos.
+   *
+   * Tope de 12: un carrusel mas largo es una lista disfrazada.
+   */
+  async listarFavoritosComunidad(slug: string): Promise<unknown[]> {
+    const tenant = await this.db.tenant.findFirst({ where: { slug, esTienda: true, estado: "FINALIZADO" }, select: { id: true } })
+    if (!tenant) return []
+
+    const grupos = await this.db.productoFavorito.groupBy({
+      by: ["productoId"],
+      where: { tenantId: tenant.id },
+      _count: { _all: true },
+      orderBy: { _count: { productoId: "desc" } },
+      take: MAX_FAVORITOS_COMUNIDAD,
+    })
+    if (grupos.length === 0) return []
+
+    const favoritosPorProducto = new Map<string, number>(
+      grupos.map((g: { productoId: string; _count: { _all: number } }) => [g.productoId, g._count._all]),
+    )
+
+    // Un producto retirado no vuelve al carrusel aunque siga guardado (FR-028).
+    const productos = await this.db.producto.findMany({
+      where: { id: { in: [...favoritosPorProducto.keys()] }, tenantId: tenant.id, estado: "ACTIVO" },
+      select: { id: true, nombre: true, descripcion: true, precio: true, imagenUrl: true, estado: true, categoriaId: true },
+    })
+
+    const conValoracion = await this.conValoraciones(productos)
+
+    return (conValoracion as { id: string }[])
+      .map((producto) => ({
+        ...producto,
+        totalFavoritos: favoritosPorProducto.get(producto.id) ?? 0,
+      }))
+      .sort((a, b) => b.totalFavoritos - a.totalFavoritos)
   }
 }

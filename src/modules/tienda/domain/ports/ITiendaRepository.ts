@@ -26,8 +26,25 @@ export interface PerfilPublicoDTO {
   localizaciones: Array<{ latitud: number; longitud: number; direccion: string; ciudad: string; barrio: string | null }>
   actividadesEconomicas: string[]
   configuracion: { tema: string; tipoLineado: string } | null
-  productosDestacados: Array<{ productoId: string; nombre: string; precio: number; imagenUrl: string | null; orden: number }>
+  productosDestacados: Array<{
+    productoId: string
+    nombre: string
+    precio: number
+    imagenUrl: string | null
+    orden: number
+    /** Agregado de valoración, igual que en el catálogo (spec 019 FR-020). */
+    puntuacionPromedio: number
+    totalValoraciones: number
+  }>
   metricas: { puntuacionPromedio: number; totalValoraciones: number; totalSeguidores: number; totalComentarios: number }
+}
+
+/** Categoria que el comercio usa en su catalogo publico (spec 019 FR-001). */
+export interface CategoriaPublicaDTO {
+  id: string
+  nombre: string
+  /** Productos ACTIVO que cuelgan de ella. Decide si la barra la muestra. */
+  totalProductos: number
 }
 
 export interface DirectorioItemDTO {
@@ -99,5 +116,7 @@ export interface ITiendaRepository {
   quitarDestacado(tenantId: string, productoId: string): Promise<void>
   reordenarDestacados(tenantId: string, orden: string[]): Promise<void>
   listarDestacados(tenantId: string): Promise<DestacadoItemDTO[]>
-  listarCatalogoPublico(slug: string, params: QueryParams): Promise<{ data: unknown[]; total: number }>
+  listarCatalogoPublico(slug: string, params: QueryParams, categoriaId?: string): Promise<{ data: unknown[]; total: number }>
+  listarCategoriasPublicas(slug: string): Promise<CategoriaPublicaDTO[]>
+  listarFavoritosComunidad(slug: string): Promise<unknown[]>
 }

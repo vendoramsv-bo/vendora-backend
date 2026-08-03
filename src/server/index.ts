@@ -24,6 +24,8 @@ import { InventarioProductoPrismaRepository } from "../modules/almacen/infrastru
 import { setAlmacenInventarioPort } from "../modules/almacen/infrastructure/almacen-inventario.port.provider.js"
 import { VentasSocketNotificador } from "../modules/ventas/infrastructure/ventas.socket.notificador.js"
 import { setVentasNotificador } from "../modules/ventas/infrastructure/ventas.notificador.provider.js"
+import { NotificacionSocketNotificador } from "../modules/notificacion/infrastructure/notificacion.socket.notificador.js"
+import { setNotificacionNotificador } from "../modules/notificacion/infrastructure/notificacion.notificador.provider.js"
 import { RestauranteSocketNotificador } from "../modules/restaurante/infrastructure/restaurante.socket.notificador.js"
 import { setRestauranteNotificador } from "../modules/restaurante/infrastructure/restaurante.notificador.provider.js"
 import { SocialSocketNotificador } from "../modules/social/infrastructure/social.socket.notificador.js"
@@ -168,6 +170,10 @@ setAlmacenInventarioPort(new AlmacenInventarioPortAdapter(new InventarioProducto
 export const ventasNotificador = new VentasSocketNotificador(io)
 setVentasNotificador(ventasNotificador)
 
+// NotificacionSocketNotificador — emite notifications:unread:count al room user:{id}
+export const notificacionNotificador = new NotificacionSocketNotificador(io)
+setNotificacionNotificador(notificacionNotificador)
+
 // RestauranteSocketNotificador — emite eventos restaurante:* al room tenant:{id}
 export const restauranteNotificador = new RestauranteSocketNotificador(io)
 setRestauranteNotificador(restauranteNotificador)
@@ -222,6 +228,10 @@ io.on("connection", async (socket) => {
   for (const { organizationId } of membresías) {
     await socket.join(`tenant:${organizationId}`)
   }
+
+  // Room personal: una notificación le concierne a una persona, no a todo el
+  // comercio. Es a donde emite `notifications:unread:count` (spec 019 FR-032).
+  await socket.join(`user:${session.user.id}`)
 
   logger.info(
     { userId: session.user.id, rooms: membresías.length },

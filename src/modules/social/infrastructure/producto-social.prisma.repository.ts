@@ -108,7 +108,10 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
 
   async getPromedioValoracionesProducto(productoId: string): Promise<number> {
     const agg = await db.productoValoracion.aggregate({
-      where: { productoId },
+      // Una valoracion oculta por el comercio no pesa en el promedio publico.
+      // Es el mismo hueco que la spec 018 cerro con su cambio C2 para el
+      // comercio y que en producto habia quedado abierto (019 FR-022).
+      where: { productoId, estado: "ACTIVO" },
       _avg: { puntuacion: true },
     })
     return agg._avg.puntuacion ?? 0
@@ -119,7 +122,8 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
     const page = Math.max(1, params.page)
     const skip = (page - 1) * take
     const orderField = params.orderBy === "puntuacion" ? "puntuacion" : "createdAt"
-    const where = { productoId, tenantId }
+    // La vitrina no lista valoraciones ocultas por el comercio (019 FR-022).
+    const where = { productoId, tenantId, estado: "ACTIVO" }
     const [data, total] = await Promise.all([
       db.productoValoracion.findMany({ where, take, skip, orderBy: { [orderField]: params.order } }),
       db.productoValoracion.count({ where }),
@@ -187,5 +191,24 @@ export class ProductoSocialPrismaRepository implements IProductoSocialRepository
       db.productoFavorito.count({ where }),
     ])
     return paginate(data, total, { take, skip })
+  }
+
+  /**
+   * Ids de los productos de UN comercio que esta persona marco como favoritos.
+   *
+   * Sin esto la vitrina no puede pintar el corazon lleno al cargar: el toggle
+   * existia, pero no habia forma de preguntar el estado, asi que al recargar la
+   * pagina todos los corazones volvian a verse vacios aunque el favorito siguiera
+   * guardado (spec 019 FR-038).
+   *
+   * Devuelve solo ids y acotado al comercio visitado: es lo unico que la tarjeta
+   * necesita, y evita traer los favoritos de la persona en todas las tiendas.
+   */
+  async listarIdsFavoritosEnTienda(tenantId: string, userId: string): Promise<string[]> {
+    const favoritos = await db.productoFavorito.findMany({
+      where: { tenantId, userId },
+      select: { productoId: true },
+    })
+    return favoritos.map((f: { productoId: string }) => f.productoId)
   }
 }

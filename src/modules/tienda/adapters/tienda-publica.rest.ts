@@ -4,6 +4,8 @@ import { TiendaPrismaRepository } from "../infrastructure/tienda.prisma.reposito
 import { ObtenerPerfilPublicoUseCase } from "../application/perfil/obtener-perfil-publico.usecase.js"
 import { ListarDirectorioUseCase } from "../application/directorio/listar-directorio.usecase.js"
 import { ListarCatalogoPublicoUseCase } from "../application/directorio/listar-catalogo-publico.usecase.js"
+import { ListarCategoriasPublicasUseCase } from "../application/directorio/listar-categorias-publicas.usecase.js"
+import { ListarFavoritosComunidadUseCase } from "../application/directorio/listar-favoritos-comunidad.usecase.js"
 import { DirectorioQuerySchema, CatalogoPublicoQuerySchema } from "./tienda.schema.js"
 import { TiendaNoEncontradaError } from "../domain/tienda.errors.js"
 import { makeQueryParamsSchema } from "../../../core/query-params.js"
@@ -84,7 +86,53 @@ tiendaPublicaRouter.openapi(
   }),
   async (c) => {
     const params = CatalogoQuerySchema.parse(c.req.query())
-    const result = await new ListarCatalogoPublicoUseCase(makeRepo()).execute(c.req.param("slug"), params)
+    // `CatalogoPublicoQuerySchema` declaraba `categoriaId` pero `CatalogoQuerySchema`
+    // (makeQueryParamsSchema) no lo incluye, asi que el parametro se documentaba y
+    // se descartaba en silencio. Se lee aparte y se propaga (spec 019 FR-003).
+    const categoriaId = c.req.query("categoriaId") || undefined
+    const result = await new ListarCatalogoPublicoUseCase(makeRepo()).execute(c.req.param("slug"), params, categoriaId)
     return c.json(result)
+  },
+)
+
+// GET /public/tiendas/:slug/categorias — categorías del catálogo público sin auth
+tiendaPublicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/{slug}/categorias",
+    operationId: "tienda_publico_listar_categorias",
+    tags: ["Tienda Pública"],
+    request: {
+      params: z.object({ slug: z.string() }),
+    },
+    responses: {
+      200: okResponse("Categorías del catálogo público", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const data = await new ListarCategoriasPublicasUseCase(makeRepo()).execute(c.req.param("slug"))
+    return c.json({ data })
+  },
+)
+
+// GET /public/tiendas/:slug/productos/favoritos — más guardados por la comunidad
+tiendaPublicaRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/{slug}/productos/favoritos",
+    operationId: "tienda_publico_listar_favoritos_comunidad",
+    tags: ["Tienda Pública"],
+    request: {
+      params: z.object({ slug: z.string() }),
+    },
+    responses: {
+      200: okResponse("Productos favoritos de la comunidad", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const data = await new ListarFavoritosComunidadUseCase(makeRepo()).execute(c.req.param("slug"))
+    return c.json({ data })
   },
 )

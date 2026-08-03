@@ -7,8 +7,10 @@ import { consultorioApp } from "../modules/consultorio/adapters/consultorio-rout
 import { catalogoApp } from "../modules/catalogo/adapters/catalogo-router.js"
 import { almacenApp } from "../modules/almacen/adapters/almacen-router.js"
 import { ventasApp } from "../modules/ventas/adapters/ventas-router.js"
+import { pedidoConsumerRouter } from "../modules/ventas/adapters/pedido-consumer.rest.js"
 import { restauranteApp, publicRestauranteApp, publicosRestaurantesApp, staffPerfilPublicoApp, consumerApp } from "../modules/restaurante/adapters/restaurante.router.js"
 import { socialApp, publicSocialApp } from "../modules/social/adapters/social.router.js"
+import { notificacionRouter } from "../modules/notificacion/adapters/notificacion.rest.js"
 
 export const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
@@ -71,6 +73,10 @@ export function crearApp() {
 
   // Módulo ventas (clientes, proveedores, compras)
   app.route("/api/ventas", ventasApp)
+  // Pedidos del visitante de una vitrina pública. Va aparte de `ventasApp` a
+  // propósito: ese aplica `requireTenantActivo` a todo, y quien encarga desde la
+  // vitrina de otro comercio no tiene ese contexto (spec 019 B2).
+  app.route("/api/consumer/tiendas", pedidoConsumerRouter)
 
   // Módulo restaurante (staff + endpoints públicos)
   app.route("/api/restaurante", restauranteApp)
@@ -78,6 +84,9 @@ export function crearApp() {
   app.route("/api/staff/restaurante/perfil", staffPerfilPublicoApp)
   app.route("/api/public/restaurantes", publicosRestaurantesApp)
   app.route("/api/consumer", consumerApp)
+
+  // Notificaciones personales (spec 019 B7)
+  app.route("/api/notificaciones", notificacionRouter)
 
   // Módulo social (interacciones + publicaciones)
   app.route("/api/social", socialApp)

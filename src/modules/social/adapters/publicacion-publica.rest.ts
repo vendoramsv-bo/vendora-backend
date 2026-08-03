@@ -13,7 +13,9 @@ const db = prismaBase as any
 function makeRepo() { return new PublicacionPrismaRepository() }
 
 async function resolveSlugTenantId(slug: string): Promise<string | null> {
-  const t = await db.tenant.findUnique({ where: { slug }, select: { id: true } })
+  // Un comercio con la creacion incompleta no resuelve: sus publicaciones no son
+  // publicas hasta que el wizard llega a FINALIZADO (FR-049).
+  const t = await db.tenant.findFirst({ where: { slug, estado: "FINALIZADO" }, select: { id: true } })
   return t?.id ?? null
 }
 

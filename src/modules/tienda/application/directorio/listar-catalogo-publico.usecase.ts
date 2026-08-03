@@ -4,7 +4,7 @@ import type { QueryParams } from "../../../../core/query-params.js"
 export class ListarCatalogoPublicoUseCase {
   constructor(private readonly repo: ITiendaRepository) {}
 
-  async execute(slug: string, params: QueryParams) {
-    return this.repo.listarCatalogoPublico(slug, params)
+  async execute(slug: string, params: QueryParams, categoriaId?: string) {
+    return this.repo.listarCatalogoPublico(slug, params, categoriaId)
   }
 }
