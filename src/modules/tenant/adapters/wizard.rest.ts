@@ -7,6 +7,14 @@ import { SincronizarProductosUseCase } from "../../catalogo/application/producto
 import { ProductoPrismaRepository } from "../../catalogo/infrastructure/producto.prisma.repository.js"
 import { getCatalogoNotificador } from "../../catalogo/infrastructure/catalogo.notificador.provider.js"
 import { ClaProductoNoEncontrado } from "../../catalogo/domain/catalogo.errors.js"
+import {
+  aIdTema,
+  aEnumTema,
+  aIdLineado,
+  aEnumLineado,
+  aIdDespliegue,
+  aEnumDespliegue,
+} from "./preferencia-presentacion.schema.js"
 
 export const wizardRouter = new OpenAPIHono<HonoEnv>()
 
@@ -64,7 +72,7 @@ wizardRouter.openapi(
     })
     if (!tenant) return c.json({ error: "TENANT_NO_ENCONTRADO" }, 404)
 
-    const [propietario, tienda, consultorio, restaurante] = await Promise.all([
+    const [propietario, tienda, presentacion, consultorio, restaurante] = await Promise.all([
       db.propietario.findUnique({
         where: { tenantId },
         select: { id: true, nombres: true, telefono: true, domicilio: true, nombreReferencia: true, telefonoReferencia: true, imagenUrl: true },
@@ -78,12 +86,13 @@ wizardRouter.openapi(
               tipoDeTienda: true,
               cantidadPuntosDeVenta: true,
               cantidadVendedores: true,
-              tema: true,
-              tipoDespliegueVentas: true,
-              tipoLineado: true,
             },
           },
         },
+      }),
+      db.preferenciaPresentacion.findUnique({
+        where: { tenantId },
+        select: { tema: true, tipoDespliegueVentas: true, tipoLineado: true },
       }),
       db.consultorio.findUnique({
         where: { tenantId },
@@ -102,7 +111,15 @@ wizardRouter.openapi(
       ...tenant,
       ultimoPasoCreacion: intToPaso(tenant.ultimoPasoCreacion),
       propietario: propietario ?? null,
-      configuracion: tienda?.configuracion ?? null,
+      // El paso 7 sigue viendo un solo objeto `configuracion`: lo operativo de
+      // tienda y la presentación, que ahora viven en tablas distintas. Los ids
+      // de presentación bajan en minúscula, que es lo que el cliente entiende.
+      configuracion: {
+        ...(tienda?.configuracion ?? {}),
+        tema: presentacion ? aIdTema(presentacion.tema) : undefined,
+        tipoLineado: presentacion ? aIdLineado(presentacion.tipoLineado) : undefined,
+        tipoDespliegueVentas: presentacion ? aIdDespliegue(presentacion.tipoDespliegueVentas) : undefined,
+      },
       consultorio: consultorio
         ? { seguros: consultorioContacto.seguros ?? [], especialidades: consultorio.especialidades ?? [] }
         : null,
@@ -248,6 +265,7 @@ wizardRouter.openapi(
         const cantidadPuntosDeVenta = cfg.cantidadPuntosDeVenta as number | undefined
 
         await db.$transaction(async (tx: any) => {
+          // Configuracion se quedó SOLO con lo operativo de tienda.
           await tx.configuracion.upsert({
             where: { tiendaId: tienda.id },
             create: {
@@ -255,19 +273,39 @@ wizardRouter.openapi(
               tipoDeTienda: (cfg.tipoDeTienda as string) ?? "PEQUENA",
               cantidadPuntosDeVenta: cantidadPuntosDeVenta ?? 1,
               cantidadVendedores: (cfg.cantidadVendedores as number) ?? 1,
-              tema: (cfg.tema as string) ?? "clay",
-              tipoDespliegueVentas: (cfg.tipoDespliegueVentas as string) ?? "BARRA_LATERAL",
-              tipoLineado: (cfg.tipoLineado as string) ?? "curvedLine",
             },
             update: {
               ...(cfg.tipoDeTienda !== undefined ? { tipoDeTienda: cfg.tipoDeTienda as string } : {}),
               ...(cantidadPuntosDeVenta !== undefined ? { cantidadPuntosDeVenta } : {}),
               ...(cfg.cantidadVendedores !== undefined ? { cantidadVendedores: cfg.cantidadVendedores as number } : {}),
-              ...(cfg.tema !== undefined ? { tema: cfg.tema as string } : {}),
-              ...(cfg.tipoDespliegueVentas !== undefined ? { tipoDespliegueVentas: cfg.tipoDespliegueVentas as string } : {}),
-              ...(cfg.tipoLineado !== undefined ? { tipoLineado: cfg.tipoLineado as string } : {}),
             },
           })
+
+          // La presentación va a PreferenciaPresentacion, que cuelga del Tenant:
+          // el paso 7 del asistente sigue pidiendo lo mismo, pero ahora lo guarda
+          // donde un consultorio o un restaurante también pueden tenerlo (FR-034).
+          if (
+            cfg.tema !== undefined ||
+            cfg.tipoLineado !== undefined ||
+            cfg.tipoDespliegueVentas !== undefined
+          ) {
+            const presentacion = {
+              ...(cfg.tema !== undefined
+                ? { tema: aEnumTema(aIdTema(cfg.tema as string)) }
+                : {}),
+              ...(cfg.tipoLineado !== undefined
+                ? { tipoLineado: aEnumLineado(aIdLineado(cfg.tipoLineado as string)) }
+                : {}),
+              ...(cfg.tipoDespliegueVentas !== undefined
+                ? { tipoDespliegueVentas: aEnumDespliegue(aIdDespliegue(cfg.tipoDespliegueVentas as string)) }
+                : {}),
+            }
+            await tx.preferenciaPresentacion.upsert({
+              where: { tenantId },
+              create: { tenantId, ...presentacion },
+              update: presentacion,
+            })
+          }
 
           // Al definir la cantidad de puntos de venta se completan o quitan los que corresponda hasta llegar a esa cantidad
           if (cantidadPuntosDeVenta !== undefined) {

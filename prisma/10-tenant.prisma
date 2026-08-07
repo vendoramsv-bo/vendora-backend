@@ -94,6 +94,11 @@ model Tenant {
   favoritosProducto      ProductoFavorito[]
   publicaciones          Publicacion[]
 
+  // Preferencia de presentación (tema, lineado, despliegue de ventas).
+  // Cuelga del Tenant y no de Tienda a propósito: un consultorio o un
+  // restaurante puros también eligen su tema (FR-034).
+  preferenciaPresentacion PreferenciaPresentacion?
+
   // Perfil extendido (1-a-1 opcional según tipo)
   tienda               Tienda?
   consultorio          Consultorio?
@@ -310,9 +315,9 @@ model Configuracion {
   tipoDeTienda          TipoDeConfiguracion  @default(PEQUENA)
   cantidadPuntosDeVenta Int                  @default(1)
   cantidadVendedores    Int                  @default(1)
-  tipoDespliegueVentas  TipoDespliegueVentas @default(BARRA_LATERAL)
-  tema                  String               @default("green")
-  tipoLineado           String               @default("curvedLine")
+  // tema, tipoLineado y tipoDespliegueVentas se mudaron a PreferenciaPresentacion:
+  // son de presentación y no tienen nada de específico de tienda, mientras que
+  // los tres campos que quedan no significan nada en un consultorio.
   estado                Estado               @default(ACTIVO)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime?            @updatedAt
@@ -418,6 +423,51 @@ enum TipoDeConfiguracion {
   PEQUENA
   MEDIANA
   EMPRESARIAL
+  @@schema("tenant")
+}
+
+/// Preferencia de presentación del negocio. Una fila por Tenant, creada recién
+/// cuando alguien elige: un negocio sin fila recibe el tema por defecto de su
+/// vertical, resuelto en el cliente (FR-020).
+model PreferenciaPresentacion {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  tema                 TemaVendora          @default(CLAY)
+  tipoLineado          TipoLineado          @default(CURVA)
+  tipoDespliegueVentas TipoDespliegueVentas @default(BARRA_LATERAL)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+  @@schema("tenant")
+}
+
+/// Los 7 temas curados. `system` NO está: no es un color, es una preferencia de
+/// modo, y el eje de modo vive en el dispositivo de cada persona.
+/// Cerrar esto en enumerado es lo que hace imposible que se vuelva a guardar un
+/// valor que la aplicación no sabe resolver — el `String @default("green")`
+/// anterior era justamente el agujero por el que se coló uno (FR-035).
+enum TemaVendora {
+  CLAY
+  VERDE
+  AZUL
+  VIOLETA
+  ROSA
+  DORADO
+  SLATE
+  @@schema("tenant")
+}
+
+/// Estilo de línea de los gráficos. Antes era `String` libre sin ningún enum.
+/// Los cinco valores salen del enumerado real del asistente, traducidos al
+/// español según el Artículo V.5.
+enum TipoLineado {
+  CURVA
+  RECTA
+  GUIONES
+  ZIGZAG
+  NINGUNO
   @@schema("tenant")
 }
 

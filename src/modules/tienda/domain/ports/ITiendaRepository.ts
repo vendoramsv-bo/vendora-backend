@@ -25,6 +25,13 @@ export interface PerfilPublicoDTO {
   equipoDeTrabajo: Array<{ nombres: string; cargo: string; imagenUrl: string | null }>
   localizaciones: Array<{ latitud: number; longitud: number; direccion: string; ciudad: string; barrio: string | null }>
   actividadesEconomicas: string[]
+  /**
+   * Tema del negocio, en id canónico minúscula (`"azul"`). Ausente si el
+   * negocio nunca eligió: el cliente resuelve el default de la vertical.
+   * Viaja en ESTA llamada, que la vitrina ya hacía — cero peticiones nuevas
+   * en el camino del LCP (contrato §A.2).
+   */
+  tema?: string
   configuracion: { tema: string; tipoLineado: string } | null
   productosDestacados: Array<{
     productoId: string

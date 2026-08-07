@@ -106,6 +106,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
             seguidoresTienda: { select: { id: true } },
           },
         },
+        preferenciaPresentacion: { select: { tema: true, tipoLineado: true } },
         localizaciones: { select: { latitud: true, longitud: true, direccion: true, ciudad: true, barrio: true } },
         propietarios: { where: { estado: "ACTIVO" }, select: { nombres: true, imagenUrl: true } },
         equipoDeTrabajo: { where: { estado: "ACTIVO" }, orderBy: { orden: "asc" }, select: { nombres: true, cargo: true, imagenUrl: true } },
@@ -146,8 +147,17 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       equipoDeTrabajo: tenant.equipoDeTrabajo,
       localizaciones: tenant.localizaciones,
       actividadesEconomicas: tenant.actividadesEconomicas.map((a: { claActividadEconomica: { nombre: string } | null }) => a.claActividadEconomica?.nombre ?? ""),
-      configuracion: tenant.tienda.configuracion
-        ? { tema: tenant.tienda.configuracion.tema, tipoLineado: tenant.tienda.configuracion.tipoLineado }
+      // El enumerado de Prisma es `AZUL`; por HTTP viaja el id canónico `"azul"`.
+      // Sin bajar la caja, `resolverTema` del cliente descartaría el tema en
+      // silencio y la vitrina se vería con el default (contrato §A.1).
+      tema: tenant.preferenciaPresentacion
+        ? String(tenant.preferenciaPresentacion.tema).toLowerCase()
+        : undefined,
+      configuracion: tenant.preferenciaPresentacion
+        ? {
+            tema: String(tenant.preferenciaPresentacion.tema).toLowerCase(),
+            tipoLineado: String(tenant.preferenciaPresentacion.tipoLineado).toLowerCase(),
+          }
         : null,
       productosDestacados: destacadosConValoracion,
       metricas: {

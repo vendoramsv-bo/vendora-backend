@@ -32,8 +32,20 @@
 //   3) Comando: npx prisma migrate dev (crea los 9 schemas y todas las tablas)
 // =============================================================================
 
+// `prisma-client` (TypeScript/ESM), NO `prisma-client-js` (CommonJS).
+//
+// Es el generador que produce `client.ts`, que es lo que la app importa
+// (`src/core/prisma-scoped.ts` y `better-auth.setup.ts` hacen
+// `from "../generated/prisma/client.js"`, que con `moduleResolution: bundler`
+// resuelve al `.ts`).
+//
+// Decía `prisma-client-js` y nadie lo notó porque entre el 5 de junio y el
+// 6 de agosto no hubo ningún cambio de schema: `db:generate` regeneraba el
+// cliente CommonJS que nadie importa y dejaba intacto el TypeScript de junio.
+// El primer modelo nuevo —`PreferenciaPresentacion`, feature 021— lo destapó:
+// `db.preferenciaPresentacion` llegaba `undefined` en runtime.
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 

@@ -16,6 +16,16 @@ import {
   MiembroResponseSchema,
   InvitacionResponseSchema,
 } from "./tenant.schema.js"
+import {
+  PreferenciaPresentacionResponseSchema,
+  ActualizarPreferenciaPresentacionSchema,
+  aIdTema,
+  aEnumTema,
+  aIdLineado,
+  aEnumLineado,
+  aIdDespliegue,
+  aEnumDespliegue,
+} from "./preferencia-presentacion.schema.js"
 import { paginate } from "../../../core/query-params.js"
 import { TenantNoEncontrado, SinTenantActivo } from "../domain/tenant.errors.js"
 import { errorResponses, okResponse } from "../../../core/openapi-responses.js"
@@ -180,5 +190,99 @@ tenantRouter.openapi(
         params,
       ),
     )
+  },
+)
+
+// ─── Preferencia de presentación ──────────────────────────────────────────────
+//
+// Realiza el contrato §A.1 de `specs/021-design-system-vendora/contracts/`.
+// El negocio se resuelve SIEMPRE desde la sesión, nunca de un parámetro
+// (Artículo III.4 de la constitución del frontend, III de la del backend).
+
+tenantRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/preferencia-presentacion",
+    operationId: "tenant_obtener_preferencia_presentacion",
+    tags: ["Tenant"],
+    security: [{ bearerAuth: [] }],
+    middleware: [requireAuth, requireTenantActivo] as const,
+    responses: {
+      200: okResponse(
+        "Preferencia de presentación del negocio activo",
+        PreferenciaPresentacionResponseSchema,
+      ),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+
+    const fila = await db.preferenciaPresentacion.findUnique({ where: { tenantId } })
+
+    // 404 no es un error de la app: es el caso normal de un negocio que todavía
+    // no eligió. El cliente aplica el default de su vertical (FR-020).
+    if (!fila) {
+      return c.json(
+        { error: "PREFERENCIA_NO_DEFINIDA", message: "El negocio todavía no eligió su presentación" },
+        404,
+      )
+    }
+
+    return c.json({
+      tema: aIdTema(fila.tema),
+      tipoLineado: aIdLineado(fila.tipoLineado),
+      tipoDespliegueVentas: aIdDespliegue(fila.tipoDespliegueVentas),
+    })
+  },
+)
+
+tenantRouter.openapi(
+  createRoute({
+    method: "put",
+    path: "/preferencia-presentacion",
+    operationId: "tenant_actualizar_preferencia_presentacion",
+    tags: ["Tenant"],
+    security: [{ bearerAuth: [] }],
+    // Un vendedor no cambia la identidad visual del negocio.
+    middleware: [requireAuth, requireTenantActivo, requireRol(["PROPIETARIO", "owner", "ADMIN"])] as const,
+    request: {
+      body: {
+        content: {
+          "application/json": { schema: ActualizarPreferenciaPresentacionSchema },
+        },
+      },
+    },
+    responses: {
+      200: okResponse("Preferencia actualizada", PreferenciaPresentacionResponseSchema),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const body = c.req.valid("json")
+
+    // Upsert: un negocio que nunca eligió no puede fallar al elegir por primera vez.
+    const datos = {
+      tema: aEnumTema(body.tema),
+      ...(body.tipoLineado ? { tipoLineado: aEnumLineado(body.tipoLineado) } : {}),
+      ...(body.tipoDespliegueVentas
+        ? { tipoDespliegueVentas: aEnumDespliegue(body.tipoDespliegueVentas) }
+        : {}),
+    }
+
+    const fila = await db.preferenciaPresentacion.upsert({
+      where: { tenantId },
+      update: datos,
+      create: { tenantId, ...datos },
+    })
+
+    logger.info({ tenantId, tema: body.tema }, "[tenant] usecase:actualizarPreferenciaPresentacion")
+
+    return c.json({
+      tema: aIdTema(fila.tema),
+      tipoLineado: aIdLineado(fila.tipoLineado),
+      tipoDespliegueVentas: aIdDespliegue(fila.tipoDespliegueVentas),
+    })
   },
 )
