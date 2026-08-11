@@ -170,7 +170,7 @@ pedidoRouter.openapi(
         aperturaCierreCajaId: parsed.data.aperturaCierreCajaId,
         puntoVentaId: parsed.data.puntoVentaId,
         turnoId: parsed.data.turnoId,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
         tipoPago: parsed.data.tipoPago,
         estadoPago: parsed.data.estadoPago,
         efectivo: parsed.data.efectivo,

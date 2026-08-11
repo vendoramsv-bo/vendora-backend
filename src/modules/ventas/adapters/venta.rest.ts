@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { resolverMiembroActivo } from "../../../core/hono-context.js"
+import { whereDeAlcance } from "../../../core/alcance.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { VentaPrismaRepository } from "../infrastructure/venta.prisma.repository.js"
 import { CajaPrismaRepository } from "../infrastructure/caja.prisma.repository.js"
@@ -15,6 +16,7 @@ import {
   CrearVentaSchema,
   QueryParamsVentaSchema,
   QueryParamsReporteSchema,
+  QueryConsolidadoSchema,
 } from "./ventas.schema.js"
 import {
   VentaNoEncontradaError,
@@ -42,7 +44,16 @@ ventaRouter.openapi(
     operationId: "ventas_reporte_consolidado",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    // El guard `requireRol(["PROPIETARIO","ADMIN"])` se fue de acá (023 R-06).
+    // Era literalmente el defecto que la feature viene a arreglar: con él, todo
+    // rol operativo recibía 403 y las cuatro tarjetas del panel quedaban en
+    // error. Quitarlo **sin** aplicar el alcance sería el extremo opuesto —cada
+    // vendedor viendo los números del negocio—, así que las dos cosas van
+    // juntas y no se separan.
+    middleware: resolverMiembroActivo,
+    // Los query params se declaran para que salgan en el OpenAPI y el cliente
+    // generado pueda enviarlos sin `@ts-expect-error` (023 R-07, T071/T072).
+    request: { query: QueryConsolidadoSchema },
     responses: {
       200: okResponse("Reporte consolidado", z.record(z.string(), z.unknown())),
       ...errorResponses,
@@ -56,7 +67,16 @@ ventaRouter.openapi(
     const fuente = c.req.query("fuente") as "VENTA" | "CONSULTORIO" | undefined
     const result = await new ReporteConsolidadoUseCase(makeReporteRepo()).execute({
       tenantId,
-      filtros: { fechaDesde, fechaHasta, fuente, puntoVentaId: c.req.query("puntoVentaId") },
+      filtros: {
+        fechaDesde,
+        fechaHasta,
+        fuente,
+        puntoVentaId: c.req.query("puntoVentaId"),
+        // El alcance sale de la sesión. Lo que venga en el query string con
+        // este nombre no se lee: se ignora en silencio, sin 400, porque un 400
+        // revelaría que el parámetro existe.
+        ...whereDeAlcance(c.get("alcance")),
+      },
       params,
     })
     return c.json(result)
@@ -70,6 +90,7 @@ ventaRouter.openapi(
     operationId: "ventas_listar_ventas",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    middleware: resolverMiembroActivo,
     responses: {
       200: okResponse("Lista de ventas", z.record(z.string(), z.unknown())),
       ...errorResponses,
@@ -84,6 +105,12 @@ ventaRouter.openapi(
       puntoVentaId: c.req.query("puntoVentaId"),
       turnoId: c.req.query("turnoId"),
       clienteId: c.req.query("clienteId"),
+      // El alcance se aplica **además** de los filtros de arriba, nunca en
+      // lugar de (contracts §A.2). Este endpoint alimenta la actividad
+      // reciente del panel y el listado completo, y FR-016 exige que los dos
+      // cuenten lo mismo: coinciden porque son el mismo endpoint con el mismo
+      // alcance.
+      ...whereDeAlcance(c.get("alcance")),
     })
     return c.json(result)
   },
@@ -137,7 +164,7 @@ ventaRouter.openapi(
         tenantId,
         puntoVentaId: parsed.data.puntoVentaId,
         turnoId: parsed.data.turnoId,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
         aperturaCierreCajaId: parsed.data.aperturaCierreCajaId,
         clienteId: parsed.data.clienteId,
         clienteNombre: parsed.data.clienteNombre,

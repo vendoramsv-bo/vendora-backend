@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ATENCION } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { GastosPrismaRepository } from "../infrastructure/gastos.prisma.repository.js"
 import { CrearGastoUseCase } from "../application/gastos/crear-gasto.usecase.js"
@@ -52,7 +52,7 @@ gastosRouter.openapi(
     operationId: "ventas_crear_gasto",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       body: {
         content: {
@@ -73,7 +73,7 @@ gastosRouter.openapi(
     if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
     const result = await new CrearGastoUseCase(makeRepo()).execute({
       tenantId,
-      tenantMemberId: session.user.id,
+      tenantMemberId: c.get("miembro").id,
       fecha: new Date(parsed.data.fecha),
       motivo: parsed.data.motivo,
       totalGasto: parsed.data.totalGasto,
@@ -91,7 +91,7 @@ gastosRouter.openapi(
     operationId: "ventas_actualizar_gasto",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -136,7 +136,7 @@ gastosRouter.openapi(
     operationId: "ventas_eliminar_gasto",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       params: z.object({ id: z.string() }),
     },

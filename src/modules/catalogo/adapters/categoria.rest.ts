@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_CATALOGO_ESCRITURA } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { CategoriaPrismaRepository } from "../infrastructure/categoria.prisma.repository.js"
 import { ActividadEconomicaPrismaRepository } from "../infrastructure/actividad-economica.prisma.repository.js"
@@ -54,7 +54,7 @@ categoriaRouter.openapi(
     operationId: "catalogo_crear_categoria",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       body: { content: { "application/json": { schema: CategoriaCreateSchema } } },
     },
@@ -117,7 +117,7 @@ categoriaRouter.openapi(
     operationId: "catalogo_actualizar_categoria",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: CategoriaUpdateSchema } } },
@@ -155,7 +155,7 @@ categoriaRouter.openapi(
     operationId: "catalogo_cambiarEstado_categoria",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: CambiarEstadoSchema } } },

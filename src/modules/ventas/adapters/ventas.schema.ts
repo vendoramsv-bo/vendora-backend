@@ -188,6 +188,26 @@ export const CrearVentaSchema = z.object({
 
 export const QueryParamsReporteSchema = makeQueryParamsSchema(["fecha", "fuente", "createdAt"])
 
+/**
+ * Query params del consolidado, **declarados** para que salgan en el OpenAPI.
+ *
+ * El handler los leía con `c.req.query()` sin declararlos, así que el spec decía
+ * `query?: never` y el cliente generado no podía enviarlos sin un
+ * `@ts-expect-error`. Ese silencio del contrato es lo que dejó pasar el defecto
+ * R-07 —el cliente mandaba `desde`/`hasta` y el servidor leía
+ * `fechaDesde`/`fechaHasta`— durante todo este tiempo: con los nombres en el
+ * spec, el desajuste habría sido un error de compilación.
+ *
+ * `tenantMemberId` **no está acá y no puede estarlo**: el alcance lo deriva el
+ * servidor de la sesión (023 FR-014).
+ */
+export const QueryConsolidadoSchema = QueryParamsReporteSchema.extend({
+  fechaDesde: z.string().optional(),
+  fechaHasta: z.string().optional(),
+  fuente: z.enum(["VENTA", "CONSULTORIO"]).optional(),
+  puntoVentaId: z.string().optional(),
+})
+
 // ─── Pedido ───────────────────────────────────────────────────────────────────
 
 export const QueryParamsPedidoSchema = makeQueryParamsSchema(["fecha", "estado", "createdAt"])

@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ALMACEN } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { IngresoAlmacenPrismaRepository } from "../infrastructure/ingreso-almacen.prisma.repository.js"
 import { SalidaAlmacenPrismaRepository } from "../infrastructure/salida-almacen.prisma.repository.js"
@@ -73,7 +73,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_crear_ingreso",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: CrearIngresoSchema } } } },
     responses: {
       201: createdResponse("Ingreso creado", z.record(z.string(), z.unknown())),
@@ -100,7 +100,7 @@ almacenOperacionesRouter.openapi(
           fechaVencimiento: d.fechaVencimiento ? new Date(d.fechaVencimiento) : undefined,
         })),
         createdById: session.user.id,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
       })
       return c.json(result, 201)
     } catch (err) {
@@ -147,7 +147,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_actualizar_ingreso",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ ingresoId: z.string() }),
       body: { content: { "application/json": { schema: ActualizarIngresoSchema } } },
@@ -192,7 +192,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_aprobar_ingreso",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ ingresoId: z.string() }),
       body: { content: { "application/json": { schema: AprobarDocumentoSchema } } },
@@ -257,7 +257,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_crear_salida",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: CrearSalidaSchema } } } },
     responses: {
       201: createdResponse("Salida creada", z.record(z.string(), z.unknown())),
@@ -280,7 +280,7 @@ almacenOperacionesRouter.openapi(
         descripcion: parsed.data.descripcion,
         detalles: parsed.data.detalles,
         createdById: session.user.id,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
       })
       return c.json(result, 201)
     } catch (err) {
@@ -326,7 +326,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_actualizar_salida",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ salidaId: z.string() }),
       body: { content: { "application/json": { schema: ActualizarSalidaSchema } } },
@@ -364,7 +364,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_aprobar_salida",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ salidaId: z.string() }),
       body: { content: { "application/json": { schema: AprobarDocumentoSchema } } },
@@ -431,7 +431,7 @@ almacenOperacionesRouter.openapi(
     operationId: "almacen_registrar_recuento_almacen",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: RecuentoAlmacenSchema } } } },
     responses: {
       201: createdResponse("Recuento de almacén registrado", z.record(z.string(), z.unknown())),
@@ -454,7 +454,7 @@ almacenOperacionesRouter.openapi(
         observacion: parsed.data.observacion,
         detalles: parsed.data.detalles,
         createdById: session.user.id,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
       })
       return c.json(result, 201)
     } catch (err) {

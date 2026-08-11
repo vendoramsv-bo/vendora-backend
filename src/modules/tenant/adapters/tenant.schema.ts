@@ -103,3 +103,20 @@ export const ListaInvitacionesResponseSchema = z.object({
 })
 
 export const QueryParamsInvitacionSchema = makeQueryParamsSchema(["status", "createdAt"] as const)
+
+// ─── Baja del negocio (023 US3, contracts §A.4) ───────────────────────────────
+
+/**
+ * Cuerpo de `DELETE /api/tenant/actual`.
+ *
+ * La confirmación se valida **en el servidor además de en el cliente**: el
+ * diálogo del cliente evita el accidente, el chequeo del servidor evita el
+ * `curl`. Una confirmación que solo existe en la UI no es una confirmación.
+ */
+export const EliminarNegocioSchema = z.object({
+  confirmacion: z.string().min(1),
+})
+
+export const EliminarNegocioResponseSchema = z.object({
+  ok: z.boolean(),
+})

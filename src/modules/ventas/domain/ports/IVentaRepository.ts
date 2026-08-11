@@ -90,5 +90,10 @@ export interface IVentaRepository {
   crear(dto: CrearVentaDTO): Promise<VentaData>
   confirmar(id: string, tenantId: string, updatedById?: string | null): Promise<ConfirmarVentaResultado>
   obtener(id: string, tenantId: string): Promise<VentaData | null>
-  listar(tenantId: string, params: QueryParams, filters?: { fecha?: Date; estadoPago?: string; tipoPago?: string; puntoVentaId?: string; turnoId?: string; clienteId?: string }): Promise<{ data: VentaData[]; total: number }>
+  /**
+   * `tenantMemberId` es un filtro **interno**: lo puebla el servidor desde el
+   * alcance derivado de la sesión (023 contracts §A.1). Nunca llega del query
+   * string — si un cliente lo envía, se ignora en silencio.
+   */
+  listar(tenantId: string, params: QueryParams, filters?: { fecha?: Date; estadoPago?: string; tipoPago?: string; puntoVentaId?: string; turnoId?: string; clienteId?: string; tenantMemberId?: string }): Promise<{ data: VentaData[]; total: number }>
 }

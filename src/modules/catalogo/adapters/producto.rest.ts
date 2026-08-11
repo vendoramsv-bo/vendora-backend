@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_CATALOGO_ESCRITURA } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { ProductoPrismaRepository } from "../infrastructure/producto.prisma.repository.js"
 import { getAlmacenInventarioPort } from "../../almacen/infrastructure/almacen-inventario.port.provider.js"
@@ -125,7 +125,7 @@ productoRouter.openapi(
     operationId: "catalogo_altaMasiva_productos",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       body: { content: { "application/json": { schema: AltaMasivaBodySchema } } },
     },
@@ -170,7 +170,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_producto",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       body: { content: { "application/json": { schema: ProductoCreateSchema } } },
     },
@@ -229,7 +229,7 @@ productoRouter.openapi(
     operationId: "catalogo_actualizar_producto",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: ProductoUpdateSchema } } },
@@ -268,7 +268,7 @@ productoRouter.openapi(
     operationId: "catalogo_eliminar_producto",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: { params: z.object({ id: z.string() }) },
     responses: {
       200: okResponse("Producto eliminado", z.object({ deleted: z.boolean() })),
@@ -295,7 +295,7 @@ productoRouter.openapi(
     operationId: "catalogo_cambiarEstado_producto",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: CambiarEstadoSchema } } },
@@ -376,7 +376,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_atributo",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: AtributoCreateSchema } } },
@@ -409,7 +409,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_valor_atributo",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string(), attrId: z.string() }),
       body: { content: { "application/json": { schema: AtributoValorCreateSchema } } },
@@ -447,7 +447,7 @@ productoRouter.openapi(
     operationId: "catalogo_eliminar_valor_atributo",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: { params: z.object({ id: z.string(), attrId: z.string(), valId: z.string() }) },
     responses: {
       200: okResponse("Valor eliminado", z.object({ ok: z.boolean() })),
@@ -494,7 +494,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_variante",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: VarianteCreateSchema } } },
@@ -529,7 +529,7 @@ productoRouter.openapi(
     operationId: "catalogo_actualizar_variante",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string(), varId: z.string() }),
       body: { content: { "application/json": { schema: VarianteUpdateSchema } } },
@@ -590,7 +590,7 @@ productoRouter.openapi(
     operationId: "catalogo_confirmar_variantes",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: ConfirmarVariantesBodySchema } } },
@@ -627,7 +627,7 @@ productoRouter.openapi(
     operationId: "catalogo_cambiarEstado_variante",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string(), varId: z.string() }),
       body: { content: { "application/json": { schema: CambiarEstadoSchema } } },
@@ -675,7 +675,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_precio_volumen",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: PrecioVolumenCreateSchema } } },
@@ -707,7 +707,7 @@ productoRouter.openapi(
     operationId: "catalogo_eliminar_precio_volumen",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: { params: z.object({ id: z.string(), pvId: z.string() }) },
     responses: {
       200: okResponse("Precio por volumen eliminado", z.object({ ok: z.boolean() })),
@@ -748,7 +748,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_opcion",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: OpcionCreateSchema } } },
@@ -780,7 +780,7 @@ productoRouter.openapi(
     operationId: "catalogo_actualizar_opcion",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string(), opId: z.string() }),
       body: { content: { "application/json": { schema: OpcionUpdateSchema } } },
@@ -833,7 +833,7 @@ productoRouter.openapi(
     operationId: "catalogo_crear_oferta",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: OfertaCreateSchema } } },
@@ -866,7 +866,7 @@ productoRouter.openapi(
     operationId: "catalogo_actualizar_oferta",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_CATALOGO_ESCRITURA),
     request: {
       params: z.object({ id: z.string(), ofId: z.string() }),
       body: { content: { "application/json": { schema: OfertaUpdateSchema } } },

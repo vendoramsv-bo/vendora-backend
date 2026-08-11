@@ -142,7 +142,7 @@ recetaRouter.openapi(
         motivo: parsed.data.motivo,
         forzar: parsed.data.forzar,
         createdById: session.user.id,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
       })
       return c.json(result, 201)
     } catch (err) {

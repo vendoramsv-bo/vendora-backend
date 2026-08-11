@@ -23,6 +23,8 @@ export class ReportePrismaRepository implements IReporteRepository {
       tenantId,
       ...(Object.keys(dateFilter).length > 0 && { fecha: dateFilter }),
       ...(filters.puntoVentaId && { puntoVentaId: filters.puntoVentaId }),
+      // Alcance (023 FR-013, FR-019): igualdad, nunca `OR` con null.
+      ...(filters.tenantMemberId && { tenantMemberId: filters.tenantMemberId }),
     }
 
     const [ventas, tenant] = await Promise.all([

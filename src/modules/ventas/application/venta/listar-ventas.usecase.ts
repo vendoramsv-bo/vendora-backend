@@ -9,6 +9,8 @@ export interface ListarVentasFiltros {
   puntoVentaId?: string
   turnoId?: string
   clienteId?: string
+  /** Alcance derivado en el servidor. No es un parámetro del cliente (FR-014). */
+  tenantMemberId?: string
 }
 
 export class ListarVentasUseCase {

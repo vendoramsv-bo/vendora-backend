@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ABASTECIMIENTO } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { ProveedorPrismaRepository } from "../infrastructure/proveedor.prisma.repository.js"
 import { CrearProveedorUseCase } from "../application/proveedor/crear-proveedor.usecase.js"
@@ -63,7 +63,7 @@ proveedorRouter.openapi(
     operationId: "ventas_crear_proveedor",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       body: {
         content: {
@@ -133,7 +133,7 @@ proveedorRouter.openapi(
     operationId: "ventas_actualizar_proveedor",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -178,7 +178,7 @@ proveedorRouter.openapi(
     operationId: "ventas_cambiar_estado_proveedor",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -221,7 +221,7 @@ proveedorRouter.openapi(
     operationId: "ventas_eliminar_proveedor",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
     },

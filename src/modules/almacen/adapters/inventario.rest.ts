@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ALMACEN } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { InventarioProductoPrismaRepository } from "../infrastructure/inventario-producto.prisma.repository.js"
 import { AutoInicializarStockUseCase } from "../application/inventario/auto-inicializar-stock.usecase.js"
@@ -154,7 +154,7 @@ inventarioRouter.openapi(
     operationId: "almacen_crear_ajuste_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: CrearAjusteSchema } } } },
     responses: {
       201: createdResponse("Ajuste de inventario creado", z.record(z.string(), z.unknown())),
@@ -217,7 +217,7 @@ inventarioRouter.openapi(
     operationId: "almacen_actualizar_ajuste_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ ajusteId: z.string() }),
       body: { content: { "application/json": { schema: ActualizarAjusteSchema } } },
@@ -256,7 +256,7 @@ inventarioRouter.openapi(
     operationId: "almacen_aprobar_ajuste_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ ajusteId: z.string() }),
       body: { content: { "application/json": { schema: AprobarDocumentoSchema } } },
@@ -322,7 +322,7 @@ inventarioRouter.openapi(
     operationId: "almacen_crear_recuento_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: CrearRecuentoSchema } } } },
     responses: {
       201: createdResponse("Recuento de inventario creado", z.record(z.string(), z.unknown())),
@@ -386,7 +386,7 @@ inventarioRouter.openapi(
     operationId: "almacen_actualizar_recuento_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ recuentoId: z.string() }),
       body: { content: { "application/json": { schema: ActualizarRecuentoSchema } } },
@@ -425,7 +425,7 @@ inventarioRouter.openapi(
     operationId: "almacen_aprobar_recuento_inventario",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ recuentoId: z.string() }),
       body: { content: { "application/json": { schema: AprobarDocumentoSchema } } },

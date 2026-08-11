@@ -206,7 +206,7 @@ export class VentaPrismaRepository implements IVentaRepository {
   async listar(
     tenantId: string,
     params: QueryParams,
-    filters?: { fecha?: Date; estadoPago?: string; tipoPago?: string; puntoVentaId?: string; turnoId?: string; clienteId?: string },
+    filters?: { fecha?: Date; estadoPago?: string; tipoPago?: string; puntoVentaId?: string; turnoId?: string; clienteId?: string; tenantMemberId?: string },
   ): Promise<{ data: VentaData[]; total: number }> {
     const args = toPrismaArgs(params)
     const where = {
@@ -218,6 +218,9 @@ export class VentaPrismaRepository implements IVentaRepository {
       ...(filters?.turnoId && { turnoId: filters.turnoId }),
       ...(filters?.clienteId && { clienteId: filters.clienteId }),
       ...(filters?.fecha && { fecha: { gte: filters.fecha } }),
+      // Alcance (023 FR-013): igualdad, nunca un OR con null. La igualdad SQL
+      // ya excluye las filas sin autor, que es lo que FR-019 pide.
+      ...(filters?.tenantMemberId && { tenantMemberId: filters.tenantMemberId }),
     }
     const [data, total] = await Promise.all([
       this.db.venta.findMany({ where, take: args.take, skip: args.skip, orderBy: args.orderBy }),

@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ALMACEN } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { InsumosPrismaRepository } from "../infrastructure/insumo.prisma.repository.js"
 import { RecetaProductoPrismaRepository } from "../infrastructure/receta-producto.prisma.repository.js"
@@ -72,7 +72,7 @@ insumoRouter.openapi(
     operationId: "almacen_crear_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: CrearInsumoSchema } } } },
     responses: {
       201: createdResponse("Insumo creado", z.record(z.string(), z.unknown())),
@@ -137,7 +137,7 @@ insumoRouter.openapi(
     operationId: "almacen_actualizar_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: ActualizarInsumoSchema } } },
@@ -180,7 +180,7 @@ insumoRouter.openapi(
     operationId: "almacen_cambiar_estado_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: CambiarEstadoInsumoSchema } } },
@@ -221,7 +221,7 @@ insumoRouter.openapi(
     operationId: "almacen_eliminar_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: { params: z.object({ id: z.string() }) },
     responses: {
       204: { description: "Insumo eliminado" },
@@ -276,7 +276,7 @@ insumoRouter.openapi(
     operationId: "almacen_registrar_ajuste_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ALMACEN),
     request: {
       params: z.object({ id: z.string() }),
       body: { content: { "application/json": { schema: AjusteInsumoSchema } } },

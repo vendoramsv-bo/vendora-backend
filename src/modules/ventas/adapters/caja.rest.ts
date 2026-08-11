@@ -123,7 +123,7 @@ cajaRouter.openapi(
         tenantId,
         puntoVentaId: parsed.data.puntoVentaId,
         turnoId: parsed.data.turnoId,
-        tenantMemberId: session.user.id,
+        tenantMemberId: c.get("miembro").id,
         montoInicial: parsed.data.montoInicial,
         createdById: session.user.id,
       })

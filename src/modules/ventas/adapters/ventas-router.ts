@@ -1,6 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireAuth, requireTenantActivo } from "../../../core/hono-context.js"
+import { requireAuth, requireTenantActivo, resolverMiembroActivo } from "../../../core/hono-context.js"
 import { clienteRouter } from "./cliente.rest.js"
 import { proveedorRouter } from "./proveedor.rest.js"
 import { compraRouter } from "./compra.rest.js"
@@ -12,7 +12,11 @@ import { pedidoRouter } from "./pedido.rest.js"
 import { gastosRouter } from "./gastos.rest.js"
 
 const ventasApp = new OpenAPIHono<HonoEnv>()
-ventasApp.use("*", requireAuth, requireTenantActivo)
+// `resolverMiembroActivo` se monta en toda la app y no ruta por ruta: deja en el
+// contexto el `TenantMember.id` que firma la autoría y el alcance de los datos
+// (023 contracts §A.5). No agrega consultas — **reemplaza** la que `requireRol`
+// hacía en cada endpoint guardado.
+ventasApp.use("*", requireAuth, requireTenantActivo, resolverMiembroActivo)
 ventasApp.route("/clientes", clienteRouter)
 ventasApp.route("/proveedores", proveedorRouter)
 ventasApp.route("/compras", compraRouter)

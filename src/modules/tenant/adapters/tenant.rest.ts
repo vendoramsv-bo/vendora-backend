@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
-import { requireAuth, requireTenantActivo, requireRol, type HonoEnv } from "../../../core/hono-context.js"
+import { requireAuth, requireTenantActivo, requireRol, resolverMiembroActivo, type HonoEnv } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { crearPrismaScoped } from "../../../core/prisma-scoped.js"
 import { TenantPrismaRepository } from "../infrastructure/tenant.prisma.repository.js"
@@ -15,6 +15,8 @@ import {
   ListaTenantItemSchema,
   MiembroResponseSchema,
   InvitacionResponseSchema,
+  EliminarNegocioSchema,
+  EliminarNegocioResponseSchema,
 } from "./tenant.schema.js"
 import {
   PreferenciaPresentacionResponseSchema,
@@ -284,5 +286,106 @@ tenantRouter.openapi(
       tipoLineado: aIdLineado(fila.tipoLineado),
       tipoDespliegueVentas: aIdDespliegue(fila.tipoDespliegueVentas),
     })
+  },
+)
+
+// ─── DELETE /api/tenant/actual (023 US3, contracts §A.4) ──────────────────────
+
+tenantRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/actual",
+    operationId: "tenant_eliminar_actual",
+    tags: ["Tenant"],
+    security: [{ bearerAuth: [] }],
+    /**
+     * **ADMIN no está en la lista y no puede estarlo** (FR-021). Dar de baja el
+     * negocio es la única capacidad que separa a un propietario de un
+     * administrador; si ADMIN entrara acá, los dos roles serían el mismo rol.
+     *
+     * El guard se verifica en el servidor aunque la entrada del menú esté
+     * oculta: ocultar no es controlar (FR-012, FR-026).
+     */
+    middleware: [
+      requireAuth,
+      requireTenantActivo,
+      resolverMiembroActivo,
+      requireRol(["PROPIETARIO"]),
+    ] as const,
+    request: {
+      body: { content: { "application/json": { schema: EliminarNegocioSchema } } },
+    },
+    responses: {
+      200: okResponse("Negocio dado de baja", EliminarNegocioResponseSchema),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    const userId = c.get("usuario").id
+
+    const body = await c.req.json().catch(() => ({}))
+    const parsed = EliminarNegocioSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json(
+        { error: "CONFIRMACION_INVALIDA", message: "Escribí el nombre del negocio para confirmar." },
+        400,
+      )
+    }
+
+    const negocio = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, estado: true },
+    })
+
+    if (!negocio) {
+      return c.json({ error: "TENANT_NO_ENCONTRADO", message: "El negocio no existe." }, 404)
+    }
+
+    // Idempotencia explícita: una segunda llamada no vuelve a "dar de baja"
+    // algo que ya está de baja, y decirlo es más útil que un 200 mentiroso.
+    if (negocio.estado === "ELIMINADO") {
+      return c.json(
+        { error: "NEGOCIO_YA_ELIMINADO", message: "Este negocio ya fue eliminado." },
+        409,
+      )
+    }
+
+    if (parsed.data.confirmacion !== negocio.name) {
+      return c.json(
+        { error: "CONFIRMACION_INVALIDA", message: "El nombre no coincide con el del negocio." },
+        400,
+      )
+    }
+
+    /**
+     * **Baja lógica, no borrado** (FR-025, research R-08).
+     *
+     * `authClient.organization.delete()` haría `onDelete: Cascade` sobre
+     * `TenantMember`, y desde ahí sobre `Venta`: se llevaría puestos los
+     * comprobantes. Acá no se borra ninguna fila — ventas, caja, inventario y
+     * membresías quedan intactas. Lo que cambia es que el negocio deja de estar
+     * disponible, y de eso se encarga `resolverMiembroActivo` respondiendo
+     * `403 NEGOCIO_ELIMINADO` a toda petición posterior (FR-024).
+     */
+    await db.$transaction([
+      db.tenant.update({
+        where: { id: tenantId },
+        data: { estado: "ELIMINADO", updatedById: userId },
+      }),
+      db.auditLog.create({
+        data: {
+          tenantId,
+          userId,
+          tabla: "Tenant",
+          accion: "DELETE",
+          cambios: { estado: { de: negocio.estado, a: "ELIMINADO" }, nombre: negocio.name },
+        },
+      }),
+    ])
+
+    logger.info({ tenantId, userId }, "[tenant] usecase:eliminarNegocio")
+
+    return c.json({ ok: true })
   },
 )

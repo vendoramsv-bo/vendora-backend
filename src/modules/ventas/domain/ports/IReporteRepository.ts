@@ -14,6 +14,12 @@ export interface ReporteFiltros {
   fechaHasta?: Date
   fuente?: "VENTA" | "CONSULTORIO"
   puntoVentaId?: string
+  /**
+   * Filtro **interno** del alcance: lo puebla el servidor desde la sesión
+   * (023 contracts §A.1), nunca el cliente. Con valor, el reporte trae solo
+   * las operaciones de esa persona; sin valor, las de todo el negocio.
+   */
+  tenantMemberId?: string
 }
 
 export interface IReporteRepository {

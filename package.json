@@ -13,6 +13,7 @@
     "db:push": "prisma db push --config prisma/prisma.config.ts",
     "db:studio": "prisma studio --config prisma/prisma.config.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:roles": "tsx prisma/seed-roles-023.ts",
     "db:reset": "prisma migrate reset --config prisma/prisma.config.ts",
     "db:validate": "prisma validate --schema prisma",
     "db:format": "prisma format --schema prisma",

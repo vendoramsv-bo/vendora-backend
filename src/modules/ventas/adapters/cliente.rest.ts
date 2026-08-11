@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ATENCION } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { ClientePrismaRepository } from "../infrastructure/cliente.prisma.repository.js"
 import { CrearClienteUseCase } from "../application/cliente/crear-cliente.usecase.js"
@@ -61,7 +61,7 @@ clienteRouter.openapi(
     operationId: "ventas_crear_cliente",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       body: {
         content: {
@@ -136,7 +136,7 @@ clienteRouter.openapi(
     operationId: "ventas_actualizar_cliente",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -181,7 +181,7 @@ clienteRouter.openapi(
     operationId: "ventas_cambiar_estado_cliente",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ATENCION),
     request: {
       params: z.object({ id: z.string() }),
       body: {

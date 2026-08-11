@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
 import type { HonoEnv } from "../../../core/hono-context.js"
-import { requireRol } from "../../../core/hono-context.js"
+import { requireRol, ROLES_ABASTECIMIENTO } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { CompraPrismaRepository } from "../infrastructure/compra.prisma.repository.js"
 import { ProveedorPrismaRepository } from "../infrastructure/proveedor.prisma.repository.js"
@@ -74,7 +74,7 @@ compraRouter.openapi(
     operationId: "ventas_crear_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       body: {
         content: {
@@ -148,7 +148,7 @@ compraRouter.openapi(
     operationId: "ventas_actualizar_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -194,7 +194,7 @@ compraRouter.openapi(
     operationId: "ventas_eliminar_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
     },
@@ -224,7 +224,7 @@ compraRouter.openapi(
     operationId: "ventas_agregar_detalle_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -263,7 +263,7 @@ compraRouter.openapi(
     operationId: "ventas_actualizar_detalle_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string(), detalleId: z.string() }),
       body: {
@@ -306,7 +306,7 @@ compraRouter.openapi(
     operationId: "ventas_eliminar_detalle_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string(), detalleId: z.string() }),
     },
@@ -336,7 +336,7 @@ compraRouter.openapi(
     operationId: "ventas_agregar_costo_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
       body: {
@@ -375,7 +375,7 @@ compraRouter.openapi(
     operationId: "ventas_actualizar_costo_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string(), costoId: z.string() }),
       body: {
@@ -418,7 +418,7 @@ compraRouter.openapi(
     operationId: "ventas_eliminar_costo_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string(), costoId: z.string() }),
     },
@@ -448,7 +448,7 @@ compraRouter.openapi(
     operationId: "ventas_confirmar_compra",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
-    middleware: requireRol(["PROPIETARIO", "ADMIN"]),
+    middleware: requireRol(ROLES_ABASTECIMIENTO),
     request: {
       params: z.object({ id: z.string() }),
     },
