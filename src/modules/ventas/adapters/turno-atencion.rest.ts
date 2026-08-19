@@ -36,6 +36,7 @@ turnoAtencionRouter.openapi(
     operationId: "ventas_listar_turnos_atencion",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: { query: QueryParamsTurnoSchema },
     responses: {
       200: okResponse("Lista de turnos de atención", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,

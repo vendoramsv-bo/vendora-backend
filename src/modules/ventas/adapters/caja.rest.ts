@@ -16,6 +16,7 @@ import {
   RegistrarIngresoCajaSchema,
   RegistrarEgresoCajaSchema,
   QueryParamsCajaSchema,
+  QueryCajasSchema,
 } from "./ventas.schema.js"
 import {
   CajaNoEncontradaError,
@@ -44,6 +45,7 @@ cajaRouter.openapi(
     operationId: "ventas_listar_cajas",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: { query: QueryCajasSchema },
     responses: {
       200: okResponse("Lista de cajas", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,

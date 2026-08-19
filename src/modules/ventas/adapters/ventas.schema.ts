@@ -133,6 +133,19 @@ export const ActualizarTurnoAtencionSchema = z.object({
 
 export const QueryParamsCajaSchema = makeQueryParamsSchema(["fecha", "estadoCaja", "createdAt"])
 
+/**
+ * Query del listado de cajas, **declarada** para que salga en el OpenAPI.
+ *
+ * Mismo motivo que `QueryConsolidadoSchema`: el handler lee `estadoCaja` y
+ * `puntoVentaId` con `c.req.query()` sin declararlos, así que el spec decía
+ * `query?: never` y el cliente generado no podía mandarlos sin un cast. Ese
+ * silencio del contrato es lo que deja pasar los desajustes de nombre.
+ */
+export const QueryCajasSchema = QueryParamsCajaSchema.extend({
+  estadoCaja: z.enum(["APERTURADA", "CERRADA"]).optional(),
+  puntoVentaId: z.string().optional(),
+})
+
 export const AbrirCajaSchema = z.object({
   puntoVentaId: z.string().min(1),
   turnoId: z.string().min(1),
@@ -156,6 +169,21 @@ export const RegistrarEgresoCajaSchema = z.object({
 // ─── Venta ────────────────────────────────────────────────────────────────────
 
 export const QueryParamsVentaSchema = makeQueryParamsSchema(["fecha", "estadoPago", "tipoPago", "createdAt"])
+
+/**
+ * Query del listado de ventas, **declarada** para que salga en el OpenAPI.
+ *
+ * Los cinco filtros que el handler lee con `c.req.query()` viven acá. Sin
+ * declararlos, el arqueo de la 024 —que filtra las ventas por
+ * `aperturaCierreCajaId` con el filtro genérico— no podía tiparse.
+ */
+export const QueryVentasSchema = QueryParamsVentaSchema.extend({
+  estadoPago: z.enum(["PAGADO", "EN_ESPERA"]).optional(),
+  tipoPago: z.enum(["EFECTIVO", "QR", "TARJETA_CREDITO", "TARJETA_DEBITO", "OTRO"]).optional(),
+  puntoVentaId: z.string().optional(),
+  turnoId: z.string().optional(),
+  clienteId: z.string().optional(),
+})
 
 export const VentaDetalleSchema = z.object({
   productoId: z.string().min(1),
@@ -211,6 +239,18 @@ export const QueryConsolidadoSchema = QueryParamsReporteSchema.extend({
 // ─── Pedido ───────────────────────────────────────────────────────────────────
 
 export const QueryParamsPedidoSchema = makeQueryParamsSchema(["fecha", "estado", "createdAt"])
+
+/**
+ * Query del listado de pedidos, **declarada** para que salga en el OpenAPI.
+ *
+ * `estado` acepta los cuatro del ciclo real —`PENDIENTE`, `ELABORADO`,
+ * `FINALIZADO`, `RECHAZADO`—. No hay `ACEPTADO`: los pedidos que esperan cobro
+ * son los no terminales.
+ */
+export const QueryPedidosSchema = QueryParamsPedidoSchema.extend({
+  estado: z.enum(["PENDIENTE", "ELABORADO", "FINALIZADO", "RECHAZADO"]).optional(),
+  userId: z.string().optional(),
+})
 
 export const PedidoDetalleSchema = z.object({
   productoId: z.string().min(1),

@@ -37,6 +37,7 @@ puntoVentaRouter.openapi(
     operationId: "ventas_listar_puntos_venta",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: { query: QueryParamsPuntoVentaSchema },
     responses: {
       200: okResponse("Lista de puntos de venta", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,

@@ -54,11 +54,23 @@ function toVentaData(raw: any): VentaData {
     updatedById: raw.updatedById ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? null,
-    detalles: raw.ventaDetalle ? raw.ventaDetalle.map(toDetalleData) : undefined,
+    detalles: raw.ventasDetalle ? raw.ventasDetalle.map(toDetalleData) : undefined,
   }
 }
 
-const includeDetalle = { ventaDetalle: true }
+/**
+ * La relación se llama `ventasDetalle` en `50-ventas.prisma`, no `ventaDetalle`.
+ *
+ * Estaba escrita en singular en los cinco lugares donde aparece, así que **toda
+ * creación de venta fallaba** con *"Unknown argument `ventaDetalle`"* y el
+ * cliente recibía un 500. Nadie lo había visto porque el frontend nunca llegaba
+ * hasta acá: primero pegaba a una ruta inexistente (024 research R-00), después
+ * mandaba el precio como string.
+ *
+ * Es el mismo defecto que el `include` de `caja.prisma.repository` (024 D-5),
+ * en el otro repositorio del módulo.
+ */
+const includeDetalle = { ventasDetalle: true }
 
 export class VentaPrismaRepository implements IVentaRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,7 +100,7 @@ export class VentaPrismaRepository implements IVentaRepository {
         referenciaId: dto.referenciaId ?? null,
         referenciaTipo: dto.referenciaTipo,
         createdById: dto.createdById ?? null,
-        ventaDetalle: {
+        ventasDetalle: {
           create: dto.detalles.map((d) => ({
             productoId: d.productoId,
             varianteId: d.varianteId ?? null,
@@ -113,12 +125,12 @@ export class VentaPrismaRepository implements IVentaRepository {
     const resultado = await this.db.$transaction(async (tx: any) => {
       const ventaRaw = await tx.venta.findFirst({
         where: { id, tenantId },
-        include: { ventaDetalle: true },
+        include: { ventasDetalle: true },
       })
 
       const advertencias: string[] = []
 
-      for (const detalle of ventaRaw.ventaDetalle) {
+      for (const detalle of ventaRaw.ventasDetalle) {
         if (detalle.varianteId) {
           const variante = await tx.productoVariante.findUnique({ where: { id: detalle.varianteId } })
           if (variante?.inventarioActivado) {

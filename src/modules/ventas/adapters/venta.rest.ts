@@ -15,6 +15,7 @@ import { ReporteConsolidadoUseCase } from "../application/reporte/reporte-consol
 import {
   CrearVentaSchema,
   QueryParamsVentaSchema,
+  QueryVentasSchema,
   QueryParamsReporteSchema,
   QueryConsolidadoSchema,
 } from "./ventas.schema.js"
@@ -91,6 +92,7 @@ ventaRouter.openapi(
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
     middleware: resolverMiembroActivo,
+    request: { query: QueryVentasSchema },
     responses: {
       200: okResponse("Lista de ventas", z.record(z.string(), z.unknown())),
       ...errorResponses,
@@ -148,6 +150,13 @@ ventaRouter.openapi(
     operationId: "ventas_crear_venta",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": { schema: CrearVentaSchema },
+        },
+      },
+    },
     responses: {
       201: createdResponse("Venta creada", z.record(z.string(), z.unknown())),
       ...errorResponses,

@@ -68,6 +68,13 @@ export class ProductoPrismaRepository implements IProductoRepository {
         include: {
           productosOfertas: { where: ofertasVigentesWhere() },
           preciosVolumen: { where: { estado: "ACTIVO" } },
+          // **Solo el id.** Es todo lo que el POS necesita para decidir si el
+          // toque abre el diálogo de variantes o agrega directo al carrito; el
+          // detalle con atributos lo pide `GET /productos/{id}` cuando el
+          // diálogo se abre. Traerlas completas acá sería cargar 400 productos
+          // con sus variantes y los valores de cada atributo, en la pantalla más
+          // caliente del producto (025 desvío D-2).
+          variantes: { where: { estado: "ACTIVO" }, select: { id: true } },
         },
       }),
       this.db.producto.count({ where }),

@@ -48,14 +48,28 @@ function toCajaData(raw: any): CajaAbiertaData {
     updatedById: raw.updatedById ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? null,
-    ingresos: raw.ingresosCaja ? raw.ingresosCaja.map(toIngreso) : undefined,
-    egresos: raw.egresosCaja ? raw.egresosCaja.map(toEgreso) : undefined,
+    ingresos: raw.ingresosDeCaja ? raw.ingresosDeCaja.map(toIngreso) : undefined,
+    egresos: raw.egresosDeCaja ? raw.egresosDeCaja.map(toEgreso) : undefined,
   }
 }
 
+/**
+ * Las relaciones se llaman `ingresosDeCaja` y `egresosDeCaja` en el modelo
+ * `AperturaCierreDeCaja` (`50-ventas.prisma`).
+ *
+ * Decían `ingresosCaja` / `egresosCaja`, que son los nombres de los **delegates**
+ * (`tx.ingresosCaja.create(...)`, correctos más abajo) pero no de los campos de
+ * relación del padre. Prisma rechaza un `include` con una clave que el modelo no
+ * tiene, así que `abrir`, `cerrar` y `obtener` respondían 500 — y `toCajaData`
+ * leía además la propiedad equivocada, con lo que `ingresos`/`egresos` habrían
+ * vuelto `undefined` aun con el include arreglado.
+ *
+ * Nadie lo había visto porque el frontend llamaba rutas que no existían
+ * (024 research R-00) y nunca llegaba hasta acá.
+ */
 const includeMovimientos = {
-  ingresosCaja: true,
-  egresosCaja: true,
+  ingresosDeCaja: true,
+  egresosDeCaja: true,
 }
 
 export class CajaPrismaRepository implements ICajaRepository {

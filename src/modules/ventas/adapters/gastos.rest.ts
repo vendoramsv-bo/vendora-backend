@@ -30,6 +30,7 @@ gastosRouter.openapi(
     operationId: "ventas_listar_gastos",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: { query: QueryParamsGastosSchema },
     responses: {
       200: okResponse("Lista de gastos", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,

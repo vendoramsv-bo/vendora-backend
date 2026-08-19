@@ -40,7 +40,11 @@ function toPedidoData(raw: any): PedidoData {
     updatedById: raw.updatedById ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? null,
-    detalles: raw.pedidoDetalle ? raw.pedidoDetalle.map(toDetalleData) : undefined,
+    // Las relaciones son `pedidosDetalle` y `ventasDetalle` en
+    // `50-ventas.prisma`, en plural. Estaban en singular en los ocho lugares
+    // donde aparecen, así que **crear un pedido, leerlo con detalle y
+    // convertirlo en venta fallaban con 500**. Mismo defecto que 024 D-5 y D-8.
+    detalles: raw.pedidosDetalle ? raw.pedidosDetalle.map(toDetalleData) : undefined,
   }
 }
 
@@ -90,7 +94,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
         respuesta: dto.respuesta ?? null,
         estado: "PENDIENTE",
         createdById: dto.createdById ?? null,
-        pedidoDetalle: {
+        pedidosDetalle: {
           create: dto.detalles.map((d) => ({
             productoId: d.productoId,
             varianteId: d.varianteId ?? null,
@@ -103,7 +107,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
           })),
         },
       },
-      include: { pedidoDetalle: true },
+      include: { pedidosDetalle: true },
     })
     return toPedidoData(raw)
   }
@@ -122,7 +126,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
         ...(respuesta !== undefined && { respuesta }),
         updatedById: updatedById ?? null,
       },
-      include: { pedidoDetalle: true },
+      include: { pedidosDetalle: true },
     })
     return toPedidoData(raw)
   }
@@ -132,7 +136,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
     return this.db.$transaction(async (tx: any) => {
       const pedidoRaw = await tx.pedido.findFirst({
         where: { id: dto.pedidoId, tenantId: dto.tenantId },
-        include: { pedidoDetalle: true },
+        include: { pedidosDetalle: true },
       })
 
       const venta = await tx.venta.create({
@@ -153,8 +157,8 @@ export class PedidoPrismaRepository implements IPedidoRepository {
           referenciaId: dto.pedidoId,
           referenciaTipo: "PEDIDO",
           createdById: dto.updatedById ?? null,
-          ventaDetalle: {
-            create: pedidoRaw.pedidoDetalle.map((d: any) => ({
+          ventasDetalle: {
+            create: pedidoRaw.pedidosDetalle.map((d: any) => ({
               productoId: d.productoId,
               varianteId: d.varianteId ?? null,
               etiquetaVariante: d.etiquetaVariante ?? null,
@@ -173,7 +177,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
       const pedidoActualizado = await tx.pedido.update({
         where: { id: dto.pedidoId },
         data: { estado: "FINALIZADO", updatedById: dto.updatedById ?? null },
-        include: { pedidoDetalle: true },
+        include: { pedidosDetalle: true },
       })
 
       return { pedido: toPedidoData(pedidoActualizado), venta: toVentaData(venta) }
@@ -183,7 +187,7 @@ export class PedidoPrismaRepository implements IPedidoRepository {
   async obtener(id: string, tenantId: string): Promise<PedidoData | null> {
     const raw = await this.db.pedido.findFirst({
       where: { id, tenantId },
-      include: { pedidoDetalle: true },
+      include: { pedidosDetalle: true },
     })
     return raw ? toPedidoData(raw) : null
   }

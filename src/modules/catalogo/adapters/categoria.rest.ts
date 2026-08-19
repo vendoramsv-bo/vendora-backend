@@ -34,6 +34,14 @@ categoriaRouter.openapi(
     operationId: "catalogo_listar_categorias",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
+    // El handler lee los dos de `c.req.query()`; faltaba declararlos para que el
+    // cliente generado pueda enviarlos (025 desvío D-1).
+    request: {
+      query: z.object({
+        actividadId: z.string().optional(),
+        estado: z.enum(["ACTIVO", "INACTIVO"]).optional(),
+      }),
+    },
     responses: {
       200: okResponse("Lista de categorías", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
       ...errorResponses,

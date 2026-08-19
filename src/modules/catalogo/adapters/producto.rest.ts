@@ -84,6 +84,13 @@ productoRouter.openapi(
     operationId: "catalogo_listar_productos",
     tags: ["Catálogo"],
     security: [{ bearerAuth: [] }],
+    // La ruta lee la query con `c.req.query()` desde siempre; lo que faltaba era
+    // **declararla**. Sin esto el spec dice `query?: never`, el cliente generado
+    // no puede enviarla, y el frontend la manda detrás de `as any` + `@ts-ignore`.
+    // Ese silencio del contrato es lo que dejó vivir un filtro por categoría que
+    // nunca filtró: con los nombres en el spec habría sido error de compilación
+    // (025 desvío D-1).
+    request: { query: QueryParamsCatalogoSchema },
     responses: {
       200: okResponse("Lista paginada de productos", z.record(z.string(), z.unknown())),
       ...errorResponses,

@@ -14,6 +14,7 @@ import {
   ActualizarEstadoPedidoSchema,
   ConvertirPedidoEnVentaSchema,
   QueryParamsPedidoSchema,
+  QueryPedidosSchema,
 } from "./ventas.schema.js"
 import {
   PedidoNoEncontradoError,
@@ -36,6 +37,7 @@ pedidoRouter.openapi(
     operationId: "ventas_listar_pedidos",
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
+    request: { query: QueryPedidosSchema },
     responses: {
       200: okResponse("Lista de pedidos", z.record(z.string(), z.unknown())),
       ...errorResponses,
@@ -151,7 +153,14 @@ pedidoRouter.openapi(
     tags: ["Ventas"],
     security: [{ bearerAuth: [] }],
     middleware: requireRol(["PROPIETARIO", "ADMIN", "EMPLEADO"]),
-    request: { params: z.object({ id: z.string() }) },
+    request: {
+      params: z.object({ id: z.string() }),
+      body: {
+        content: {
+          "application/json": { schema: ConvertirPedidoEnVentaSchema },
+        },
+      },
+    },
     responses: {
       200: okResponse("Pedido convertido en venta", z.record(z.string(), z.unknown())),
       ...errorResponses,
