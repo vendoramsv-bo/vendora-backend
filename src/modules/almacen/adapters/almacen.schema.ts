@@ -1,14 +1,73 @@
 import { z } from "zod"
 import { makeQueryParamsSchema } from "../../../core/query-params.js"
+import { ORIGENES_MOVIMIENTO, TIPOS_MOVIMIENTO_TENANT } from "../domain/movimiento-tenant.js"
 
 // Query schemas para listados paginados
 export const QueryParamsInventarioSchema = makeQueryParamsSchema([
   "fecha", "motivo", "estado", "tipo", "createdAt",
 ])
 
-export const QueryParamsMovimientosSchema = makeQueryParamsSchema([
-  "tipo", "cantidad", "motivo", "createdAt",
-])
+const CAMPOS_MOVIMIENTO_ENTIDAD = ["tipo", "cantidad", "motivo", "createdAt"] as const
+
+export const QueryParamsMovimientosSchema = makeQueryParamsSchema([...CAMPOS_MOVIMIENTO_ENTIDAD]).extend({
+  // Acotado (Art. IV): un campo libre llega al `where` de Prisma y termina en 500.
+  filterField: z.enum(CAMPOS_MOVIMIENTO_ENTIDAD).optional(),
+})
+
+export const QueryParamsMovimientosTenantSchema = makeQueryParamsSchema(["tipo", "cantidad", "createdAt"]).extend({
+  filterField: z.enum(["origen", "tipo", "motivo", "cantidad", "createdAt"]).optional(),
+})
+
+export const MovimientoTenantSchema = z.object({
+  id: z.string(),
+  origen: z.enum(ORIGENES_MOVIMIENTO),
+  insumoId: z.string().nullable(),
+  productoId: z.string().nullable(),
+  varianteId: z.string().nullable(),
+  nombreEntidad: z.string(),
+  etiquetaVariante: z.string().nullable(),
+  tipo: z.enum(TIPOS_MOVIMIENTO_TENANT),
+  cantidad: z.number(),
+  stockAntes: z.number().int(),
+  stockDespues: z.number().int(),
+  motivo: z.string().nullable(),
+  referenciaId: z.string().nullable(),
+  createdAt: z.string(),
+})
+
+// Fila tal cual la devuelve `findMany` sobre MovimientoAlmacen, sin `select`.
+export const MovimientoInsumoSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  insumoId: z.string(),
+  tipo: z.enum(["CREACION", "INGRESO", "SALIDA", "AJUSTE", "RECUENTO"]),
+  cantidad: z.string(), // Decimal(10,4) serializado por c.json
+  motivo: z.string().nullable(),
+  referenciaId: z.string().nullable(),
+  stockAntes: z.number().int(),
+  stockDespues: z.number().int(),
+  createdById: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable(),
+})
+
+// Fila tal cual la devuelve `findMany` sobre MovimientoInventario, sin `select`.
+export const MovimientoVarianteSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  productoId: z.string(),
+  varianteId: z.string().nullable(),
+  etiquetaVariante: z.string().nullable(),
+  tipo: z.enum(["CREACION", "ENTRADA", "SALIDA", "AJUSTE", "RECUENTO"]),
+  cantidad: z.number().int(),
+  motivo: z.string().nullable(),
+  referenciaId: z.string().nullable(),
+  stockAntes: z.number().int(),
+  stockDespues: z.number().int(),
+  createdById: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable(),
+})
 
 export const QueryParamsInsumoSchema = makeQueryParamsSchema([
   "nombre", "cantidadStock", "stockMinimo", "estado", "createdAt", "updatedAt",

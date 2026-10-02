@@ -171,3 +171,13 @@ export class DocumentoNoEncontradoError extends Error {
     this.code = `${tipo.toUpperCase().replace(/ /g, "_")}_NO_ENCONTRADO`
   }
 }
+
+// HTTP 400 — el valor de un filtro de listado no corresponde al tipo del campo
+export class FiltroInvalidoError extends Error {
+  readonly code = "FILTRO_INVALIDO"
+  readonly statusCode = 400
+  constructor(campo: string, valor: string, esperado: string) {
+    super(`Valor "${valor}" inválido para el filtro "${campo}": se esperaba ${esperado}`)
+    this.name = "FiltroInvalidoError"
+  }
+}

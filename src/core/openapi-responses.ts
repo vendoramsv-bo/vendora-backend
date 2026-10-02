@@ -19,6 +19,19 @@ export function createdResponse(description: string, schema: z.ZodTypeAny) {
   }
 }
 
+// Forma exacta de `paginate()` (core/query-params.ts). Si una cambia, la otra también.
+export function paginadoSchema<T extends z.ZodTypeAny>(item: T) {
+  return z.object({
+    data: z.array(item),
+    total: z.number().int(),
+    page: z.number().int(),
+    take: z.number().int(),
+    totalPaginas: z.number().int(),
+    hayPaginaSiguiente: z.boolean(),
+    hayPaginaAnterior: z.boolean(),
+  })
+}
+
 export const errorResponses = {
   400: { description: "Solicitud inválida" },
   401: { description: "No autenticado" },

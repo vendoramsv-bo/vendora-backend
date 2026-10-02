@@ -8,6 +8,7 @@ import type {
 } from "../domain/ports/IInsumoRepository.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
+import { argsListadoMovimientos, TIPOS_MOVIMIENTO_ALMACEN } from "./movimiento-prisma-args.js"
 
 function toInsumoData(raw: any): InsumoData {
   return {
@@ -149,7 +150,7 @@ export class InsumosPrismaRepository implements IInsumoRepository {
   }
 
   async listarMovimientos(insumoId: string, tenantId: string, params: QueryParams) {
-    const { take, skip, orderBy, where: whereSearch } = toPrismaArgs(params, ["motivo"])
+    const { take, skip, orderBy, where: whereSearch } = argsListadoMovimientos(params, TIPOS_MOVIMIENTO_ALMACEN)
     const where = { insumoId, tenantId, ...whereSearch }
     const [data, total] = await Promise.all([
       this.db.movimientoAlmacen.findMany({ where, take, skip, orderBy }),

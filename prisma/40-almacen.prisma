@@ -29,6 +29,7 @@ model MovimientoInventario {
   updatedAt        DateTime?
 
   @@unique([tenantId, productoId, varianteId, tipo, referenciaId])
+  @@index([tenantId, createdAt])
   @@schema("almacen")
 }
 
@@ -150,6 +151,7 @@ model MovimientoAlmacen {
   updatedAt    DateTime?
 
   @@unique([tenantId, insumoId, tipo, referenciaId])
+  @@index([tenantId, createdAt])
   @@schema("almacen")
 }
 

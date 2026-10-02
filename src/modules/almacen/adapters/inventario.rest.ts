@@ -24,6 +24,7 @@ import {
   ActualizarRecuentoSchema,
   QueryParamsInventarioSchema,
   QueryParamsMovimientosSchema,
+  MovimientoVarianteSchema,
 } from "./almacen.schema.js"
 import {
   VarianteNoEncontradaError,
@@ -33,9 +34,10 @@ import {
   ConflictoVersionError,
   DocumentoYaAprobadoError,
   DocumentoNoEncontradoError,
+  FiltroInvalidoError,
 } from "../domain/almacen.errors.js"
 import { getAlmacenNotificador } from "../infrastructure/almacen.notificador.provider.js"
-import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
+import { errorResponses, okResponse, createdResponse, paginadoSchema } from "../../../core/openapi-responses.js"
 
 export const inventarioRouter = new OpenAPIHono<HonoEnv>()
 
@@ -83,21 +85,25 @@ inventarioRouter.openapi(
     operationId: "almacen_listar_movimientos_variante",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    request: { params: z.object({ varianteId: z.string() }) },
+    request: { params: z.object({ varianteId: z.string() }), query: QueryParamsMovimientosSchema },
     responses: {
-      200: okResponse("Movimientos de variante", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      200: okResponse("Movimientos de variante", paginadoSchema(MovimientoVarianteSchema)),
       ...errorResponses,
     },
   }),
   async (c) => {
     const tenantId = c.get("tenantId")
-    const params = QueryParamsMovimientosSchema.parse(c.req.query())
-    const result = await new ListarMovimientosVarianteUseCase(makeRepo()).execute(
-      c.req.param("varianteId"),
-      tenantId,
-      params
-    )
-    return c.json(result)
+    try {
+      const result = await new ListarMovimientosVarianteUseCase(makeRepo()).execute(
+        c.req.param("varianteId"),
+        tenantId,
+        c.req.valid("query")
+      )
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof FiltroInvalidoError) return c.json({ error: err.code, message: err.message }, 400)
+      throw err
+    }
   },
 )
 

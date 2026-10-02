@@ -19,15 +19,17 @@ import {
   AjusteInsumoSchema,
   QueryParamsInsumoSchema,
   QueryParamsMovimientosSchema,
+  MovimientoInsumoSchema,
 } from "./almacen.schema.js"
 import {
   InsumoNoEncontradoError,
   InsumoNombreDuplicadoError,
   InsumoEnUsoEnRecetaError,
   MotivoRequeridoError,
+  FiltroInvalidoError,
 } from "../domain/almacen.errors.js"
 import { getAlmacenNotificador } from "../infrastructure/almacen.notificador.provider.js"
-import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
+import { errorResponses, okResponse, createdResponse, paginadoSchema } from "../../../core/openapi-responses.js"
 
 export const insumoRouter = new OpenAPIHono<HonoEnv>()
 
@@ -250,21 +252,25 @@ insumoRouter.openapi(
     operationId: "almacen_listar_movimientos_insumo",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string() }), query: QueryParamsMovimientosSchema },
     responses: {
-      200: okResponse("Movimientos del insumo", z.object({ data: z.array(z.record(z.string(), z.unknown())) })),
+      200: okResponse("Movimientos del insumo", paginadoSchema(MovimientoInsumoSchema)),
       ...errorResponses,
     },
   }),
   async (c) => {
     const tenantId = c.get("tenantId")
-    const params = QueryParamsMovimientosSchema.parse(c.req.query())
-    const result = await new ListarMovimientosInsumoUseCase(makeRepo()).execute(
-      c.req.param("id"),
-      tenantId,
-      params
-    )
-    return c.json(result)
+    try {
+      const result = await new ListarMovimientosInsumoUseCase(makeRepo()).execute(
+        c.req.param("id"),
+        tenantId,
+        c.req.valid("query")
+      )
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof FiltroInvalidoError) return c.json({ error: err.code, message: err.message }, 400)
+      throw err
+    }
   },
 )
 

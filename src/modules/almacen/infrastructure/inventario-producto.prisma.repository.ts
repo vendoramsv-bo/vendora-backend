@@ -16,6 +16,7 @@ import type {
 } from "../domain/ports/IInventarioProductoRepository.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
+import { argsListadoMovimientos, TIPOS_MOVIMIENTO_INVENTARIO } from "./movimiento-prisma-args.js"
 import {
   ConflictoVersionError,
   DocumentoNoEncontradoError,
@@ -716,7 +717,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
   }
 
   async listarMovimientos(varianteId: string, tenantId: string, params: QueryParams) {
-    const { take, skip, orderBy, where: whereSearch } = toPrismaArgs(params, ["motivo"])
+    const { take, skip, orderBy, where: whereSearch } = argsListadoMovimientos(params, TIPOS_MOVIMIENTO_INVENTARIO)
     const where = { varianteId, tenantId, ...whereSearch }
     const [data, total] = await Promise.all([
       this.db.movimientoInventario.findMany({ where, take, skip, orderBy }),

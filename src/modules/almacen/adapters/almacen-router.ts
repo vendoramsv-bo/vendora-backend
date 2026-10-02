@@ -5,6 +5,7 @@ import { inventarioRouter } from "./inventario.rest.js"
 import { insumoRouter } from "./insumo.rest.js"
 import { almacenOperacionesRouter } from "./almacen-operaciones.rest.js"
 import { recetaRouter } from "./receta.rest.js"
+import { movimientoRouter } from "./movimiento.rest.js"
 
 const almacenApp = new OpenAPIHono<HonoEnv>()
 // `resolverMiembroActivo` se monta en toda la app y no ruta por ruta: deja en el
@@ -14,6 +15,7 @@ const almacenApp = new OpenAPIHono<HonoEnv>()
 almacenApp.use("*", requireAuth, requireTenantActivo, resolverMiembroActivo)
 almacenApp.route("/", inventarioRouter)
 almacenApp.route("/insumos", insumoRouter)
+almacenApp.route("/movimientos", movimientoRouter)
 almacenApp.route("/", almacenOperacionesRouter)
 almacenApp.route("/", recetaRouter)
 
