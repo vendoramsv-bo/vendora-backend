@@ -11,6 +11,12 @@ let idCounter = 1
 
 export class FakeVentaRepository implements IVentaRepository {
   readonly ventas: VentaData[] = []
+  /** Productos que el fake reporta como "con variantes activas" (spec 027). */
+  productosConVariante: string[] = []
+
+  async productosQueRequierenVariante(_tenantId: string, productoIds: string[]): Promise<string[]> {
+    return productoIds.filter((id) => this.productosConVariante.includes(id))
+  }
 
   async crear(dto: CrearVentaDTO): Promise<VentaData> {
     const venta: VentaData = {

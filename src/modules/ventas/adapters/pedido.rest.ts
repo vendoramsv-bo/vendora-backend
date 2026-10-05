@@ -15,10 +15,12 @@ import {
   ConvertirPedidoEnVentaSchema,
   QueryParamsPedidoSchema,
   QueryPedidosSchema,
+  VarianteRequeridaResponseSchema,
 } from "./ventas.schema.js"
 import {
   PedidoNoEncontradoError,
   PedidoTerminalError,
+  VarianteRequeridaError,
 } from "../domain/ventas.errors.js"
 import { getVentasNotificador } from "../infrastructure/ventas.notificador.provider.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
@@ -164,6 +166,10 @@ pedidoRouter.openapi(
     responses: {
       200: okResponse("Pedido convertido en venta", z.record(z.string(), z.unknown())),
       ...errorResponses,
+      422: okResponse(
+        "Pedido terminal (PEDIDO_TERMINAL) o línea sin variante de un producto que la tiene (VARIANTE_REQUERIDA, con productoIds)",
+        VarianteRequeridaResponseSchema,
+      ),
     },
   }),
   async (c) => {
@@ -189,6 +195,9 @@ pedidoRouter.openapi(
     } catch (err) {
       if (err instanceof PedidoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof PedidoTerminalError) return c.json({ error: err.code, message: err.message }, 422)
+      if (err instanceof VarianteRequeridaError) {
+        return c.json({ error: err.code, message: err.message, productoIds: err.productoIds }, 422)
+      }
       throw err
     }
   },

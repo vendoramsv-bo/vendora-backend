@@ -17,12 +17,15 @@ import type {
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 import { argsListadoMovimientos, TIPOS_MOVIMIENTO_INVENTARIO } from "./movimiento-prisma-args.js"
+import { registrarMovimiento } from "./movimiento-inventario.writer.js"
 import {
   ConflictoVersionError,
   DocumentoNoEncontradoError,
   DocumentoYaAprobadoError,
   StockNegativoError,
 } from "../domain/almacen.errors.js"
+
+const MOTIVO_INICIALIZACION = "Inicialización de inventario"
 
 export class InventarioProductoPrismaRepository implements IInventarioProductoRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,6 +61,23 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
       where: { id: productoId },
       data: { cantidadStock: total },
     })
+  }
+
+  // Fija el stock de la variante (y recalcula el padre) o del producto simple.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async fijarStock(tx: any, tenantId: string, productoId: string, varianteId: string | null, stock: number): Promise<void> {
+    if (varianteId) {
+      await tx.productoVariante.update({
+        where: { id: varianteId, producto: { tenantId } },
+        data: { cantidadStock: stock },
+      })
+      await this.recalcularStockPadre(tx, productoId)
+    } else {
+      await tx.producto.update({
+        where: { id: productoId, tenantId },
+        data: { cantidadStock: stock },
+      })
+    }
   }
 
   // ─── Ajustes ─────────────────────────────────────────────────────────────────
@@ -150,7 +170,8 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
     for (let i = 0; i < ajuste.detalles.length; i++) {
       const d = ajuste.detalles[i]
       const v = variantesActuales[i]
-      const stockActual = Number(v?.cantidadStock ?? 0)
+      if (!v) throw new DocumentoNoEncontradoError(d.varianteId ? "VARIANTE" : "PRODUCTO", d.varianteId ?? d.productoId)
+      const stockActual = Number(v.cantidadStock ?? 0)
       const stockResultante = stockActual + d.cantidadAjuste
       if (stockResultante < 0) {
         throw new StockNegativoError(d.productoId, stockResultante, d.varianteId ?? undefined)
@@ -167,47 +188,18 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
         const stockAntes = Number(v?.cantidadStock ?? 0)
         const stockDespues = stockAntes + d.cantidadAjuste
 
-        if (d.varianteId) {
-          await tx.productoVariante.update({
-            where: { id: d.varianteId },
-            data: { cantidadStock: stockDespues },
-          })
-          await this.recalcularStockPadre(tx, d.productoId)
-        } else {
-          await tx.producto.update({
-            where: { id: d.productoId },
-            data: { cantidadStock: stockDespues },
-          })
-        }
-
-        await tx.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId: dto.tenantId,
-              productoId: d.productoId,
-              varianteId: d.varianteId ?? null,
-              tipo: "AJUSTE",
-              referenciaId: dto.ajusteId,
-            },
-          },
-          create: {
-            tenantId: dto.tenantId,
-            productoId: d.productoId,
-            varianteId: d.varianteId ?? null,
-            tipo: "AJUSTE",
-            cantidad: d.cantidadAjuste,
-            motivo: ajuste.motivo ?? null,
-            referenciaId: dto.ajusteId,
-            stockAntes,
-            stockDespues,
-            createdById: dto.aprobadoPorId ?? null,
-          },
-          update: {
-            cantidad: d.cantidadAjuste,
-            stockAntes,
-            stockDespues,
-          },
+        const { insertado } = await registrarMovimiento(tx, {
+          tenantId: dto.tenantId,
+          productoId: d.productoId,
+          varianteId: d.varianteId ?? null,
+          tipo: "AJUSTE",
+          stockAntes,
+          stockDespues,
+          motivo: ajuste.motivo ?? null,
+          referenciaId: dto.ajusteId,
+          createdById: dto.aprobadoPorId ?? null,
         })
+        if (insertado) await this.fijarStock(tx, dto.tenantId, d.productoId, d.varianteId ?? null, stockDespues)
 
         await tx.ajusteDetalle.update({
           where: { id: d.id },
@@ -363,6 +355,9 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
 
     for (let i = 0; i < recuento.detalles.length; i++) {
       const d = recuento.detalles[i]
+      if (!variantesActuales[i]) {
+        throw new DocumentoNoEncontradoError(d.varianteId ? "VARIANTE" : "PRODUCTO", d.varianteId ?? d.productoId)
+      }
       const stockFisico = Number(d.stockFisico)
       if (stockFisico < 0) {
         throw new StockNegativoError(d.productoId, stockFisico, d.varianteId ?? undefined)
@@ -378,49 +373,20 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
         const v = variantesActuales[i]
         const stockAntes = Number(v?.cantidadStock ?? 0)
         const stockDespues = Number(d.stockFisico)
-        const diferencia = Number(d.diferencia)
+        const diferencia = stockDespues - stockAntes
 
-        if (d.varianteId) {
-          await tx.productoVariante.update({
-            where: { id: d.varianteId },
-            data: { cantidadStock: stockDespues },
-          })
-          await this.recalcularStockPadre(tx, d.productoId)
-        } else {
-          await tx.producto.update({
-            where: { id: d.productoId },
-            data: { cantidadStock: stockDespues },
-          })
-        }
-
-        await tx.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId: dto.tenantId,
-              productoId: d.productoId,
-              varianteId: d.varianteId ?? null,
-              tipo: "RECUENTO",
-              referenciaId: dto.recuentoId,
-            },
-          },
-          create: {
-            tenantId: dto.tenantId,
-            productoId: d.productoId,
-            varianteId: d.varianteId ?? null,
-            tipo: "RECUENTO",
-            cantidad: diferencia,
-            motivo: recuento.observacion ?? null,
-            referenciaId: dto.recuentoId,
-            stockAntes,
-            stockDespues,
-            createdById: dto.aprobadoPorId ?? null,
-          },
-          update: {
-            cantidad: diferencia,
-            stockAntes,
-            stockDespues,
-          },
+        const { insertado } = await registrarMovimiento(tx, {
+          tenantId: dto.tenantId,
+          productoId: d.productoId,
+          varianteId: d.varianteId ?? null,
+          tipo: "RECUENTO",
+          stockAntes,
+          stockDespues,
+          motivo: recuento.observacion ?? null,
+          referenciaId: dto.recuentoId,
+          createdById: dto.aprobadoPorId ?? null,
         })
+        if (insertado) await this.fijarStock(tx, dto.tenantId, d.productoId, d.varianteId ?? null, stockDespues)
 
         await tx.recuentoDetalle.update({
           where: { id: d.id },
@@ -454,12 +420,17 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
   }
 
   // ─── Inicialización de stock ──────────────────────────────────────────────────
+  //
+  // Producto sin variantes: "inicializado" = tiene su CREACION (`init-<productoId>`).
+  // Se registra con el stock actual y NO se toca `cantidadStock` (spec 027).
+  // Producto con variantes: el padre no se inicializa; su stock es la suma de las variantes.
+  // Variante: si `inventarioActivado = false`, se activa con stock 0 y su CREACION.
 
   async inicializarStockBulk(tenantId: string, createdById?: string): Promise<InicializarBulkResultado> {
     const [productos, variantes] = await Promise.all([
       this.db.producto.findMany({
-        where: { tenantId, inventarioActivado: false },
-        select: { id: true },
+        where: { tenantId, variantes: { none: {} } },
+        select: { id: true, cantidadStock: true },
       }),
       this.db.productoVariante.findMany({
         where: { producto: { tenantId }, inventarioActivado: false },
@@ -473,67 +444,23 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.$transaction(async (tx: any) => {
       for (const p of productos) {
-        await tx.producto.update({
-          where: { id: p.id },
-          data: { inventarioActivado: true, cantidadStock: 0 },
+        const stock = Number(p.cantidadStock ?? 0)
+        const { insertado } = await registrarMovimiento(tx, {
+          tenantId,
+          productoId: p.id,
+          varianteId: null,
+          tipo: "CREACION",
+          stockAntes: stock,
+          stockDespues: stock,
+          motivo: MOTIVO_INICIALIZACION,
+          referenciaId: `init-${p.id}`,
+          createdById: createdById ?? null,
         })
-        await tx.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId,
-              productoId: p.id,
-              varianteId: null,
-              tipo: "CREACION",
-              referenciaId: `init-${p.id}`,
-            },
-          },
-          create: {
-            tenantId,
-            productoId: p.id,
-            varianteId: null,
-            tipo: "CREACION",
-            cantidad: 0,
-            motivo: "Inicialización de inventario",
-            referenciaId: `init-${p.id}`,
-            stockAntes: 0,
-            stockDespues: 0,
-            createdById: createdById ?? null,
-          },
-          update: {},
-        })
-        productosInicializados++
+        if (insertado) productosInicializados++
       }
 
       for (const v of variantes) {
-        await tx.productoVariante.update({
-          where: { id: v.id },
-          data: { inventarioActivado: true, cantidadStock: 0 },
-        })
-        await tx.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId,
-              productoId: v.productoId,
-              varianteId: v.id,
-              tipo: "CREACION",
-              referenciaId: `init-${v.id}`,
-            },
-          },
-          create: {
-            tenantId,
-            productoId: v.productoId,
-            varianteId: v.id,
-            tipo: "CREACION",
-            cantidad: 0,
-            motivo: "Inicialización de inventario",
-            referenciaId: `init-${v.id}`,
-            stockAntes: 0,
-            stockDespues: 0,
-            createdById: createdById ?? null,
-          },
-          update: {},
-        })
-        variantesInicializadas++
+        if (await this.inicializarVariante(tx, tenantId, v.productoId, v.id, createdById)) variantesInicializadas++
       }
     })
 
@@ -548,78 +475,72 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
   ): Promise<void> {
     if (varianteId) {
       const v = await this.db.productoVariante.findFirst({
-        where: { id: varianteId, producto: { tenantId }, inventarioActivado: false },
+        where: { id: varianteId, productoId, producto: { tenantId }, inventarioActivado: false },
+        select: { id: true },
       })
       if (!v) return
-      await this.db.$transaction([
-        this.db.productoVariante.update({
-          where: { id: varianteId },
-          data: { inventarioActivado: true, cantidadStock: 0 },
-        }),
-        this.db.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId,
-              productoId,
-              varianteId,
-              tipo: "CREACION",
-              referenciaId: `init-${varianteId}`,
-            },
-          },
-          create: {
-            tenantId,
-            productoId,
-            varianteId,
-            tipo: "CREACION",
-            cantidad: 0,
-            motivo: "Inicialización de inventario",
-            referenciaId: `init-${varianteId}`,
-            stockAntes: 0,
-            stockDespues: 0,
-            createdById: createdById ?? null,
-          },
-          update: {},
-        }),
-      ])
-    } else {
-      const p = await this.db.producto.findFirst({
-        where: { id: productoId, tenantId, inventarioActivado: false },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await this.db.$transaction(async (tx: any) => {
+        await this.inicializarVariante(tx, tenantId, productoId, varianteId, createdById)
       })
-      if (!p) return
-      await this.db.$transaction([
-        this.db.producto.update({
-          where: { id: productoId },
-          data: { inventarioActivado: true, cantidadStock: 0 },
-        }),
-        this.db.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId,
-              productoId,
-              varianteId: null,
-              tipo: "CREACION",
-              referenciaId: `init-${productoId}`,
-            },
-          },
-          create: {
-            tenantId,
-            productoId,
-            varianteId: null,
-            tipo: "CREACION",
-            cantidad: 0,
-            motivo: "Inicialización de inventario",
-            referenciaId: `init-${productoId}`,
-            stockAntes: 0,
-            stockDespues: 0,
-            createdById: createdById ?? null,
-          },
-          update: {},
-        }),
-      ])
+      return
     }
+
+    const p = await this.db.producto.findFirst({
+      where: { id: productoId, tenantId, variantes: { none: {} } },
+      select: { id: true, cantidadStock: true },
+    })
+    if (!p) return
+    const stock = Number(p.cantidadStock ?? 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.db.$transaction(async (tx: any) => {
+      await registrarMovimiento(tx, {
+        tenantId,
+        productoId,
+        varianteId: null,
+        tipo: "CREACION",
+        stockAntes: stock,
+        stockDespues: stock,
+        motivo: MOTIVO_INICIALIZACION,
+        referenciaId: `init-${productoId}`,
+        createdById: createdById ?? null,
+      })
+    })
+  }
+
+  // Activa la variante con stock 0 y registra su CREACION. Devuelve si se inicializó.
+  private async inicializarVariante(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    tenantId: string,
+    productoId: string,
+    varianteId: string,
+    createdById?: string
+  ): Promise<boolean> {
+    const { insertado } = await registrarMovimiento(tx, {
+      tenantId,
+      productoId,
+      varianteId,
+      tipo: "CREACION",
+      stockAntes: 0,
+      stockDespues: 0,
+      motivo: MOTIVO_INICIALIZACION,
+      referenciaId: `init-${varianteId}`,
+      createdById: createdById ?? null,
+    })
+    await tx.productoVariante.update({
+      where: { id: varianteId },
+      data: insertado ? { inventarioActivado: true, cantidadStock: 0 } : { inventarioActivado: true },
+    })
+    if (insertado) await this.recalcularStockPadre(tx, productoId)
+    return insertado
   }
 
   // ─── Movimiento de salida idempotente para ventas ─────────────────────────────
+  //
+  // Por línea: lee el stock con FOR UPDATE (stockAntes correcto con ventas
+  // concurrentes), registra la SALIDA y solo si se insertó descuenta el stock.
+  // Un reintento de la misma venta no descuenta dos veces.
 
   async registrarMovimientoSalidaIdempotente(
     tenantId: string,
@@ -627,44 +548,47 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
     detalles: MovimientoSalidaDetalle[],
     createdById?: string
   ): Promise<void> {
+    // Líneas repetidas del mismo producto/variante se descuentan como una sola SALIDA
+    const agrupados = new Map<string, MovimientoSalidaDetalle>()
+    for (const d of detalles) {
+      const clave = `${d.productoId}:${d.varianteId ?? ""}`
+      const previo = agrupados.get(clave)
+      agrupados.set(clave, previo ? { ...previo, cantidad: previo.cantidad + d.cantidad } : { ...d })
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.$transaction(async (tx: any) => {
-      for (const d of detalles) {
-        const varianteData = d.varianteId
-          ? await tx.productoVariante.findFirst({ where: { id: d.varianteId }, select: { cantidadStock: true } })
-          : await tx.producto.findFirst({ where: { id: d.productoId }, select: { cantidadStock: true } })
+      for (const d of agrupados.values()) {
+        const filas: { cantidadStock: number }[] = d.varianteId
+          ? await tx.$queryRaw`
+              SELECT v."cantidadStock" FROM "catalogo"."ProductoVariante" v
+              JOIN "catalogo"."Producto" p ON p.id = v."productoId"
+              WHERE v.id = ${d.varianteId} AND v."productoId" = ${d.productoId} AND p."tenantId" = ${tenantId}
+              FOR UPDATE OF v`
+          : await tx.$queryRaw`
+              SELECT "cantidadStock" FROM "catalogo"."Producto"
+              WHERE id = ${d.productoId} AND "tenantId" = ${tenantId}
+              FOR UPDATE`
+        if (filas.length === 0) {
+          throw new Error(
+            `Salida de venta ${ventaId}: no existe ${d.varianteId ? `la variante ${d.varianteId}` : "el producto"} ` +
+              `(producto ${d.productoId}) en el tenant ${tenantId}`
+          )
+        }
 
-        const stockAntes = Number(varianteData?.cantidadStock ?? 0)
-        const stockDespues = stockAntes - d.cantidad
-
-        await tx.movimientoInventario.upsert({
-          where: {
-            tenantId_productoId_varianteId_tipo_referenciaId: {
-              tenantId,
-              productoId: d.productoId,
-              varianteId: d.varianteId ?? null,
-              tipo: "SALIDA",
-              referenciaId: ventaId,
-            },
-          },
-          create: {
-            tenantId,
-            productoId: d.productoId,
-            varianteId: d.varianteId ?? null,
-            tipo: "SALIDA",
-            cantidad: -d.cantidad,
-            motivo: "Venta",
-            referenciaId: ventaId,
-            stockAntes,
-            stockDespues,
-            createdById: createdById ?? null,
-          },
-          update: {
-            cantidad: -d.cantidad,
-            stockAntes,
-            stockDespues,
-          },
+        const stockAntes = Number(filas[0].cantidadStock)
+        const { insertado } = await registrarMovimiento(tx, {
+          tenantId,
+          productoId: d.productoId,
+          varianteId: d.varianteId ?? null,
+          tipo: "SALIDA",
+          stockAntes,
+          stockDespues: stockAntes - d.cantidad,
+          motivo: "Venta",
+          referenciaId: ventaId,
+          createdById: createdById ?? null,
         })
+        if (!insertado) continue
 
         if (d.varianteId) {
           await tx.productoVariante.update({
@@ -674,7 +598,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
           await this.recalcularStockPadre(tx, d.productoId)
         } else {
           await tx.producto.update({
-            where: { id: d.productoId },
+            where: { id: d.productoId, tenantId },
             data: { cantidadStock: { decrement: d.cantidad } },
           })
         }

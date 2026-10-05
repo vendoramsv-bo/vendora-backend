@@ -2,7 +2,7 @@ import type { IVentaRepository, VentaData, VentaDetalleInput } from "../../domai
 import type { ICajaRepository } from "../../domain/ports/ICajaRepository.js"
 import type { IVentasNotificador } from "../../domain/ports/IVentasNotificador.js"
 import type { IAlmacenInventarioPort } from "../../domain/ports/IAlmacenInventarioPort.js"
-import { CajaNoEncontradaError, CajaYaCerradaError } from "../../domain/ventas.errors.js"
+import { CajaNoEncontradaError, CajaYaCerradaError, VarianteRequeridaError } from "../../domain/ventas.errors.js"
 
 export interface CrearVentaInput {
   tenantId: string
@@ -37,6 +37,10 @@ export class CrearVentaUseCase {
     const caja = await this.cajaRepo.obtener(input.aperturaCierreCajaId, input.tenantId)
     if (!caja) throw new CajaNoEncontradaError(input.aperturaCierreCajaId)
     if (caja.estadoCaja !== "APERTURADA") throw new CajaYaCerradaError()
+
+    const sinVariante = input.detalles.filter((d) => !d.varianteId).map((d) => d.productoId)
+    const requierenVariante = await this.repo.productosQueRequierenVariante(input.tenantId, sinVariante)
+    if (requierenVariante.length > 0) throw new VarianteRequeridaError(requierenVariante)
 
     const totalCantidad = input.detalles.reduce((s, d) => s + d.cantidad, 0)
     const totalVenta = input.detalles.reduce((s, d) => s + d.precio * d.cantidad - (d.descuento ?? 0), 0)
@@ -81,7 +85,11 @@ export class CrearVentaUseCase {
         varianteId: d.varianteId ?? undefined,
         cantidad: d.cantidad,
       }))
-      this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen).catch(() => {})
+      try {
+        await this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen)
+      } catch {
+        // Ya logueado en el adaptador; la venta ya existe y un 500 provocaría un reintento duplicado
+      }
     }
 
     return venta

@@ -296,3 +296,12 @@ export const ActualizarGastoSchema = z.object({
   motivo: z.string().min(1).optional(),
   totalGasto: z.number().min(0).optional(),
 })
+
+// ─── Errores ──────────────────────────────────────────────────────────────────
+
+// 422 VARIANTE_REQUERIDA (spec 027): líneas sin variante de productos que la tienen
+export const VarianteRequeridaResponseSchema = z.object({
+  error: z.literal("VARIANTE_REQUERIDA"),
+  message: z.string(),
+  productoIds: z.array(z.string()),
+})

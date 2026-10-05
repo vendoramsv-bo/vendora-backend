@@ -1,4 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi"
+import pino from "pino"
 import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireRol, ROLES_CATALOGO_ESCRITURA } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
@@ -65,6 +66,8 @@ import {
 import { getCatalogoNotificador } from "../infrastructure/catalogo.notificador.provider.js"
 import { paginate } from "../../../core/query-params.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
+
+const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
 export const productoRouter = new OpenAPIHono<HonoEnv>()
 
@@ -194,7 +197,9 @@ productoRouter.openapi(
     if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
     try {
       const producto = await new CrearProductoUseCase(makeRepo(), getCatalogoNotificador()).ejecutar(parsed.data, tenantId, session.user.id)
-      getAlmacenInventarioPort()?.inicializarProducto(tenantId, producto.id).catch(() => {})
+      getAlmacenInventarioPort()
+        ?.inicializarProducto(tenantId, producto.id)
+        .catch((err) => logger.error({ err, tenantId, productoId: producto.id, varianteId: null }, "[catalogo] inicializarProducto falló"))
       return c.json(producto.toJSON(), 201)
     } catch (err) {
       if (err instanceof ProductoCodigoDuplicado) return c.json({ error: err.code, message: err.message }, 409)
@@ -518,7 +523,11 @@ productoRouter.openapi(
     if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
     try {
       const variante = await new CrearVarianteUseCase(makeRepo()).ejecutar(c.req.param("id"), parsed.data, tenantId) as { id: string }
-      getAlmacenInventarioPort()?.inicializarProducto(tenantId, c.req.param("id"), variante.id).catch(() => {})
+      getAlmacenInventarioPort()
+        ?.inicializarProducto(tenantId, c.req.param("id"), variante.id)
+        .catch((err) =>
+          logger.error({ err, tenantId, productoId: c.req.param("id"), varianteId: variante.id }, "[catalogo] inicializarProducto falló"),
+        )
       return c.json(variante, 201)
     } catch (err) {
       if (err instanceof ProductoNoEncontrado) return c.json({ error: err.code, message: err.message }, 404)

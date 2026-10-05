@@ -178,6 +178,18 @@ export class PedidoTerminalError extends Error {
   }
 }
 
+// HTTP 422
+export class VarianteRequeridaError extends Error {
+  readonly code = "VARIANTE_REQUERIDA"
+  readonly statusCode = 422
+  readonly productoIds: string[]
+  constructor(productoIds: string[]) {
+    super("Estos productos tienen variantes: la línea debe indicar cuál se vende")
+    this.name = "VarianteRequeridaError"
+    this.productoIds = productoIds
+  }
+}
+
 // HTTP 409
 export class PuntoVentaNombreDuplicadoError extends Error {
   readonly code = "PUNTO_VENTA_NOMBRE_DUPLICADO"

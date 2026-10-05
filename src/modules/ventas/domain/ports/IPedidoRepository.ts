@@ -68,6 +68,8 @@ export interface IPedidoRepository {
   actualizarEstado(id: string, tenantId: string, estado: string, respuesta?: string | null, updatedById?: string | null): Promise<PedidoData>
   convertirEnVenta(dto: ConvertirPedidoEnVentaDTO): Promise<{ pedido: PedidoData; venta: VentaData }>
   obtener(id: string, tenantId: string): Promise<PedidoData | null>
+  /** Productos de la lista con al menos una variante en estado ACTIVO. */
+  productosQueRequierenVariante(tenantId: string, productoIds: string[]): Promise<string[]>
   listar(tenantId: string, params: QueryParams, filters?: { estado?: string; userId?: string }): Promise<{ data: PedidoData[]; total: number }>
 }
 

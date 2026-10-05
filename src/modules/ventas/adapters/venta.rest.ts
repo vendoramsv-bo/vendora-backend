@@ -18,12 +18,14 @@ import {
   QueryVentasSchema,
   QueryParamsReporteSchema,
   QueryConsolidadoSchema,
+  VarianteRequeridaResponseSchema,
 } from "./ventas.schema.js"
 import {
   VentaNoEncontradaError,
   VentaYaConfirmadaError,
   CajaNoEncontradaError,
   CajaYaCerradaError,
+  VarianteRequeridaError,
 } from "../domain/ventas.errors.js"
 import { getVentasNotificador } from "../infrastructure/ventas.notificador.provider.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
@@ -160,6 +162,10 @@ ventaRouter.openapi(
     responses: {
       201: createdResponse("Venta creada", z.record(z.string(), z.unknown())),
       ...errorResponses,
+      422: okResponse(
+        "Caja cerrada (CAJA_YA_CERRADA) o línea sin variante de un producto que la tiene (VARIANTE_REQUERIDA, con productoIds)",
+        VarianteRequeridaResponseSchema,
+      ),
     },
   }),
   async (c) => {
@@ -192,6 +198,9 @@ ventaRouter.openapi(
     } catch (err) {
       if (err instanceof CajaNoEncontradaError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof CajaYaCerradaError) return c.json({ error: err.code, message: err.message }, 422)
+      if (err instanceof VarianteRequeridaError) {
+        return c.json({ error: err.code, message: err.message, productoIds: err.productoIds }, 422)
+      }
       throw err
     }
   },

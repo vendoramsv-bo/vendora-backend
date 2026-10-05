@@ -1,7 +1,7 @@
 import type { IPedidoRepository, ConvertirPedidoEnVentaDTO } from "../../domain/ports/IPedidoRepository.js"
 import type { IVentasNotificador } from "../../domain/ports/IVentasNotificador.js"
 import type { IAlmacenInventarioPort } from "../../domain/ports/IAlmacenInventarioPort.js"
-import { PedidoNoEncontradoError, PedidoTerminalError } from "../../domain/ventas.errors.js"
+import { PedidoNoEncontradoError, PedidoTerminalError, VarianteRequeridaError } from "../../domain/ventas.errors.js"
 
 const TERMINALES = ["FINALIZADO", "RECHAZADO"]
 
@@ -30,6 +30,10 @@ export class ConvertirPedidoEnVentaUseCase {
     if (!pedido) throw new PedidoNoEncontradoError(input.pedidoId)
     if (TERMINALES.includes(pedido.estado)) throw new PedidoTerminalError()
 
+    const sinVariante = (pedido.detalles ?? []).filter((d) => !d.varianteId).map((d) => d.productoId)
+    const requierenVariante = await this.repo.productosQueRequierenVariante(input.tenantId, sinVariante)
+    if (requierenVariante.length > 0) throw new VarianteRequeridaError(requierenVariante)
+
     const dto: ConvertirPedidoEnVentaDTO = {
       pedidoId: input.pedidoId,
       tenantId: input.tenantId,
@@ -57,7 +61,11 @@ export class ConvertirPedidoEnVentaUseCase {
         varianteId: d.varianteId ?? undefined,
         cantidad: d.cantidad,
       }))
-      this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen).catch(() => {})
+      try {
+        await this.almacenPort.registrarSalidaVenta(venta.id, input.tenantId, detallesAlmacen)
+      } catch {
+        // Ya logueado en el adaptador; la venta ya existe y un 500 provocaría un reintento duplicado
+      }
     }
 
     return { pedido: pedidoFinalizado, venta }

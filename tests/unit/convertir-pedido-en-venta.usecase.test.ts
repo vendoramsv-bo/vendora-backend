@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest"
 import { ConvertirPedidoEnVentaUseCase } from "../../src/modules/ventas/application/pedido/convertir-pedido-en-venta.usecase.js"
 import { FakePedidoRepository } from "../helpers/fake-pedido.repository.js"
 import { FakeVentasNotificador } from "../helpers/fake-ventas.notificador.js"
-import { PedidoTerminalError } from "../../src/modules/ventas/domain/ventas.errors.js"
+import { PedidoTerminalError, VarianteRequeridaError } from "../../src/modules/ventas/domain/ventas.errors.js"
 import type { PedidoData } from "../../src/modules/ventas/domain/ports/IPedidoRepository.js"
+import type { IAlmacenInventarioPort, SalidaVentaDetalle } from "../../src/modules/ventas/domain/ports/IAlmacenInventarioPort.js"
 
 const TENANT = "t1"
 
@@ -83,5 +84,56 @@ describe("ConvertirPedidoEnVentaUseCase", () => {
     const ev = notificador.events[0]
     expect(ev.event).toBe("pedidoActualizado")
     expect((ev.payload as { estado: string }).estado).toBe("FINALIZADO")
+  })
+})
+
+// Fake del puerto de almacén: registra las llamadas, y puede tardar o fallar
+class FakeAlmacenPort implements IAlmacenInventarioPort {
+  readonly salidas: Array<{ ventaId: string; detalles: SalidaVentaDetalle[] }> = []
+  fallar = false
+
+  async registrarSalidaVenta(ventaId: string, _tenantId: string, detalles: SalidaVentaDetalle[]): Promise<void> {
+    await new Promise((r) => setTimeout(r, 5))
+    if (this.fallar) throw new Error("fallo de inventario")
+    this.salidas.push({ ventaId, detalles })
+  }
+
+  async inicializarProducto(): Promise<void> {}
+}
+
+describe("ConvertirPedidoEnVentaUseCase — variante requerida y salida de almacén (spec 027)", () => {
+  let pedidoRepo: FakePedidoRepository
+  let almacen: FakeAlmacenPort
+  let useCase: ConvertirPedidoEnVentaUseCase
+
+  beforeEach(() => {
+    pedidoRepo = new FakePedidoRepository()
+    almacen = new FakeAlmacenPort()
+    useCase = new ConvertirPedidoEnVentaUseCase(pedidoRepo, new FakeVentasNotificador(), almacen)
+    pedidoRepo.pedidos.push({ ...basePedido, estado: "PENDIENTE", detalles: [...(basePedido.detalles ?? [])] })
+  })
+
+  it("rechaza con VarianteRequeridaError una línea sin variante de un producto con variantes y no convierte", async () => {
+    pedidoRepo.productosConVariante = ["prod-1"]
+
+    const err = await useCase.execute(convertirInput).catch((e) => e)
+    expect(err).toBeInstanceOf(VarianteRequeridaError)
+    expect((err as VarianteRequeridaError).productoIds).toEqual(["prod-1"])
+    expect(pedidoRepo.ventas).toHaveLength(0)
+    expect(pedidoRepo.pedidos[0]!.estado).toBe("PENDIENTE")
+    expect(almacen.salidas).toHaveLength(0)
+  })
+
+  it("con líneas válidas espera la salida de almacén antes de devolver", async () => {
+    const { venta } = await useCase.execute(convertirInput)
+    expect(almacen.salidas).toHaveLength(1)
+    expect(almacen.salidas[0]!.ventaId).toBe(venta.id)
+    expect(almacen.salidas[0]!.detalles).toEqual([{ productoId: "prod-1", varianteId: undefined, cantidad: 2 }])
+  })
+
+  it("si la salida de almacén falla, igual devuelve la venta (no relanza)", async () => {
+    almacen.fallar = true
+    const { venta } = await useCase.execute(convertirInput)
+    expect(venta.id).toBeTruthy()
   })
 })

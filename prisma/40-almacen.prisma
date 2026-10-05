@@ -28,6 +28,8 @@ model MovimientoInventario {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime?
 
+  /// En la base esta restricción es NULLS NOT DISTINCT (migración
+  /// 20261005000000_movimiento_inventario_nulls_not_distinct); Prisma no lo modela.
   @@unique([tenantId, productoId, varianteId, tipo, referenciaId])
   @@index([tenantId, createdAt])
   @@schema("almacen")

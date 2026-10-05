@@ -90,6 +90,8 @@ export interface IVentaRepository {
   crear(dto: CrearVentaDTO): Promise<VentaData>
   confirmar(id: string, tenantId: string, updatedById?: string | null): Promise<ConfirmarVentaResultado>
   obtener(id: string, tenantId: string): Promise<VentaData | null>
+  /** Productos de la lista con al menos una variante en estado ACTIVO. */
+  productosQueRequierenVariante(tenantId: string, productoIds: string[]): Promise<string[]>
   /**
    * `tenantMemberId` es un filtro **interno**: lo puebla el servidor desde el
    * alcance derivado de la sesión (023 contracts §A.1). Nunca llega del query

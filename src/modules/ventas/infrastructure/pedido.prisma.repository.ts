@@ -8,6 +8,7 @@ import type {
 import type { VentaData } from "../domain/ports/IVentaRepository.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
+import { productosConVarianteActiva } from "./productos-con-variante.js"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toDetalleData(raw: any): PedidoDetalleData {
@@ -190,6 +191,10 @@ export class PedidoPrismaRepository implements IPedidoRepository {
       include: { pedidosDetalle: true },
     })
     return raw ? toPedidoData(raw) : null
+  }
+
+  async productosQueRequierenVariante(tenantId: string, productoIds: string[]): Promise<string[]> {
+    return productosConVarianteActiva(this.db, tenantId, productoIds)
   }
 
   async listar(

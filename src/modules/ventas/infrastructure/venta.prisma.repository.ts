@@ -5,6 +5,7 @@ import type {
   CrearVentaDTO,
   ConfirmarVentaResultado,
 } from "../domain/ports/IVentaRepository.js"
+import { productosConVarianteActiva } from "./productos-con-variante.js"
 import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 
@@ -130,38 +131,9 @@ export class VentaPrismaRepository implements IVentaRepository {
 
       const advertencias: string[] = []
 
+      // El stock de productos y variantes se descuenta al registrar la venta
+      // (puerto de almacén, spec 027): acá no se toca ni se escribe MovimientoInventario.
       for (const detalle of ventaRaw.ventasDetalle) {
-        if (detalle.varianteId) {
-          const variante = await tx.productoVariante.findUnique({ where: { id: detalle.varianteId } })
-          if (variante?.inventarioActivado) {
-            const stockAntes = variante.cantidadStock
-            const stockDespues = stockAntes - detalle.cantidad
-
-            await tx.productoVariante.update({
-              where: { id: detalle.varianteId },
-              data: { cantidadStock: stockDespues },
-            })
-
-            await tx.movimientoInventario.create({
-              data: {
-                tenantId,
-                productoId: detalle.productoId,
-                varianteId: detalle.varianteId,
-                etiquetaVariante: detalle.etiquetaVariante ?? null,
-                tipo: "SALIDA",
-                cantidad: detalle.cantidad,
-                motivo: "Venta confirmada",
-                referenciaId: id,
-                stockAntes,
-                stockDespues,
-                createdById: updatedById ?? null,
-              },
-            })
-          } else {
-            advertencias.push(`Variante ${detalle.varianteId} sin inventario activado — stock no decrementado`)
-          }
-        }
-
         const insumos = await tx.productoInsumo.findMany({ where: { productoId: detalle.productoId } })
         for (const insumo of insumos) {
           const cantidadConsumo = detalle.cantidad * insumo.cantidad
@@ -213,6 +185,10 @@ export class VentaPrismaRepository implements IVentaRepository {
       include: includeDetalle,
     })
     return raw ? toVentaData(raw) : null
+  }
+
+  async productosQueRequierenVariante(tenantId: string, productoIds: string[]): Promise<string[]> {
+    return productosConVarianteActiva(this.db, tenantId, productoIds)
   }
 
   async listar(
