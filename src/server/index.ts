@@ -4,15 +4,15 @@ import { Server } from "socket.io"
 import { createAdapter } from "@socket.io/redis-adapter"
 import { Redis } from "ioredis"
 import { S3Client } from "@aws-sdk/client-s3"
-import { crearApp } from "./hono.js"
-import { authRouter } from "../modules/autenticacion/adapters/auth.rest.js"
-import { tenantRouter } from "../modules/tenant/adapters/tenant.rest.js"
-import { wizardRouter } from "../modules/tenant/adapters/wizard.rest.js"
-import { tenantUploadRouter } from "../modules/tenant/adapters/tenant-upload.rest.js"
 import { R2AlmacenamientoAdapter } from "../modules/tenant/infrastructure/r2.almacenamiento.adapter.js"
 import { setAlmacenamientoPort } from "../modules/tenant/infrastructure/almacenamiento.port.provider.js"
 import { auth, prisma } from "../modules/autenticacion/infrastructure/better-auth.setup.js"
 import { TenantSocketNotificador } from "../modules/tenant/infrastructure/tenant.socket.notificador.js"
+import { setTenantNotificador } from "../modules/tenant/infrastructure/tenant.notificador.provider.js"
+import { registrarActivadorVertical } from "../modules/tenant/infrastructure/activador-vertical.provider.js"
+import { TiendaActivadorVertical } from "../modules/tienda/infrastructure/tienda.activador-vertical.js"
+import { ConsultorioActivadorVertical } from "../modules/consultorio/infrastructure/consultorio.activador-vertical.js"
+import { RestauranteActivadorVertical } from "../modules/restaurante/infrastructure/restaurante.activador-vertical.js"
 import { ConsultorioSocketNotificador } from "../modules/consultorio/infrastructure/consultorio.socket.notificador.js"
 import { setConsultorioNotificador } from "../modules/consultorio/infrastructure/consultorio.notificador.provider.js"
 import { CatalogoSocketNotificador } from "../modules/catalogo/infrastructure/catalogo.socket.notificador.js"
@@ -36,38 +36,22 @@ import { RestauranteSocialSocketNotificador } from "../modules/social/infrastruc
 import { setRestauranteSocialNotificador } from "../modules/social/infrastructure/restaurante-social.notificador.provider.js"
 import { RestaurantePublicoSocketNotificador } from "../modules/restaurante/infrastructure/restaurante-publico.socket.notificador.js"
 import { setRestaurantePublicoNotificador } from "../modules/restaurante/infrastructure/restaurante-publico.notificador.provider.js"
-import { tiendaStaffRouter } from "../modules/tienda/adapters/tienda-staff.rest.js"
-import { tiendaPublicaRouter } from "../modules/tienda/adapters/tienda-publica.rest.js"
 import { ConsultorioPublicoSocketNotificador } from "../modules/consultorio/infrastructure/consultorio-publico.socket.notificador.js"
 import { setConsultorioPublicoNotificador } from "../modules/consultorio/infrastructure/consultorio-publico.notificador.provider.js"
 import { ConsultorioSocialSocketNotificador } from "../modules/social/infrastructure/consultorio-social.socket.notificador.js"
 import { setConsultorioSocialNotificador } from "../modules/social/infrastructure/consultorio-social.notificador.provider.js"
-import { consultorioPublicaRouter } from "../modules/consultorio/adapters/consultorio-publica.rest.js"
-import { consultorioConsumerCitasRouter } from "../modules/consultorio/adapters/consultorio-consumer-citas.rest.js"
-import { consultorioStaffPublicoRouter } from "../modules/consultorio/adapters/consultorio-staff-publico.rest.js"
 import "../workers/recordatorio-cita.worker.js"
 import "../workers/expirar-recetas.worker.js"
 import "../modules/restaurante/infrastructure/publicacion-rrss.bullmq.worker.js"
 import { expirarRecetasQueue } from "../core/recordatorios.queue.js"
 import pino from "pino"
+import { crearAppCompleta } from "./app.js"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
 // ─── Hono app ─────────────────────────────────────────────────────────────────
 
-const app = crearApp()
-
-// T016 — router de autenticación (Better-Auth + DELETE /api/user)
-app.route("/api", authRouter)
-
-// T029 — router de tenant (endpoints de lectura scoped)
-app.route("/api/tenant", tenantRouter)
-
-// Wizard de creación de negocio (endpoints de configuración + bulk)
-app.route("/api/tenant", wizardRouter)
-
-// Subida de archivos a Cloudflare R2 con URLs prefirmadas
-app.route("/api/tenant", tenantUploadRouter)
+const app = crearAppCompleta()
 
 // R2AlmacenamientoAdapter — firma URLs PUT prefirmadas contra el bucket "vendora"
 if (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY) {
@@ -89,15 +73,6 @@ if (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_
 } else {
   logger.warn("[r2] Variables de entorno de R2 no configuradas — /api/tenant/upload-url responderá 500")
 }
-
-// TuTienda — staff (configuración, destacados) y directorio público
-app.route("/api/tenant", tiendaStaffRouter)
-app.route("/api/public/tiendas", tiendaPublicaRouter)
-
-// TuConsultorio — perfil público, directorio y citas online
-app.route("/api/public/consultorios", consultorioPublicaRouter)
-app.route("/api/consumer/consultorios", consultorioConsumerCitasRouter)
-app.route("/api/consultorio", consultorioStaffPublicoRouter)
 
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 
@@ -150,6 +125,7 @@ pubClient.on("connect", () => {
 
 // T047 — TenantSocketNotificador (reemplaza NullTenantNotificador de US2-US4)
 export const socketNotificador = new TenantSocketNotificador(io)
+setTenantNotificador(socketNotificador)
 
 // ConsultorioSocketNotificador — emite eventos consultorio:* al room tenant:{id}
 export const consultorioNotificador = new ConsultorioSocketNotificador(io)
@@ -165,6 +141,11 @@ setAlmacenNotificador(almacenNotificador)
 
 // AlmacenInventarioPortAdapter — integración ventas → almacén (FR-019)
 setAlmacenInventarioPort(new AlmacenInventarioPortAdapter(new InventarioProductoPrismaRepository(prisma as any)))
+
+// 026 — cada vertical aporta su activación a /api/tenant/capabilities (el núcleo no las importa)
+registrarActivadorVertical("tienda", new TiendaActivadorVertical())
+registrarActivadorVertical("consultorio", new ConsultorioActivadorVertical())
+registrarActivadorVertical("restaurante", new RestauranteActivadorVertical())
 
 // VentasSocketNotificador — emite eventos ventas:* al room tenant:{id}
 export const ventasNotificador = new VentasSocketNotificador(io)

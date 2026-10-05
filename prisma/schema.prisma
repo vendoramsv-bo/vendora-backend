@@ -45,8 +45,13 @@
 // El primer modelo nuevo —`PreferenciaPresentacion`, feature 021— lo destapó:
 // `db.preferenciaPresentacion` llegaba `undefined` en runtime.
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  // `node dist/...` corre ESM puro y exige la extensión en los imports relativos.
+  // Sin esto el cliente generado importa "./internal/class" y `pnpm start` falla;
+  // `pnpm dev` no lo nota porque tsx resuelve imports sin extensión.
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {

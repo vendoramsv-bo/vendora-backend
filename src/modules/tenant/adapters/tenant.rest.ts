@@ -30,7 +30,7 @@ import {
 } from "./preferencia-presentacion.schema.js"
 import { paginate } from "../../../core/query-params.js"
 import { TenantNoEncontrado, SinTenantActivo } from "../domain/tenant.errors.js"
-import { errorResponses, okResponse } from "../../../core/openapi-responses.js"
+import { errorResponses, okResponse, paginadoSchema } from "../../../core/openapi-responses.js"
 import pino from "pino"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
@@ -126,7 +126,7 @@ tenantRouter.openapi(
     security: [{ bearerAuth: [] }],
     middleware: [requireAuth, requireTenantActivo] as const,
     responses: {
-      200: okResponse("Lista de miembros del tenant", z.object({ data: z.array(MiembroResponseSchema) })),
+      200: okResponse("Lista de miembros del tenant", paginadoSchema(MiembroResponseSchema)),
       ...errorResponses,
     },
   }),
@@ -146,7 +146,7 @@ tenantRouter.openapi(
 
     return c.json(
       paginate(
-        resultado.data.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        resultado.data.map((m) => ({ ...m, createdAt: m.createdAt.toISOString(), joinedAt: m.joinedAt.toISOString() })),
         resultado.total,
         params,
       ),
@@ -165,7 +165,7 @@ tenantRouter.openapi(
     security: [{ bearerAuth: [] }],
     middleware: [requireAuth, requireTenantActivo, requireRol(["PROPIETARIO", "owner", "ADMIN"])] as const,
     responses: {
-      200: okResponse("Lista de invitaciones del tenant", z.object({ data: z.array(InvitacionResponseSchema) })),
+      200: okResponse("Invitaciones pendientes y vigentes del tenant", paginadoSchema(InvitacionResponseSchema)),
       ...errorResponses,
     },
   }),

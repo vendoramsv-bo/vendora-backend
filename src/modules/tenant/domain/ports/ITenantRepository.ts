@@ -8,6 +8,10 @@ export interface MiembroDTO {
   estado: string
   createdAt: Date
   usuario: { name: string; email: string; image?: string | null }
+  rol: string
+  nombreCompleto: string
+  email: string
+  joinedAt: Date
 }
 
 export interface InvitacionDTO {
@@ -18,6 +22,7 @@ export interface InvitacionDTO {
   expiresAt: Date
   createdAt: Date
   invitador: { name: string; email: string }
+  rol: string
 }
 
 export interface ListResult<T> {

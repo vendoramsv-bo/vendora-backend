@@ -6,6 +6,8 @@ import { TiendaPrismaRepository } from "../infrastructure/tienda.prisma.reposito
 import { getTiendaNotificador } from "../infrastructure/tienda.notificador.provider.js"
 import { ActivarTiendaUseCase } from "../application/perfil/activar-tienda.usecase.js"
 import { DesactivarTiendaUseCase } from "../application/perfil/desactivar-tienda.usecase.js"
+import { MiembrosPrismaRepository } from "../../tenant/infrastructure/miembros.prisma.repository.js"
+import { UltimaVerticalError } from "../../tenant/domain/tenant.errors.js"
 import { ObtenerConfiguracionUseCase } from "../application/perfil/obtener-configuracion.usecase.js"
 import { ActualizarConfiguracionUseCase } from "../application/perfil/actualizar-configuracion.usecase.js"
 import { AgregarProductoDestacadoUseCase } from "../application/destacados/agregar-producto-destacado.usecase.js"
@@ -74,8 +76,13 @@ tiendaStaffRouter.openapi(
   }),
   async (c) => {
     const tenantId = c.get("tenantId")
-    const result = await new DesactivarTiendaUseCase(makeRepo()).execute(tenantId)
-    return c.json(result)
+    try {
+      const result = await new DesactivarTiendaUseCase(makeRepo(), new MiembrosPrismaRepository(db)).execute(tenantId)
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof UltimaVerticalError) return c.json({ error: err.code, message: err.message }, 422)
+      throw err
+    }
   },
 )
 

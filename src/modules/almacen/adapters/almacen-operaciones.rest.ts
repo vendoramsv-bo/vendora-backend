@@ -403,11 +403,13 @@ almacenOperacionesRouter.openapi(
 )
 
 // ─── Recuentos ───────────────────────────────────────────────────────────────
+// `/recuentos` es de productos (inventario.rest.ts), montado antes en almacen-router.
+// Con el mismo path, estos handlers nunca se ejecutaban.
 
 almacenOperacionesRouter.openapi(
   createRoute({
     method: "get",
-    path: "/recuentos",
+    path: "/recuentos-insumos",
     operationId: "almacen_listar_recuentos_almacen",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],
@@ -427,7 +429,7 @@ almacenOperacionesRouter.openapi(
 almacenOperacionesRouter.openapi(
   createRoute({
     method: "post",
-    path: "/recuentos",
+    path: "/recuentos-insumos",
     operationId: "almacen_registrar_recuento_almacen",
     tags: ["Almacén"],
     security: [{ bearerAuth: [] }],

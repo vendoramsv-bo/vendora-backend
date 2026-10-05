@@ -77,6 +77,10 @@ export class TenantPrismaRepository implements ITenantRepository {
         estado: String(m.estado),
         createdAt: m.createdAt,
         usuario: { name: m.user.name, email: m.user.email, image: m.user.image },
+        rol: m.role === "owner" ? "PROPIETARIO" : m.role,
+        nombreCompleto: m.user.name,
+        email: m.user.email,
+        joinedAt: m.createdAt,
       })),
       total,
     }
@@ -84,7 +88,8 @@ export class TenantPrismaRepository implements ITenantRepository {
 
   async listarInvitaciones(tenantId: string, params: QueryParams): Promise<ListResult<InvitacionDTO>> {
     const prismaArgs = toPrismaArgs(params, ["status", "createdAt"])
-    const whereBase = { organizationId: tenantId }
+    // 026: la pantalla muestra invitaciones pendientes; las aceptadas, canceladas o vencidas no.
+    const whereBase = { organizationId: tenantId, status: "pending", expiresAt: { gt: new Date() } }
 
     const [invitaciones, total] = await Promise.all([
       this.client.invitacion.findMany({
@@ -107,6 +112,7 @@ export class TenantPrismaRepository implements ITenantRepository {
         expiresAt: i.expiresAt,
         createdAt: i.createdAt,
         invitador: { name: i.inviter.name, email: i.inviter.email },
+        rol: i.role === "owner" ? "PROPIETARIO" : (i.role ?? ""),
       })),
       total,
     }

@@ -191,7 +191,8 @@ model Propietario {
   nombreReferencia   String
   telefonoReferencia String
   imagenUrl          String?
-  userId             String    @unique
+  // Un usuario puede ser propietario de varios negocios (026); uno por negocio vía tenantId @unique
+  userId             String
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   estado             Estado    @default(ACTIVO)
   createdAt          DateTime  @default(now())
@@ -202,6 +203,7 @@ model Propietario {
 
   @@unique([tenantId, telefono])
   @@unique([tenantId, nombres])
+  @@index([userId])
   @@schema("tenant")
 }
 
@@ -246,9 +248,9 @@ model EquipoDeTrabajo {
   tenantId    String
   tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombres     String
-  telefono    String
+  telefono    String?
   cargo       String
-  domicilio   String
+  domicilio   String?
   descripcion String?
   imagenUrl   String?
   orden       Int       @default(0)

@@ -73,6 +73,11 @@ export const MiembroResponseSchema = z.object({
     email: z.string(),
     image: z.string().nullable().optional(),
   }),
+  // 026 — campos que lee la pantalla de Configuración; se agregan sin quitar los de arriba
+  rol: z.string(),
+  nombreCompleto: z.string(),
+  email: z.string(),
+  joinedAt: z.string(),
 })
 
 export const ListaMiembrosResponseSchema = z.object({
@@ -95,6 +100,7 @@ export const InvitacionResponseSchema = z.object({
     name: z.string(),
     email: z.string(),
   }),
+  rol: z.string(), // 026
 })
 
 export const ListaInvitacionesResponseSchema = z.object({

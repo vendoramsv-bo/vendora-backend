@@ -51,7 +51,7 @@ model User {
   mensajesRecibidos                Mensaje[]                       @relation("recipientUser")
   pedidos                          Pedido[]
   // Un User puede ser propietario de al menos un Tenant
-  propietario                      Propietario?
+  propietarios                      Propietario[]
 
   // ---- Social productos ----
   reaccionesProducto               ProductoReaccion[]
