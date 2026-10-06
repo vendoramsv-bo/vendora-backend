@@ -6,6 +6,8 @@ import { normalizarFiltro, type CampoFiltroMovimiento, type OperadorFiltro } fro
 // manda el cliente llega al texto del SQL.
 const COLUMNAS: Record<CampoFiltroMovimiento, Prisma.Sql> = {
   origen: Prisma.raw("u.origen"),
+  // NULL en la rama de insumos: filtrar por producto deja solo movimientos de productos.
+  productoId: Prisma.raw('u."productoId"'),
   tipo: Prisma.raw("u.tipo"),
   motivo: Prisma.raw("u.motivo"),
   cantidad: Prisma.raw("u.cantidad"),

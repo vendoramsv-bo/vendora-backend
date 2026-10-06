@@ -1,6 +1,6 @@
 import { FiltroInvalidoError } from "./almacen.errors.js"
 
-export type CampoFiltroMovimiento = "tipo" | "cantidad" | "motivo" | "createdAt" | "origen"
+export type CampoFiltroMovimiento = "tipo" | "cantidad" | "motivo" | "createdAt" | "origen" | "productoId"
 
 // `filterValue` llega siempre como string; Prisma y Postgres necesitan el tipo
 // de la columna, o el filtro termina en un 500 en lugar de un 400.
@@ -26,6 +26,9 @@ const OPERADORES_PERMITIDOS: Record<CampoFiltroMovimiento, OperadorFiltro[]> = {
   motivo: ["equals", "contains", "startsWith", "endsWith"],
   tipo: ["equals"],
   origen: ["equals"],
+  // Los movimientos de un producto, con o sin variantes: es lo que pide "Ver movimientos"
+  // desde Inventario. Un id solo se compara por igualdad.
+  productoId: ["equals"],
   cantidad: ["equals", "gt", "gte", "lt", "lte"],
   createdAt: ["equals", "gt", "gte", "lt", "lte"],
 }

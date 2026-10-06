@@ -54,6 +54,20 @@ describe("construirConsultaMovimientosTenant", () => {
     expect(values).toContain("INSUMO")
   })
 
+  it("filtro por producto: todos los movimientos de un producto, con o sin variante", () => {
+    const { sql, values, conteoSql } = construir({ filterField: "productoId", filterOp: "equals", filterValue: "prod-1" })
+    expect(sql).toMatch(/WHERE u\."productoId" = \$\d+/)
+    expect(conteoSql).toMatch(/WHERE u\."productoId" = \$\d+/)
+    expect(values).toContain("prod-1")
+    expect(sql).not.toContain("prod-1")
+  })
+
+  it("filtro por producto solo admite igualdad", () => {
+    expect(() => construir({ filterField: "productoId", filterOp: "contains", filterValue: "prod" })).toThrow(
+      FiltroInvalidoError,
+    )
+  })
+
   it("filtros numéricos y de fecha van tipados", () => {
     expect(construir({ filterField: "cantidad", filterOp: "gte", filterValue: "3" }).values).toContain(3)
     const { sql, values } = construir({ filterField: "createdAt", filterOp: "lt", filterValue: "2026-09-30" })

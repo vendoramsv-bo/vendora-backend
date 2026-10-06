@@ -15,7 +15,7 @@ export const QueryParamsMovimientosSchema = makeQueryParamsSchema([...CAMPOS_MOV
 })
 
 export const QueryParamsMovimientosTenantSchema = makeQueryParamsSchema(["tipo", "cantidad", "createdAt"]).extend({
-  filterField: z.enum(["origen", "tipo", "motivo", "cantidad", "createdAt"]).optional(),
+  filterField: z.enum(["origen", "tipo", "motivo", "cantidad", "createdAt", "productoId"]).optional(),
 })
 
 export const MovimientoTenantSchema = z.object({
