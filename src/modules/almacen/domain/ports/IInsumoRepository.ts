@@ -17,6 +17,7 @@ export interface CrearInsumoDTO {
   tenantId: string
   nombre: string
   unidadMedidaId: string
+  stockInicial?: number
   stockMinimo?: number
   costoUnitario?: number
   fechaVencimiento?: Date

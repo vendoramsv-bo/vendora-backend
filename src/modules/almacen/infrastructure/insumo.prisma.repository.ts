@@ -40,13 +40,16 @@ export class InsumosPrismaRepository implements IInsumoRepository {
   }
 
   async create(dto: CrearInsumoDTO): Promise<InsumoData> {
+    // El stock inicial y su movimiento CREACION van en la misma transacción: el historial
+    // explica desde el primer día de dónde salió el stock.
+    const stockInicial = dto.stockInicial ?? 0
     const raw = await this.db.$transaction(async (tx: any) => {
       const insumo = await tx.insumo.create({
         data: {
           tenantId: dto.tenantId,
           nombre: dto.nombre,
           unidadMedidaId: dto.unidadMedidaId,
-          cantidadStock: 0,
+          cantidadStock: stockInicial,
           stockMinimo: dto.stockMinimo ?? 0,
           costoUnitario: dto.costoUnitario ?? 0,
           fechaVencimiento: dto.fechaVencimiento ?? null,
@@ -59,10 +62,10 @@ export class InsumosPrismaRepository implements IInsumoRepository {
           tenantId: dto.tenantId,
           insumoId: insumo.id,
           tipo: "CREACION",
-          cantidad: 0,
+          cantidad: stockInicial,
           motivo: "Creación de insumo",
           stockAntes: 0,
-          stockDespues: 0,
+          stockDespues: stockInicial,
           createdById: dto.createdById ?? null,
         },
       })
@@ -156,6 +159,13 @@ export class InsumosPrismaRepository implements IInsumoRepository {
       this.db.movimientoAlmacen.findMany({ where, take, skip, orderBy }),
       this.db.movimientoAlmacen.count({ where }),
     ])
-    return { data, total }
+    // Decimal se serializa como texto: se entregan números, como en el listado del tenant.
+    const filas = data.map((m: any) => ({
+      ...m,
+      cantidad: Number(m.cantidad),
+      stockAntes: Number(m.stockAntes),
+      stockDespues: Number(m.stockDespues),
+    }))
+    return { data: filas, total }
   }
 }

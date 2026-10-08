@@ -146,8 +146,9 @@ model MovimientoAlmacen {
   cantidad     Decimal               @db.Decimal(10, 4)
   motivo       String?
   referenciaId String?
-  stockAntes   Int                   @default(0)
-  stockDespues Int                   @default(0)
+  // Decimal como Insumo.cantidadStock: un insumo se mide en fracciones (2,5 kg).
+  stockAntes   Decimal               @default(0) @db.Decimal(10, 4)
+  stockDespues Decimal               @default(0) @db.Decimal(10, 4)
   createdById  String?
   createdAt    DateTime              @default(now())
   updatedAt    DateTime?

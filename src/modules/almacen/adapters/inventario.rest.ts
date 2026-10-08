@@ -16,6 +16,8 @@ import { CrearRecuentoUseCase } from "../application/inventario/crear-recuento.u
 import { ObtenerRecuentoUseCase } from "../application/inventario/obtener-recuento.usecase.js"
 import { ActualizarRecuentoUseCase } from "../application/inventario/actualizar-recuento.usecase.js"
 import { AprobarRecuentoUseCase } from "../application/inventario/aprobar-recuento.usecase.js"
+import { EliminarAjusteUseCase } from "../application/inventario/eliminar-ajuste.usecase.js"
+import { EliminarRecuentoUseCase } from "../application/inventario/eliminar-recuento.usecase.js"
 import {
   CrearAjusteSchema,
   ActualizarAjusteSchema,
@@ -35,6 +37,7 @@ import {
   DocumentoYaAprobadoError,
   DocumentoNoEncontradoError,
   FiltroInvalidoError,
+  FechaFuturaError,
 } from "../domain/almacen.errors.js"
 import { getAlmacenNotificador } from "../infrastructure/almacen.notificador.provider.js"
 import { errorResponses, okResponse, createdResponse, paginadoSchema } from "../../../core/openapi-responses.js"
@@ -177,12 +180,14 @@ inventarioRouter.openapi(
       const result = await new CrearAjusteUseCase(makeRepo()).execute({
         tenantId,
         motivo: parsed.data.motivo,
+        fecha: parsed.data.fecha ? new Date(parsed.data.fecha) : undefined,
         detalles: parsed.data.detalles,
         createdById: session.user.id,
       })
       return c.json(result, 201)
     } catch (err) {
       if (err instanceof DetalleVacioError) return c.json({ error: err.code, message: err.message }, 400)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       if (err instanceof VarianteNoEncontradaError) return c.json({ error: err.code, message: err.message }, 404)
       throw err
     }
@@ -210,6 +215,34 @@ inventarioRouter.openapi(
       return c.json(result)
     } catch (err) {
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
+
+// DELETE /ajustes/:ajusteId — solo pendientes (spec 032, B-01)
+inventarioRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/ajustes/{ajusteId}",
+    operationId: "almacen_eliminar_ajuste_inventario",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: { params: z.object({ ajusteId: z.string() }) },
+    responses: {
+      204: { description: "Ajuste de inventario eliminado" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      await new EliminarAjusteUseCase(makeRepo()).execute(c.req.param("ajusteId"), tenantId)
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
       throw err
     }
   },
@@ -243,12 +276,17 @@ inventarioRouter.openapi(
       const result = await new ActualizarAjusteUseCase(makeRepo()).execute(
         c.req.param("ajusteId"),
         tenantId,
-        { ...parsed.data, updatedById: session.user.id }
+        {
+          ...parsed.data,
+          fecha: parsed.data.fecha ? new Date(parsed.data.fecha) : undefined,
+          updatedById: session.user.id,
+        }
       )
       return c.json(result)
     } catch (err) {
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },
@@ -345,12 +383,14 @@ inventarioRouter.openapi(
       const result = await new CrearRecuentoUseCase(makeRepo()).execute({
         tenantId,
         observacion: parsed.data.observacion,
+        fecha: parsed.data.fecha ? new Date(parsed.data.fecha) : undefined,
         detalles: parsed.data.detalles,
         createdById: session.user.id,
       })
       return c.json(result, 201)
     } catch (err) {
       if (err instanceof DetalleVacioError) return c.json({ error: err.code, message: err.message }, 400)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       if (err instanceof VarianteNoEncontradaError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof VarianteNoInicializadaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
@@ -384,6 +424,34 @@ inventarioRouter.openapi(
   },
 )
 
+// DELETE /recuentos/:recuentoId — solo pendientes (spec 032, B-01)
+inventarioRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/recuentos/{recuentoId}",
+    operationId: "almacen_eliminar_recuento_inventario",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: { params: z.object({ recuentoId: z.string() }) },
+    responses: {
+      204: { description: "Recuento de inventario eliminado" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      await new EliminarRecuentoUseCase(makeRepo()).execute(c.req.param("recuentoId"), tenantId)
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
+
 // PATCH /recuentos/:recuentoId
 inventarioRouter.openapi(
   createRoute({
@@ -412,12 +480,17 @@ inventarioRouter.openapi(
       const result = await new ActualizarRecuentoUseCase(makeRepo()).execute(
         c.req.param("recuentoId"),
         tenantId,
-        { ...parsed.data, updatedById: session.user.id }
+        {
+          ...parsed.data,
+          fecha: parsed.data.fecha ? new Date(parsed.data.fecha) : undefined,
+          updatedById: session.user.id,
+        }
       )
       return c.json(result)
     } catch (err) {
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },

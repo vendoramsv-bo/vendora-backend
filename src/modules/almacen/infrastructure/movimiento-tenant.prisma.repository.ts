@@ -16,8 +16,9 @@ interface FilaMovimiento {
   etiquetaVariante: string | null
   tipo: TipoMovimientoTenant
   cantidad: Prisma.Decimal | number | string
-  stockAntes: number
-  stockDespues: number
+  // En el UNION la columna es `numeric` (la de insumos es Decimal): llega como Decimal.
+  stockAntes: Prisma.Decimal | number | string
+  stockDespues: Prisma.Decimal | number | string
   motivo: string | null
   referenciaId: string | null
   createdAt: Date
@@ -44,6 +45,8 @@ function aMovimiento(f: FilaMovimiento): MovimientoTenant {
   return {
     ...f,
     cantidad: Number(f.cantidad),
+    stockAntes: Number(f.stockAntes),
+    stockDespues: Number(f.stockDespues),
     createdAt: f.createdAt.toISOString(),
   }
 }

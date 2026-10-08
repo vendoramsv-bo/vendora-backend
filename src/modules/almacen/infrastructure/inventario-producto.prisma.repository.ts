@@ -87,6 +87,8 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
       data: {
         tenantId: dto.tenantId,
         motivo: dto.motivo ?? null,
+        // Sin fecha, la base pone ahora (default).
+        ...(dto.fecha ? { fecha: dto.fecha } : {}),
         estado: "PENDIENTE",
         version: 0,
         tenantMemberId: dto.tenantMemberId ?? null,
@@ -123,6 +125,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = { updatedById: dto.updatedById ?? null }
     if (dto.motivo !== undefined) updateData.motivo = dto.motivo
+    if (dto.fecha !== undefined) updateData.fecha = dto.fecha
     if (dto.detalles !== undefined) {
       updateData.detalles = {
         deleteMany: {},
@@ -253,6 +256,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
       data: {
         tenantId: dto.tenantId,
         observacion: dto.observacion ?? null,
+        ...(dto.fecha ? { fecha: dto.fecha } : {}),
         estado: "PENDIENTE",
         version: 0,
         tenantMemberId: dto.tenantMemberId ?? null,
@@ -292,6 +296,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = { updatedById: dto.updatedById ?? null }
     if (dto.observacion !== undefined) updateData.observacion = dto.observacion
+    if (dto.fecha !== undefined) updateData.fecha = dto.fecha
     if (dto.detalles !== undefined) {
       // Recapturar stockSistema para los detalles modificados
       const stocksActuales = await Promise.all(
@@ -608,6 +613,23 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
 
   // ─── Listados ────────────────────────────────────────────────────────────────
 
+  // ─── Eliminar pendientes (spec 032, B-01) ────────────────────────────────────
+
+  async eliminarAjuste(id: string, tenantId: string): Promise<void> {
+    const existing = await this.db.ajusteInventario.findFirst({ where: { id, tenantId } })
+    if (!existing) throw new DocumentoNoEncontradoError("AJUSTE", id)
+    if (existing.estado === "APROBADO") throw new DocumentoYaAprobadoError("ajuste")
+    // Las líneas se borran en cascada (AjusteDetalle.ajuste onDelete: Cascade).
+    await this.db.ajusteInventario.delete({ where: { id } })
+  }
+
+  async eliminarRecuento(id: string, tenantId: string): Promise<void> {
+    const existing = await this.db.recuentoInventario.findFirst({ where: { id, tenantId } })
+    if (!existing) throw new DocumentoNoEncontradoError("RECUENTO", id)
+    if (existing.estado === "APROBADO") throw new DocumentoYaAprobadoError("recuento")
+    await this.db.recuentoInventario.delete({ where: { id } })
+  }
+
   async listarAjustes(tenantId: string, params: QueryParams) {
     const { take, skip, orderBy, where: whereSearch } = toPrismaArgs(params, ["motivo"])
     const where = { tenantId, ...whereSearch }
@@ -660,6 +682,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
       estado: raw.estado,
       motivo: raw.motivo,
       version: raw.version,
+      fecha: raw.fecha,
       detalles: raw.detalles.map((d: any) => ({
         productoId: d.productoId,
         varianteId: d.varianteId,
@@ -678,6 +701,7 @@ export class InventarioProductoPrismaRepository implements IInventarioProductoRe
       estado: raw.estado,
       observacion: raw.observacion,
       version: raw.version,
+      fecha: raw.fecha,
       detalles: raw.detalles.map((d: any) => ({
         productoId: d.productoId,
         varianteId: d.varianteId,

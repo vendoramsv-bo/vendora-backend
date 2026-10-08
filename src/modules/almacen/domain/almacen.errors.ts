@@ -181,3 +181,28 @@ export class FiltroInvalidoError extends Error {
     this.name = "FiltroInvalidoError"
   }
 }
+
+// HTTP 422 — la fecha de un documento no puede ser posterior al momento actual
+export class FechaFuturaError extends Error {
+  readonly code = "FECHA_FUTURA"
+  readonly statusCode = 422
+  constructor() {
+    super("La fecha del documento no puede ser posterior a hoy")
+    this.name = "FechaFuturaError"
+  }
+}
+
+/** Rechaza una fecha de documento posterior a ahora (spec 032, FR-029). */
+export function validarFechaDocumento(fecha: Date | undefined): void {
+  if (fecha && fecha.getTime() > Date.now()) throw new FechaFuturaError()
+}
+
+/** El producto no existe en el tenant (resumen de movimientos, spec 032 B-03). */
+export class ProductoNoEncontradoError extends Error {
+  readonly code = "PRODUCTO_NO_ENCONTRADO"
+  readonly statusCode = 404
+  constructor(id?: string) {
+    super(id ? `Producto ${id} no encontrado` : "Producto no encontrado")
+    this.name = "ProductoNoEncontradoError"
+  }
+}

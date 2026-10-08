@@ -92,6 +92,7 @@ insumoRouter.openapi(
         tenantId,
         nombre: parsed.data.nombre,
         unidadMedidaId: parsed.data.unidadMedidaId,
+        stockInicial: parsed.data.stockInicial,
         stockMinimo: parsed.data.stockMinimo,
         costoUnitario: parsed.data.costoUnitario,
         fechaVencimiento: parsed.data.fechaVencimiento ? new Date(parsed.data.fechaVencimiento) : undefined,

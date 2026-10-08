@@ -101,11 +101,15 @@ export const AjusteInventarioSchema = z.object({
 
 export const CrearAjusteSchema = z.object({
   motivo: z.string().min(1).optional(),
+  // La fecha que declara la persona; ausente = ahora. No puede ser futura (spec 032).
+  fecha: z.string().datetime().optional(),
   detalles: z.array(AjusteDetalleSchema).min(1),
 })
 
 export const ActualizarAjusteSchema = z.object({
-  motivo: z.string().min(1).optional(),
+  // null vacía el motivo (spec 032, B-04).
+  motivo: z.string().min(1).nullable().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(AjusteDetalleSchema).optional(),
 })
 
@@ -126,11 +130,14 @@ export const RecuentoInventarioSchema = z.object({
 
 export const CrearRecuentoSchema = z.object({
   observacion: z.string().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(RecuentoDetalleSchema).min(1),
 })
 
 export const ActualizarRecuentoSchema = z.object({
-  observacion: z.string().optional(),
+  // null vacía la observación (spec 032, B-04).
+  observacion: z.string().nullable().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(RecuentoDetalleSchema).optional(),
 })
 
@@ -139,6 +146,8 @@ export const ActualizarRecuentoSchema = z.object({
 export const CrearInsumoSchema = z.object({
   nombre: z.string().min(1),
   unidadMedidaId: z.string().min(1),
+  // El stock con que arranca el insumo; queda registrado en el movimiento CREACION.
+  stockInicial: z.number().min(0).default(0),
   stockMinimo: z.number().min(0).default(0),
   costoUnitario: z.number().min(0).default(0),
   fechaVencimiento: z.string().datetime().optional(),

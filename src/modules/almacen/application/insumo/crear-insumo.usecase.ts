@@ -5,6 +5,7 @@ export interface CrearInsumoInput {
   tenantId: string
   nombre: string
   unidadMedidaId: string
+  stockInicial?: number
   stockMinimo?: number
   costoUnitario?: number
   fechaVencimiento?: Date
@@ -22,6 +23,7 @@ export class CrearInsumoUseCase {
       tenantId: input.tenantId,
       nombre: input.nombre,
       unidadMedidaId: input.unidadMedidaId,
+      stockInicial: input.stockInicial,
       stockMinimo: input.stockMinimo,
       costoUnitario: input.costoUnitario,
       fechaVencimiento: input.fechaVencimiento,

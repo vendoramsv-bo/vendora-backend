@@ -80,7 +80,7 @@ describe("US1 — GET /api/almacen/movimientos", () => {
   it("acota filterField y orderBy", () => {
     const params = queryParams(get(path))
     expect(params.find((p) => p.name === "filterField")?.schema?.enum?.sort()).toEqual(
-      ["cantidad", "createdAt", "motivo", "origen", "tipo"],
+      ["cantidad", "createdAt", "motivo", "origen", "productoId", "tipo"],
     )
     expect(params.find((p) => p.name === "orderBy")?.schema?.enum?.sort()).toEqual(["cantidad", "createdAt", "tipo"])
   })

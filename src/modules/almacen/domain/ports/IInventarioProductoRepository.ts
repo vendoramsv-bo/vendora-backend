@@ -23,13 +23,15 @@ export interface AjusteDetalleInput {
 export interface CrearAjusteDTO {
   tenantId: string
   motivo?: string
+  fecha?: Date
   detalles: AjusteDetalleInput[]
   tenantMemberId?: string
   createdById?: string
 }
 
 export interface ActualizarAjusteDTO {
-  motivo?: string
+  motivo?: string | null
+  fecha?: Date
   detalles?: AjusteDetalleInput[]
   updatedById?: string
 }
@@ -55,6 +57,7 @@ export interface AjusteDoc {
   estado: string
   motivo?: string | null
   version: number
+  fecha: Date
   detalles: AjusteDetalle[]
 }
 
@@ -84,13 +87,15 @@ export interface RecuentoDetalleInput {
 export interface CrearRecuentoDTO {
   tenantId: string
   observacion?: string
+  fecha?: Date
   detalles: RecuentoDetalleInput[]
   tenantMemberId?: string
   createdById?: string
 }
 
 export interface ActualizarRecuentoDTO {
-  observacion?: string
+  observacion?: string | null
+  fecha?: Date
   detalles?: RecuentoDetalleInput[]
   updatedById?: string
 }
@@ -116,6 +121,7 @@ export interface RecuentoDoc {
   estado: string
   observacion?: string | null
   version: number
+  fecha: Date
   detalles: RecuentoDetalle[]
 }
 
@@ -158,12 +164,15 @@ export interface IInventarioProductoRepository {
   obtenerAjuste(id: string, tenantId: string): Promise<AjusteDoc | null>
   actualizarAjuste(id: string, tenantId: string, dto: ActualizarAjusteDTO): Promise<AjusteDoc>
   aprobarAjuste(dto: AprobarAjusteDTO): Promise<AprobarAjusteResultado>
+  /** Solo pendientes; lanza DocumentoYaAprobadoError o DocumentoNoEncontradoError. */
+  eliminarAjuste(id: string, tenantId: string): Promise<void>
 
   // Recuentos
   crearRecuento(dto: CrearRecuentoDTO): Promise<RecuentoDoc>
   obtenerRecuento(id: string, tenantId: string): Promise<RecuentoDoc | null>
   actualizarRecuento(id: string, tenantId: string, dto: ActualizarRecuentoDTO): Promise<RecuentoDoc>
   aprobarRecuento(dto: AprobarRecuentoDTO): Promise<AprobarRecuentoResultado>
+  eliminarRecuento(id: string, tenantId: string): Promise<void>
 
   // Inicialización
   inicializarStockBulk(tenantId: string, createdById?: string): Promise<InicializarBulkResultado>
