@@ -12,6 +12,7 @@ import { CambiarEstadoInsumoUseCase } from "../application/insumo/cambiar-estado
 import { EliminarInsumoUseCase } from "../application/insumo/eliminar-insumo.usecase.js"
 import { RegistrarAjusteInsumoUseCase } from "../application/insumo/registrar-ajuste-insumo.usecase.js"
 import { ListarMovimientosInsumoUseCase } from "../application/insumo/listar-movimientos-insumo.usecase.js"
+import { ResumenMovimientosInsumoUseCase } from "../application/insumo/resumen-movimientos-insumo.usecase.js"
 import {
   CrearInsumoSchema,
   ActualizarInsumoSchema,
@@ -20,11 +21,13 @@ import {
   QueryParamsInsumoSchema,
   QueryParamsMovimientosSchema,
   MovimientoInsumoSchema,
+  ResumenMovimientosInsumoSchema,
 } from "./almacen.schema.js"
 import {
   InsumoNoEncontradoError,
   InsumoNombreDuplicadoError,
   InsumoEnUsoEnRecetaError,
+  InsumoEnUsoError,
   MotivoRequeridoError,
   FiltroInvalidoError,
 } from "../domain/almacen.errors.js"
@@ -211,6 +214,7 @@ insumoRouter.openapi(
       if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof InsumoEnUsoEnRecetaError)
         return c.json({ error: err.code, message: err.message, productoIds: err.productoIds }, 422)
+      if (err instanceof InsumoEnUsoError) return c.json({ error: err.code, message: err.message }, 409)
       throw err
     }
   },
@@ -240,6 +244,32 @@ insumoRouter.openapi(
       if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof InsumoEnUsoEnRecetaError)
         return c.json({ error: err.code, message: err.message, productoIds: err.productoIds }, 422)
+      if (err instanceof InsumoEnUsoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
+
+// GET /insumos/:id/movimientos/resumen — antes de cualquier ruta que pudiera capturarla
+insumoRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/{id}/movimientos/resumen",
+    operationId: "almacen_resumen_movimientos_insumo",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: okResponse("Entradas, salidas y stock actual del insumo", ResumenMovimientosInsumoSchema),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    try {
+      const result = await new ResumenMovimientosInsumoUseCase(makeRepo()).execute(c.req.param("id"), c.get("tenantId"))
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       throw err
     }
   },

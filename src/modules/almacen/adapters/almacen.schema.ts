@@ -43,11 +43,13 @@ export const MovimientoInsumoSchema = z.object({
   tenantId: z.string(),
   insumoId: z.string(),
   tipo: z.enum(["CREACION", "INGRESO", "SALIDA", "AJUSTE", "RECUENTO"]),
-  cantidad: z.string(), // Decimal(10,4) serializado por c.json
+  // Decimal(10,4): el repositorio lo entrega como número. El signo no es uniforme entre
+  // tipos (SALIDA va positiva); stockDespues − stockAntes sí lo es.
+  cantidad: z.number(),
   motivo: z.string().nullable(),
   referenciaId: z.string().nullable(),
-  stockAntes: z.number().int(),
-  stockDespues: z.number().int(),
+  stockAntes: z.number(),
+  stockDespues: z.number(),
   createdById: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string().nullable(),
@@ -184,6 +186,8 @@ export const IngresoDetalleSchema = z.object({
 export const CrearIngresoSchema = z.object({
   proveedorId: z.string().min(1),
   descripcion: z.string().optional(),
+  // La fecha que declara la persona; ausente = ahora. No puede ser futura (spec 033).
+  fecha: z.string().datetime().optional(),
   detalles: z.array(IngresoDetalleSchema).min(1),
 })
 
@@ -195,19 +199,24 @@ export const SalidaDetalleSchema = z.object({
 export const CrearSalidaSchema = z.object({
   motivo: z.string().min(1).optional(),
   descripcion: z.string().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(SalidaDetalleSchema).min(1),
   forzar: z.boolean().default(false),
 })
 
 export const ActualizarIngresoSchema = z.object({
   proveedorId: z.string().min(1).optional(),
-  descripcion: z.string().optional(),
+  // null vacía la descripción (spec 033, B-03).
+  descripcion: z.string().nullable().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(IngresoDetalleSchema).optional(),
 })
 
 export const ActualizarSalidaSchema = z.object({
-  motivo: z.string().min(1).optional(),
-  descripcion: z.string().optional(),
+  // null vacía el campo (spec 033, B-03).
+  motivo: z.string().min(1).nullable().optional(),
+  descripcion: z.string().nullable().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(SalidaDetalleSchema).optional(),
 })
 
@@ -218,7 +227,16 @@ export const RecuentoAlmacenDetalleSchema = z.object({
 
 export const RecuentoAlmacenSchema = z.object({
   observacion: z.string().optional(),
+  fecha: z.string().datetime().optional(),
   detalles: z.array(RecuentoAlmacenDetalleSchema).min(1),
+})
+
+// Editar un recuento de almacén pendiente (spec 033, B-05). `detalles` reemplaza todas
+// las líneas; `observacion: null` la vacía.
+export const ActualizarRecuentoAlmacenSchema = z.object({
+  observacion: z.string().nullable().optional(),
+  fecha: z.string().datetime().optional(),
+  detalles: z.array(RecuentoAlmacenDetalleSchema).optional(),
 })
 
 // ─── Recetas ─────────────────────────────────────────────────────────────────
@@ -240,4 +258,12 @@ export const ConsumirProductoSchema = z.object({
   cantidad: z.number().int().positive(),
   motivo: z.string().optional(),
   forzar: z.boolean().default(false),
+})
+
+// GET /insumos/{id}/movimientos/resumen (spec 033, B-04)
+export const ResumenMovimientosInsumoSchema = z.object({
+  entradas: z.number(),
+  salidas: z.number(),
+  stockActual: z.number(),
+  unidad: z.string(),
 })

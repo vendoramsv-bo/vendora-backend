@@ -9,6 +9,8 @@ export interface CrearSalidaDTO {
   tenantId: string
   motivo?: string
   descripcion?: string
+  /** Ausente = la base pone ahora. */
+  fecha?: Date
   detalles: SalidaDetalleDTO[]
   tenantMemberId?: string
   createdById?: string
@@ -16,8 +18,10 @@ export interface CrearSalidaDTO {
 }
 
 export interface ActualizarSalidaDTO {
-  motivo?: string
-  descripcion?: string
+  /** `null` vacía el campo. */
+  motivo?: string | null
+  descripcion?: string | null
+  fecha?: Date
   detalles?: SalidaDetalleDTO[]
   updatedById?: string
 }
@@ -48,12 +52,16 @@ export interface SalidaResultado {
 export interface SalidaDoc {
   id: string
   tenantId: string
+  fecha: Date
   motivo?: string | null
   descripcion?: string | null
   estado: string
   version: number
   detalles: Array<{
     insumoId: string
+    insumoNombre: string
+    unidad: string
+    stockActual: number
     cantidad: number
   }>
 }
@@ -63,6 +71,8 @@ export interface ISalidaAlmacenRepository {
   obtenerSalida(id: string, tenantId: string): Promise<SalidaDoc | null>
   actualizarSalida(id: string, tenantId: string, dto: ActualizarSalidaDTO): Promise<SalidaDoc>
   aprobarSalida(dto: AprobarSalidaDTO): Promise<SalidaResultado>
+  /** Solo un pendiente (spec 033, B-02); las líneas se borran en cascada. */
+  eliminarSalida(id: string, tenantId: string): Promise<void>
   findById(id: string, tenantId: string): Promise<unknown | null>
   listar(tenantId: string, params: QueryParams): Promise<{ data: unknown[]; total: number }>
 }

@@ -14,6 +14,41 @@ import {
   DocumentoYaAprobadoError,
 } from "../domain/almacen.errors.js"
 
+/**
+ * Lo que el detalle necesita: el proveedor y, por línea, el nombre, la unidad y el stock
+ * del insumo, para que el formulario muestre cada línea sin otra consulta (spec 033).
+ */
+const INCLUDE_DOC = {
+  proveedor: { select: { id: true, nombre: true } },
+  detalles: { include: { insumo: { include: { unidadMedida: true } } } },
+} as const
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapIngresoDoc(raw: any): IngresoDoc {
+  return {
+    id: raw.id,
+    tenantId: raw.tenantId,
+    proveedorId: raw.proveedorId,
+    proveedor: raw.proveedor ? { id: raw.proveedor.id, nombre: raw.proveedor.nombre } : null,
+    fecha: raw.fecha,
+    descripcion: raw.descripcion,
+    estado: raw.estado,
+    version: raw.version,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    detalles: (raw.detalles ?? []).map((d: any) => ({
+      insumoId: d.insumoId,
+      insumoNombre: d.insumo?.nombre ?? "",
+      unidad: d.insumo?.unidadMedida?.sigla ?? "",
+      stockActual: Number(d.insumo?.cantidadStock ?? 0),
+      cantidad: Number(d.cantidad),
+      costoUnitario: Number(d.costoUnitario),
+      lote: d.lote,
+      fechaVencimiento: d.fechaVencimiento,
+      observaciones: d.observaciones,
+    })),
+  }
+}
+
 export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(private readonly db: any) {}
@@ -24,6 +59,8 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
         tenantId: dto.tenantId,
         proveedorId: dto.proveedorId,
         descripcion: dto.descripcion ?? null,
+        // Sin fecha declarada, la base pone ahora (`@default(now())`).
+        ...(dto.fecha ? { fecha: dto.fecha } : {}),
         tenantMemberId: dto.tenantMemberId ?? null,
         createdById: dto.createdById ?? null,
         totalCantidad: dto.detalles.reduce((s, d) => s + d.cantidad, 0),
@@ -55,25 +92,9 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
   async obtenerIngreso(id: string, tenantId: string): Promise<IngresoDoc | null> {
     const raw = await this.db.ingresoAlmacen.findFirst({
       where: { id, tenantId },
-      include: { detalles: true },
+      include: INCLUDE_DOC,
     })
-    if (!raw) return null
-    return {
-      id: raw.id,
-      tenantId: raw.tenantId,
-      proveedorId: raw.proveedorId,
-      descripcion: raw.descripcion,
-      estado: raw.estado,
-      version: raw.version,
-      detalles: raw.detalles.map((d: any) => ({
-        insumoId: d.insumoId,
-        cantidad: Number(d.cantidad),
-        costoUnitario: Number(d.costoUnitario),
-        lote: d.lote,
-        fechaVencimiento: d.fechaVencimiento,
-        observaciones: d.observaciones,
-      })),
-    }
+    return raw ? mapIngresoDoc(raw) : null
   }
 
   async actualizarIngreso(id: string, tenantId: string, dto: ActualizarIngresoDTO): Promise<IngresoDoc> {
@@ -85,6 +106,7 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
     const updateData: any = { updatedById: dto.updatedById ?? null }
     if (dto.proveedorId !== undefined) updateData.proveedorId = dto.proveedorId
     if (dto.descripcion !== undefined) updateData.descripcion = dto.descripcion
+    if (dto.fecha !== undefined) updateData.fecha = dto.fecha
     if (dto.detalles !== undefined) {
       updateData.totalCantidad = dto.detalles.reduce((s, d) => s + d.cantidad, 0)
       updateData.totalIngreso = dto.detalles.reduce((s, d) => s + d.cantidad * (d.costoUnitario ?? 0), 0)
@@ -105,24 +127,9 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
     const updated = await this.db.ingresoAlmacen.update({
       where: { id },
       data: updateData,
-      include: { detalles: true },
+      include: INCLUDE_DOC,
     })
-    return {
-      id: updated.id,
-      tenantId: updated.tenantId,
-      proveedorId: updated.proveedorId,
-      descripcion: updated.descripcion,
-      estado: updated.estado,
-      version: updated.version,
-      detalles: updated.detalles.map((d: any) => ({
-        insumoId: d.insumoId,
-        cantidad: Number(d.cantidad),
-        costoUnitario: Number(d.costoUnitario),
-        lote: d.lote,
-        fechaVencimiento: d.fechaVencimiento,
-        observaciones: d.observaciones,
-      })),
-    }
+    return mapIngresoDoc(updated)
   }
 
   async aprobarIngreso(dto: AprobarIngresoDTO): Promise<IngresoResultado> {
@@ -200,6 +207,14 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
     }
   }
 
+  async eliminarIngreso(id: string, tenantId: string): Promise<void> {
+    const existing = await this.db.ingresoAlmacen.findFirst({ where: { id, tenantId } })
+    if (!existing) throw new DocumentoNoEncontradoError("INGRESO", id)
+    if (existing.estado === "APROBADO") throw new DocumentoYaAprobadoError("ingreso")
+    // Las líneas se borran en cascada (detalle onDelete: Cascade).
+    await this.db.ingresoAlmacen.delete({ where: { id } })
+  }
+
   async findById(id: string, tenantId: string) {
     return this.db.ingresoAlmacen.findFirst({
       where: { id, tenantId },
@@ -211,7 +226,13 @@ export class IngresoAlmacenPrismaRepository implements IIngresoAlmacenRepository
     const { take, skip, orderBy, where: whereSearch } = toPrismaArgs(params, ["descripcion"])
     const where = { tenantId, ...whereSearch }
     const [data, total] = await Promise.all([
-      this.db.ingresoAlmacen.findMany({ where, take, skip, orderBy, include: { detalles: true } }),
+      this.db.ingresoAlmacen.findMany({
+        where,
+        take,
+        skip,
+        orderBy,
+        include: { detalles: true, proveedor: { select: { id: true, nombre: true } } },
+      }),
       this.db.ingresoAlmacen.count({ where }),
     ])
     return { data, total }

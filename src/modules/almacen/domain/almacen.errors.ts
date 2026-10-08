@@ -61,6 +61,20 @@ export class InsumoEnUsoEnRecetaError extends Error {
   }
 }
 
+/**
+ * El insumo tiene movimientos (fuera del de su creación) o figura en un ingreso, salida o
+ * recuento, pendiente o aprobado (spec 033, B-01). Borrarlo se llevaría en cascada su
+ * historial y líneas de documentos: se desactiva en su lugar.
+ */
+export class InsumoEnUsoError extends Error {
+  readonly code = "INSUMO_EN_USO"
+  readonly statusCode = 409
+  constructor(id: string) {
+    super(`El insumo ${id} tiene movimientos o figura en documentos: no se puede eliminar`)
+    this.name = "InsumoEnUsoError"
+  }
+}
+
 // No bloquea — se retorna como advertencia (header X-Warning: insumo-vencido)
 export class InsumoVencidoWarning extends Error {
   readonly code = "INSUMO_VENCIDO"

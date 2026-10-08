@@ -15,6 +15,32 @@ import {
   StockNegativoInsumoError,
 } from "../domain/almacen.errors.js"
 
+/** Por línea, el nombre, la unidad y el stock del insumo (spec 033). */
+const INCLUDE_DOC = {
+  detalles: { include: { insumo: { include: { unidadMedida: true } } } },
+} as const
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapSalidaDoc(raw: any): SalidaDoc {
+  return {
+    id: raw.id,
+    tenantId: raw.tenantId,
+    fecha: raw.fecha,
+    motivo: raw.motivo,
+    descripcion: raw.descripcion,
+    estado: raw.estado,
+    version: raw.version,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    detalles: (raw.detalles ?? []).map((d: any) => ({
+      insumoId: d.insumoId,
+      insumoNombre: d.insumo?.nombre ?? "",
+      unidad: d.insumo?.unidadMedida?.sigla ?? "",
+      stockActual: Number(d.insumo?.cantidadStock ?? 0),
+      cantidad: Number(d.cantidad),
+    })),
+  }
+}
+
 export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(private readonly db: any) {}
@@ -25,6 +51,8 @@ export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
         tenantId: dto.tenantId,
         motivo: dto.motivo ?? null,
         descripcion: dto.descripcion ?? null,
+        // Sin fecha declarada, la base pone ahora (`@default(now())`).
+        ...(dto.fecha ? { fecha: dto.fecha } : {}),
         tenantMemberId: dto.tenantMemberId ?? null,
         createdById: dto.createdById ?? null,
         estado: "PENDIENTE",
@@ -49,21 +77,9 @@ export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
   async obtenerSalida(id: string, tenantId: string): Promise<SalidaDoc | null> {
     const raw = await this.db.salidaAlmacen.findFirst({
       where: { id, tenantId },
-      include: { detalles: true },
+      include: INCLUDE_DOC,
     })
-    if (!raw) return null
-    return {
-      id: raw.id,
-      tenantId: raw.tenantId,
-      motivo: raw.motivo,
-      descripcion: raw.descripcion,
-      estado: raw.estado,
-      version: raw.version,
-      detalles: raw.detalles.map((d: any) => ({
-        insumoId: d.insumoId,
-        cantidad: Number(d.cantidad),
-      })),
-    }
+    return raw ? mapSalidaDoc(raw) : null
   }
 
   async actualizarSalida(id: string, tenantId: string, dto: ActualizarSalidaDTO): Promise<SalidaDoc> {
@@ -75,6 +91,7 @@ export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
     const updateData: any = { updatedById: dto.updatedById ?? null }
     if (dto.motivo !== undefined) updateData.motivo = dto.motivo
     if (dto.descripcion !== undefined) updateData.descripcion = dto.descripcion
+    if (dto.fecha !== undefined) updateData.fecha = dto.fecha
     if (dto.detalles !== undefined) {
       updateData.detalles = {
         deleteMany: {},
@@ -88,20 +105,9 @@ export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
     const updated = await this.db.salidaAlmacen.update({
       where: { id },
       data: updateData,
-      include: { detalles: true },
+      include: INCLUDE_DOC,
     })
-    return {
-      id: updated.id,
-      tenantId: updated.tenantId,
-      motivo: updated.motivo,
-      descripcion: updated.descripcion,
-      estado: updated.estado,
-      version: updated.version,
-      detalles: updated.detalles.map((d: any) => ({
-        insumoId: d.insumoId,
-        cantidad: Number(d.cantidad),
-      })),
-    }
+    return mapSalidaDoc(updated)
   }
 
   async aprobarSalida(dto: AprobarSalidaDTO): Promise<SalidaResultado> {
@@ -187,6 +193,14 @@ export class SalidaAlmacenPrismaRepository implements ISalidaAlmacenRepository {
       version: salida.version + 1,
       detalles: resultadoDetalles,
     }
+  }
+
+  async eliminarSalida(id: string, tenantId: string): Promise<void> {
+    const existing = await this.db.salidaAlmacen.findFirst({ where: { id, tenantId } })
+    if (!existing) throw new DocumentoNoEncontradoError("SALIDA", id)
+    if (existing.estado === "APROBADO") throw new DocumentoYaAprobadoError("salida")
+    // Las líneas se borran en cascada (detalle onDelete: Cascade).
+    await this.db.salidaAlmacen.delete({ where: { id } })
   }
 
   async findById(id: string, tenantId: string) {

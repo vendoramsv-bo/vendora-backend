@@ -11,12 +11,20 @@ import { ListarIngresosUseCase } from "../application/almacen/listar-ingresos.us
 import { ObtenerIngresoUseCase } from "../application/almacen/obtener-ingreso.usecase.js"
 import { ActualizarIngresoUseCase } from "../application/almacen/actualizar-ingreso.usecase.js"
 import { AprobarIngresoUseCase } from "../application/almacen/aprobar-ingreso.usecase.js"
+import { EliminarIngresoUseCase } from "../application/almacen/eliminar-ingreso.usecase.js"
+import { EliminarSalidaUseCase } from "../application/almacen/eliminar-salida.usecase.js"
 import { CrearSalidaUseCase } from "../application/almacen/crear-salida.usecase.js"
 import { ListarSalidasUseCase } from "../application/almacen/listar-salidas.usecase.js"
 import { ObtenerSalidaUseCase } from "../application/almacen/obtener-salida.usecase.js"
 import { ActualizarSalidaUseCase } from "../application/almacen/actualizar-salida.usecase.js"
 import { AprobarSalidaUseCase } from "../application/almacen/aprobar-salida.usecase.js"
 import { RegistrarRecuentoAlmacenUseCase } from "../application/almacen/registrar-recuento-almacen.usecase.js"
+import {
+  ActualizarRecuentoAlmacenUseCase,
+  AprobarRecuentoAlmacenUseCase,
+  EliminarRecuentoAlmacenUseCase,
+  ObtenerRecuentoAlmacenUseCase,
+} from "../application/almacen/recuento-almacen.usecases.js"
 import { ListarRecuentosAlmacenUseCase } from "../application/almacen/listar-recuentos-almacen.usecase.js"
 import {
   CrearIngresoSchema,
@@ -25,6 +33,7 @@ import {
   ActualizarSalidaSchema,
   AprobarDocumentoSchema,
   RecuentoAlmacenSchema,
+  ActualizarRecuentoAlmacenSchema,
   QueryParamsAlmacenSchema,
 } from "./almacen.schema.js"
 import {
@@ -35,6 +44,7 @@ import {
   DocumentoYaAprobadoError,
   DocumentoNoEncontradoError,
   StockNegativoInsumoError,
+  FechaFuturaError,
 } from "../domain/almacen.errors.js"
 import { getAlmacenNotificador } from "../infrastructure/almacen.notificador.provider.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
@@ -43,6 +53,9 @@ export const almacenOperacionesRouter = new OpenAPIHono<HonoEnv>()
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
+
+/** La fecha del documento llega como ISO; ausente = la pone la base (spec 033). */
+const aFecha = (iso: string | undefined) => (iso ? new Date(iso) : undefined)
 
 // ─── Ingresos ────────────────────────────────────────────────────────────────
 
@@ -95,6 +108,7 @@ almacenOperacionesRouter.openapi(
         tenantId,
         proveedorId: parsed.data.proveedorId,
         descripcion: parsed.data.descripcion,
+        fecha: aFecha(parsed.data.fecha),
         detalles: parsed.data.detalles.map((d) => ({
           ...d,
           fechaVencimiento: d.fechaVencimiento ? new Date(d.fechaVencimiento) : undefined,
@@ -107,6 +121,7 @@ almacenOperacionesRouter.openapi(
       if (err instanceof DetalleVacioError) return c.json({ error: err.code, message: err.message }, 400)
       if (err instanceof ProveedorNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },
@@ -169,6 +184,7 @@ almacenOperacionesRouter.openapi(
         tenantId,
         {
           ...parsed.data,
+          fecha: aFecha(parsed.data.fecha),
           detalles: parsed.data.detalles?.map((d) => ({
             ...d,
             fechaVencimiento: d.fechaVencimiento ? new Date(d.fechaVencimiento) : undefined,
@@ -180,6 +196,7 @@ almacenOperacionesRouter.openapi(
     } catch (err) {
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },
@@ -223,6 +240,34 @@ almacenOperacionesRouter.openapi(
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
       if (err instanceof ConflictoVersionError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
+
+// DELETE /ingresos/:ingresoId — solo pendientes (spec 033, B-02)
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/ingresos/{ingresoId}",
+    operationId: "almacen_eliminar_ingreso",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: { params: z.object({ ingresoId: z.string() }) },
+    responses: {
+      204: { description: "Ingreso eliminado" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      await new EliminarIngresoUseCase(new IngresoAlmacenPrismaRepository(db)).execute(c.req.param("ingresoId"), tenantId)
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
       throw err
     }
   },
@@ -278,6 +323,7 @@ almacenOperacionesRouter.openapi(
         tenantId,
         motivo: parsed.data.motivo,
         descripcion: parsed.data.descripcion,
+        fecha: aFecha(parsed.data.fecha),
         detalles: parsed.data.detalles,
         createdById: session.user.id,
         tenantMemberId: c.get("miembro").id,
@@ -286,6 +332,7 @@ almacenOperacionesRouter.openapi(
     } catch (err) {
       if (err instanceof DetalleVacioError) return c.json({ error: err.code, message: err.message }, 400)
       if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },
@@ -346,12 +393,13 @@ almacenOperacionesRouter.openapi(
       const result = await new ActualizarSalidaUseCase(new SalidaAlmacenPrismaRepository(db)).execute(
         c.req.param("salidaId"),
         tenantId,
-        { ...parsed.data, updatedById: session.user.id }
+        { ...parsed.data, fecha: aFecha(parsed.data.fecha), updatedById: session.user.id }
       )
       return c.json(result)
     } catch (err) {
       if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
       if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },
@@ -402,6 +450,34 @@ almacenOperacionesRouter.openapi(
   },
 )
 
+// DELETE /salidas/:salidaId — solo pendientes (spec 033, B-02)
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/salidas/{salidaId}",
+    operationId: "almacen_eliminar_salida",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: { params: z.object({ salidaId: z.string() }) },
+    responses: {
+      204: { description: "Salida eliminada" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      await new EliminarSalidaUseCase(new SalidaAlmacenPrismaRepository(db)).execute(c.req.param("salidaId"), tenantId)
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
+
 // ─── Recuentos ───────────────────────────────────────────────────────────────
 // `/recuentos` es de productos (inventario.rest.ts), montado antes en almacen-router.
 // Con el mismo path, estos handlers nunca se ejecutaban.
@@ -436,7 +512,7 @@ almacenOperacionesRouter.openapi(
     middleware: requireRol(ROLES_ALMACEN),
     request: { body: { content: { "application/json": { schema: RecuentoAlmacenSchema } } } },
     responses: {
-      201: createdResponse("Recuento de almacén registrado", z.record(z.string(), z.unknown())),
+      201: createdResponse("Recuento de almacén registrado (pendiente)", z.record(z.string(), z.unknown())),
       ...errorResponses,
     },
   }),
@@ -447,13 +523,10 @@ almacenOperacionesRouter.openapi(
     const parsed = RecuentoAlmacenSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
     try {
-      const result = await new RegistrarRecuentoAlmacenUseCase(
-        new RecuentoAlmacenPrismaRepository(db),
-        new InsumosPrismaRepository(db),
-        getAlmacenNotificador()
-      ).execute({
+      const result = await new RegistrarRecuentoAlmacenUseCase(new RecuentoAlmacenPrismaRepository(db)).execute({
         tenantId,
         observacion: parsed.data.observacion,
+        fecha: aFecha(parsed.data.fecha),
         detalles: parsed.data.detalles,
         createdById: session.user.id,
         tenantMemberId: c.get("miembro").id,
@@ -462,6 +535,145 @@ almacenOperacionesRouter.openapi(
     } catch (err) {
       if (err instanceof DetalleVacioError) return c.json({ error: err.code, message: err.message }, 400)
       if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
+      throw err
+    }
+  },
+)
+
+// ─── Ciclo del recuento de almacén (spec 033, B-05) ──────────────────────────
+
+const recuentoParams = z.object({ recuentoId: z.string() })
+
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/recuentos-insumos/{recuentoId}",
+    operationId: "almacen_obtener_recuento_almacen",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    request: { params: recuentoParams },
+    responses: {
+      200: okResponse("Recuento de almacén", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    try {
+      const result = await new ObtenerRecuentoAlmacenUseCase(new RecuentoAlmacenPrismaRepository(db)).execute(
+        c.req.param("recuentoId"),
+        c.get("tenantId"),
+      )
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
+
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "patch",
+    path: "/recuentos-insumos/{recuentoId}",
+    operationId: "almacen_actualizar_recuento_almacen",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: {
+      params: recuentoParams,
+      body: { content: { "application/json": { schema: ActualizarRecuentoAlmacenSchema } } },
+    },
+    responses: {
+      200: okResponse("Recuento de almacén actualizado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const parsed = ActualizarRecuentoAlmacenSchema.safeParse(await c.req.json())
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const result = await new ActualizarRecuentoAlmacenUseCase(new RecuentoAlmacenPrismaRepository(db)).execute(
+        c.req.param("recuentoId"),
+        c.get("tenantId"),
+        { ...parsed.data, fecha: aFecha(parsed.data.fecha), updatedById: c.get("session").user.id },
+      )
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof FechaFuturaError) return c.json({ error: err.code, message: err.message }, 422)
+      throw err
+    }
+  },
+)
+
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/recuentos-insumos/{recuentoId}",
+    operationId: "almacen_eliminar_recuento_almacen",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: { params: recuentoParams },
+    responses: {
+      204: { description: "Recuento de almacén eliminado" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    try {
+      await new EliminarRecuentoAlmacenUseCase(new RecuentoAlmacenPrismaRepository(db)).execute(
+        c.req.param("recuentoId"),
+        c.get("tenantId"),
+      )
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      throw err
+    }
+  },
+)
+
+almacenOperacionesRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/recuentos-insumos/{recuentoId}/aprobar",
+    operationId: "almacen_aprobar_recuento_almacen",
+    tags: ["Almacén"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ALMACEN),
+    request: {
+      params: recuentoParams,
+      body: { content: { "application/json": { schema: AprobarDocumentoSchema } } },
+    },
+    responses: {
+      200: okResponse("Recuento de almacén aprobado", z.record(z.string(), z.unknown())),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const parsed = AprobarDocumentoSchema.safeParse(await c.req.json())
+    if (!parsed.success) return c.json({ error: "VALIDACION", details: parsed.error.flatten() }, 400)
+    try {
+      const result = await new AprobarRecuentoAlmacenUseCase(
+        new RecuentoAlmacenPrismaRepository(db),
+        getAlmacenNotificador(),
+      ).execute({
+        recuentoId: c.req.param("recuentoId"),
+        tenantId: c.get("tenantId"),
+        version: parsed.data.version,
+        aprobadoPorId: c.get("session").user.id,
+      })
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof DocumentoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof InsumoNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof DocumentoYaAprobadoError) return c.json({ error: err.code, message: err.message }, 409)
+      if (err instanceof ConflictoVersionError) return c.json({ error: err.code, message: err.message }, 409)
       throw err
     }
   },

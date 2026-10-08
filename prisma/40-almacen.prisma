@@ -258,6 +258,8 @@ model RecuentoAlmacen {
   tenantMember            TenantMember?            @relation(fields: [tenantMemberId], references: [id], onDelete: SetNull)
   fecha                   DateTime                 @default(now())
   estado                  Estado                   @default(PENDIENTE)
+  // Concurrencia optimista al aprobar, como ingreso y salida (spec 033, B-05).
+  version                 Int                      @default(0)
   observacion             String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime?

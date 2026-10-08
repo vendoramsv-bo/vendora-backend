@@ -4,6 +4,7 @@ import {
   ProveedorNoEncontradoError,
   InsumoNoEncontradoError,
   DetalleVacioError,
+  validarFechaDocumento,
 } from "../../domain/almacen.errors.js"
 
 export interface IngresoDetalleInput {
@@ -19,6 +20,7 @@ export interface CrearIngresoInput {
   tenantId: string
   proveedorId: string
   descripcion?: string
+  fecha?: Date
   detalles: IngresoDetalleInput[]
   createdById?: string
   tenantMemberId?: string
@@ -34,6 +36,7 @@ export class CrearIngresoUseCase {
 
   async execute(input: CrearIngresoInput) {
     if (input.detalles.length === 0) throw new DetalleVacioError()
+    validarFechaDocumento(input.fecha)
 
     const proveedor = await this.db.proveedor.findFirst({
       where: { id: input.proveedorId, tenantId: input.tenantId },
@@ -49,6 +52,7 @@ export class CrearIngresoUseCase {
       tenantId: input.tenantId,
       proveedorId: input.proveedorId,
       descripcion: input.descripcion,
+      fecha: input.fecha,
       detalles: input.detalles,
       createdById: input.createdById,
       tenantMemberId: input.tenantMemberId,

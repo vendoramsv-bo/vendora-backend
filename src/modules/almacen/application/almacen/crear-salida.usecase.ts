@@ -3,6 +3,7 @@ import type { IInsumoRepository } from "../../domain/ports/IInsumoRepository.js"
 import {
   InsumoNoEncontradoError,
   DetalleVacioError,
+  validarFechaDocumento,
 } from "../../domain/almacen.errors.js"
 
 export interface SalidaDetalleInput {
@@ -14,6 +15,7 @@ export interface CrearSalidaInput {
   tenantId: string
   motivo?: string
   descripcion?: string
+  fecha?: Date
   detalles: SalidaDetalleInput[]
   createdById?: string
   tenantMemberId?: string
@@ -27,6 +29,7 @@ export class CrearSalidaUseCase {
 
   async execute(input: CrearSalidaInput) {
     if (input.detalles.length === 0) throw new DetalleVacioError()
+    validarFechaDocumento(input.fecha)
 
     for (const d of input.detalles) {
       const ins = await this.insumoRepo.findById(d.insumoId, input.tenantId)
@@ -37,6 +40,7 @@ export class CrearSalidaUseCase {
       tenantId: input.tenantId,
       motivo: input.motivo,
       descripcion: input.descripcion,
+      fecha: input.fecha,
       detalles: input.detalles,
       createdById: input.createdById,
       tenantMemberId: input.tenantMemberId,

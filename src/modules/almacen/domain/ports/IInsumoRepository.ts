@@ -49,6 +49,14 @@ export interface AjusteInsumoResultado {
   stockMinimo: number
 }
 
+/** Totales de todo el historial de un insumo (spec 033, B-04). `salidas` es ≤ 0. */
+export interface ResumenMovimientosInsumo {
+  entradas: number
+  salidas: number
+  stockActual: number
+  unidad: string
+}
+
 export interface IInsumoRepository {
   findById(id: string, tenantId: string): Promise<InsumoData | null>
   findByNombre(nombre: string, tenantId: string): Promise<InsumoData | null>
@@ -59,4 +67,11 @@ export interface IInsumoRepository {
   registrarAjuste(dto: AjusteInsumoDTO): Promise<AjusteInsumoResultado>
   listar(tenantId: string, params: QueryParams, stockCritico?: boolean): Promise<{ data: unknown[]; total: number }>
   listarMovimientos(insumoId: string, tenantId: string, params: QueryParams): Promise<{ data: unknown[]; total: number }>
+  /**
+   * Tiene movimientos distintos de CREACION o líneas en ingresos, salidas o recuentos
+   * (spec 033, B-01). Las recetas se chequean aparte (`InsumoEnUsoEnRecetaError`).
+   */
+  enUso(id: string, tenantId: string): Promise<boolean>
+  /** `null` si el insumo no existe en el tenant. */
+  resumenMovimientos(insumoId: string, tenantId: string): Promise<ResumenMovimientosInsumo | null>
 }

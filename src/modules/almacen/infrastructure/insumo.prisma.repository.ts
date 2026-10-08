@@ -10,6 +10,30 @@ import type { QueryParams } from "../../../core/query-params.js"
 import { toPrismaArgs } from "../../../core/query-params.js"
 import { argsListadoMovimientos, TIPOS_MOVIMIENTO_ALMACEN } from "./movimiento-prisma-args.js"
 
+/**
+ * Lo que hace que un insumo no se pueda eliminar (spec 033, B-01). El movimiento CREACION
+ * no cuenta: todo insumo nace con uno.
+ */
+const CONTEO_USO = {
+  movimientosAlmacen: { where: { tipo: { not: "CREACION" } } },
+  ingresosDetalle: true,
+  salidasDetalle: true,
+  recuentosAlmacenDetalle: true,
+} as const
+
+type ConteoUso = Partial<Record<keyof typeof CONTEO_USO | "productosInsumo", number>>
+
+function usoDe(conteo: ConteoUso | undefined, conRecetas: boolean): boolean {
+  if (!conteo) return false
+  const n =
+    (conteo.movimientosAlmacen ?? 0) +
+    (conteo.ingresosDetalle ?? 0) +
+    (conteo.salidasDetalle ?? 0) +
+    (conteo.recuentosAlmacenDetalle ?? 0) +
+    (conRecetas ? (conteo.productosInsumo ?? 0) : 0)
+  return n > 0
+}
+
 function toInsumoData(raw: any): InsumoData {
   return {
     id: raw.id,
@@ -89,6 +113,14 @@ export class InsumosPrismaRepository implements IInsumoRepository {
     return toInsumoData(raw)
   }
 
+  async enUso(id: string, tenantId: string): Promise<boolean> {
+    const raw = await this.db.insumo.findFirst({
+      where: { id, tenantId },
+      select: { _count: { select: CONTEO_USO } },
+    })
+    return usoDe(raw?._count, false)
+  }
+
   async delete(id: string, _tenantId: string): Promise<void> {
     await this.db.insumo.delete({ where: { id } })
   }
@@ -142,13 +174,21 @@ export class InsumosPrismaRepository implements IInsumoRepository {
       // así que filtramos en JS (aceptable a la escala del módulo)
     }
     const [data, total] = await Promise.all([
-      this.db.insumo.findMany({ where, take, skip, orderBy, include: { unidadMedida: true } }),
+      this.db.insumo.findMany({
+        where,
+        take,
+        skip,
+        orderBy,
+        include: { unidadMedida: true, _count: { select: { ...CONTEO_USO, productosInsumo: true } } },
+      }),
       this.db.insumo.count({ where }),
     ])
     // Filtro post-query para stockCritico (comparación de campos)
+    // `eliminable` en lugar del conteo: la pantalla deshabilita Eliminar (spec 033, FR-002).
+    const conUso = data.map(({ _count, ...i }: any) => ({ ...i, eliminable: !usoDe(_count, true) }))
     const filtered = stockCritico
-      ? data.filter((i: any) => Number(i.cantidadStock) < i.stockMinimo)
-      : data
+      ? conUso.filter((i: any) => Number(i.cantidadStock) < i.stockMinimo)
+      : conUso
     return { data: filtered, total: stockCritico ? filtered.length : total }
   }
 
@@ -167,5 +207,36 @@ export class InsumosPrismaRepository implements IInsumoRepository {
       stockDespues: Number(m.stockDespues),
     }))
     return { data: filas, total }
+  }
+
+  /**
+   * Entradas y salidas de todo el historial (spec 033, B-04), por
+   * `stockDespues − stockAntes`: el signo de `cantidad` no es uniforme entre tipos
+   * (SALIDA la guarda positiva). CREACION cuenta como entrada: el stock inicial.
+   */
+  async resumenMovimientos(insumoId: string, tenantId: string) {
+    const insumo = await this.db.insumo.findFirst({
+      where: { id: insumoId, tenantId },
+      include: { unidadMedida: true },
+    })
+    if (!insumo) return null
+    const movimientos = await this.db.movimientoAlmacen.findMany({
+      where: { insumoId, tenantId },
+      select: { stockAntes: true, stockDespues: true },
+    })
+    let entradas = 0
+    let salidas = 0
+    for (const m of movimientos) {
+      const delta = Number(m.stockDespues) - Number(m.stockAntes)
+      if (delta > 0) entradas += delta
+      else salidas += delta
+    }
+    const redondear = (n: number) => Math.round(n * 10000) / 10000
+    return {
+      entradas: redondear(entradas),
+      salidas: redondear(salidas),
+      stockActual: Number(insumo.cantidadStock),
+      unidad: insumo.unidadMedida?.sigla ?? "",
+    }
   }
 }
