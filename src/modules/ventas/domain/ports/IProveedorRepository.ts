@@ -49,6 +49,7 @@ export interface IProveedorRepository {
   actualizar(id: string, tenantId: string, dto: ActualizarProveedorDTO): Promise<ProveedorData>
   cambiarEstado(id: string, tenantId: string, estado: string, updatedById?: string | null): Promise<ProveedorData>
   eliminar(id: string, tenantId: string): Promise<void>
-  tieneCompras(id: string, tenantId: string): Promise<boolean>
+  /** Tiene compras o ingresos de almacén: no se puede eliminar (spec 035). */
+  tieneDocumentos(id: string, tenantId: string): Promise<boolean>
   listar(tenantId: string, params: QueryParams, estado?: string): Promise<{ data: ProveedorData[]; total: number }>
 }

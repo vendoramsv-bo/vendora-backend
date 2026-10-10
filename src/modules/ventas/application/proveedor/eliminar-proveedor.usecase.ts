@@ -8,7 +8,7 @@ export class EliminarProveedorUseCase {
     const existente = await this.repo.obtenerPorId(id, tenantId)
     if (!existente) throw new ProveedorNoEncontradoError(id)
 
-    const enUso = await this.repo.tieneCompras(id, tenantId)
+    const enUso = await this.repo.tieneDocumentos(id, tenantId)
     if (enUso) throw new ProveedorEnUsoError()
 
     return this.repo.eliminar(id, tenantId)

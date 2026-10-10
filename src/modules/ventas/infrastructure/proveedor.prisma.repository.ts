@@ -20,7 +20,7 @@ function toProveedorData(raw: any): ProveedorData {
     departamento: raw.departamento ?? null,
     productosOfrece: raw.productosOfrece ?? null,
     sitioWeb: raw.sitioWeb ?? null,
-    estado: raw.estado,
+    estado: raw.estado ?? "ACTIVO",
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? null,
     createdById: raw.createdById ?? null,
@@ -94,9 +94,14 @@ export class ProveedorPrismaRepository implements IProveedorRepository {
     await this.db.proveedor.delete({ where: { id, tenantId } })
   }
 
-  async tieneCompras(id: string, tenantId: string): Promise<boolean> {
-    const count = await this.db.compra.count({ where: { proveedorId: id, tenantId } })
-    return count > 0
+  async tieneDocumentos(id: string, tenantId: string): Promise<boolean> {
+    // Los ingresos de almacén referencian al proveedor sin `onDelete`: borrarlo con
+    // ingresos fallaba por FK (spec 035, R-03).
+    const [compras, ingresos] = await Promise.all([
+      this.db.compra.count({ where: { proveedorId: id, tenantId } }),
+      this.db.ingresoAlmacen.count({ where: { proveedorId: id, tenantId } }),
+    ])
+    return compras + ingresos > 0
   }
 
   async listar(tenantId: string, params: QueryParams, estado?: string): Promise<{ data: ProveedorData[]; total: number }> {

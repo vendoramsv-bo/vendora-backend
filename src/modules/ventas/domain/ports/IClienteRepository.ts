@@ -45,4 +45,7 @@ export interface IClienteRepository {
   actualizar(id: string, tenantId: string, dto: ActualizarClienteDTO): Promise<ClienteData>
   cambiarEstado(id: string, tenantId: string, estado: string, updatedById?: string | null): Promise<ClienteData>
   listar(tenantId: string, params: QueryParams, estado?: string): Promise<{ data: ClienteData[]; total: number }>
+  /** Tiene ventas o reservas: no se puede eliminar (spec 035). */
+  tieneDocumentos(id: string, tenantId: string): Promise<boolean>
+  eliminar(id: string, tenantId: string): Promise<void>
 }

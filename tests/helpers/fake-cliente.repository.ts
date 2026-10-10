@@ -8,10 +8,23 @@ import type { QueryParams } from "../../src/core/query-params.js"
 
 export class FakeClienteRepository implements IClienteRepository {
   private _clientes = new Map<string, ClienteData>()
+  private _documentosPorCliente = new Map<string, number>()
   private _counter = 1
 
-  seed(c: ClienteData): void {
+  /** `documentos`: ventas + reservas del cliente (spec 035). */
+  seed(c: ClienteData, { documentos = 0 }: { documentos?: number } = {}): void {
     this._clientes.set(c.id, c)
+    if (documentos > 0) this._documentosPorCliente.set(c.id, documentos)
+  }
+
+  async tieneDocumentos(id: string, _tenantId: string): Promise<boolean> {
+    return (this._documentosPorCliente.get(id) ?? 0) > 0
+  }
+
+  async eliminar(id: string, tenantId: string): Promise<void> {
+    const c = this._clientes.get(id)
+    if (!c || c.tenantId !== tenantId) throw new Error(`Cliente ${id} no encontrado`)
+    this._clientes.delete(id)
   }
 
   async obtenerPorId(id: string, tenantId: string): Promise<ClienteData | null> {

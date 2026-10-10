@@ -8,6 +8,7 @@ import { ObtenerClienteUseCase } from "../application/cliente/obtener-cliente.us
 import { ActualizarClienteUseCase } from "../application/cliente/actualizar-cliente.usecase.js"
 import { CambiarEstadoClienteUseCase } from "../application/cliente/cambiar-estado-cliente.usecase.js"
 import { ListarClientesUseCase } from "../application/cliente/listar-clientes.usecase.js"
+import { EliminarClienteUseCase } from "../application/cliente/eliminar-cliente.usecase.js"
 import {
   CrearClienteSchema,
   ActualizarClienteSchema,
@@ -18,6 +19,7 @@ import {
   ClienteNoEncontradoError,
   ClienteNombreDuplicadoError,
   ClienteEmailDuplicadoError,
+  ClienteEnUsoError,
 } from "../domain/ventas.errors.js"
 import { getVentasNotificador } from "../infrastructure/ventas.notificador.provider.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
@@ -211,6 +213,36 @@ clienteRouter.openapi(
       return c.json(result)
     } catch (err) {
       if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      throw err
+    }
+  },
+)
+
+// DELETE /clientes/:id — spec 035: bloqueado si tiene ventas o reservas
+clienteRouter.openapi(
+  createRoute({
+    method: "delete",
+    path: "/{id}",
+    operationId: "ventas_eliminar_cliente",
+    tags: ["Ventas"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireRol(ROLES_ATENCION),
+    request: {
+      params: z.object({ id: z.string() }),
+    },
+    responses: {
+      204: { description: "Cliente eliminado" },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const tenantId = c.get("tenantId")
+    try {
+      await new EliminarClienteUseCase(makeRepo()).execute(c.req.param("id"), tenantId)
+      return c.body(null, 204)
+    } catch (err) {
+      if (err instanceof ClienteNoEncontradoError) return c.json({ error: err.code, message: err.message }, 404)
+      if (err instanceof ClienteEnUsoError) return c.json({ error: err.code, message: err.message }, 422)
       throw err
     }
   },

@@ -8,12 +8,14 @@ import type { QueryParams } from "../../src/core/query-params.js"
 
 export class FakeProveedorRepository implements IProveedorRepository {
   private _proveedores = new Map<string, ProveedorData>()
-  private _comprasPorProveedor = new Map<string, number>()
+  private _documentosPorProveedor = new Map<string, number>()
   private _counter = 1
 
-  seed(p: ProveedorData, compras = 0): void {
+  /** `documentos`: compras (número, forma heredada) o compras + ingresos de almacén. */
+  seed(p: ProveedorData, documentos: number | { compras?: number; ingresos?: number } = 0): void {
     this._proveedores.set(p.id, p)
-    if (compras > 0) this._comprasPorProveedor.set(p.id, compras)
+    const total = typeof documentos === "number" ? documentos : (documentos.compras ?? 0) + (documentos.ingresos ?? 0)
+    if (total > 0) this._documentosPorProveedor.set(p.id, total)
   }
 
   async obtenerPorId(id: string, tenantId: string): Promise<ProveedorData | null> {
@@ -91,8 +93,8 @@ export class FakeProveedorRepository implements IProveedorRepository {
     this._proveedores.delete(id)
   }
 
-  async tieneCompras(id: string, _tenantId: string): Promise<boolean> {
-    return (this._comprasPorProveedor.get(id) ?? 0) > 0
+  async tieneDocumentos(id: string, _tenantId: string): Promise<boolean> {
+    return (this._documentosPorProveedor.get(id) ?? 0) > 0
   }
 
   async listar(tenantId: string, _params: QueryParams, estado?: string): Promise<{ data: ProveedorData[]; total: number }> {

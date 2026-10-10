@@ -95,4 +95,32 @@ export class ClientePrismaRepository implements IClienteRepository {
     ])
     return { data: data.map(toClienteData), total }
   }
+
+  async tieneDocumentos(id: string, tenantId: string): Promise<boolean> {
+    // `Venta.clienteId` no tiene FK y `Reserva.clienteId` es SetNull: borrar un cliente
+    // con documentos no fallaría, los dejaría huérfanos (spec 035, R-04). La reserva no
+    // tiene `tenantId`; el cliente ya se resolvió dentro del tenant.
+    //
+    // Hay ventas que guardaron solo el nombre del cliente, sin `clienteId`. También
+    // cuentan: ante la duda, el cliente se inactiva en vez de eliminarse.
+    const cliente = await this.db.cliente.findFirst({ where: { id, tenantId }, select: { nombre: true } })
+    if (!cliente) return false
+    const [ventas, reservas] = await Promise.all([
+      this.db.venta.count({
+        where: {
+          tenantId,
+          OR: [
+            { clienteId: id },
+            { clienteId: null, clienteNombre: { equals: cliente.nombre, mode: "insensitive" } },
+          ],
+        },
+      }),
+      this.db.reserva.count({ where: { clienteId: id } }),
+    ])
+    return ventas + reservas > 0
+  }
+
+  async eliminar(id: string, tenantId: string): Promise<void> {
+    await this.db.cliente.delete({ where: { id, tenantId } })
+  }
 }

@@ -28,6 +28,16 @@ export class ClienteEmailDuplicadoError extends Error {
   }
 }
 
+// HTTP 422 — mismo código HTTP que ProveedorEnUsoError (spec 035)
+export class ClienteEnUsoError extends Error {
+  readonly code = "CLIENTE_EN_USO"
+  readonly statusCode = 422
+  constructor() {
+    super("El cliente tiene ventas o reservas y no puede eliminarse")
+    this.name = "ClienteEnUsoError"
+  }
+}
+
 // HTTP 404
 export class ProveedorNoEncontradoError extends Error {
   readonly code = "PROVEEDOR_NO_ENCONTRADO"
@@ -63,7 +73,7 @@ export class ProveedorEnUsoError extends Error {
   readonly code = "PROVEEDOR_EN_USO"
   readonly statusCode = 422
   constructor() {
-    super("El proveedor tiene compras registradas y no puede eliminarse")
+    super("El proveedor tiene compras o ingresos de almacén y no puede eliminarse")
     this.name = "ProveedorEnUsoError"
   }
 }
