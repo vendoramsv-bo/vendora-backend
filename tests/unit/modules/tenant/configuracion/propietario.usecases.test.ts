@@ -44,6 +44,22 @@ describe("propietario", () => {
     expect(r).toMatchObject({ data: [], total: 0 })
   })
 
+  it("editar guarda la foto y la devuelve (spec 036 frontend, B2)", async () => {
+    const p = await new EditarPropietarioUseCase(repo).ejecutar(
+      "a",
+      "p-a",
+      { imagenUrl: "https://cdn/fotoPropietario/ana.webp" },
+      "u1",
+    )
+    expect(p).toMatchObject({ nombre: "Ana", imagenUrl: "https://cdn/fotoPropietario/ana.webp" })
+  })
+
+  it("editar con imagenUrl null quita la foto", async () => {
+    repo.items[0]!.imagenUrl = "https://cdn/fotoPropietario/ana.webp"
+    const p = await new EditarPropietarioUseCase(repo).ejecutar("a", "p-a", { imagenUrl: null }, "u1")
+    expect(p.imagenUrl).toBeNull()
+  })
+
   it("editar parcial conserva lo no enviado", async () => {
     const p = await new EditarPropietarioUseCase(repo).ejecutar("a", "p-a", { telefono: "7222222" }, "u1")
     expect(p).toMatchObject({ nombre: "Ana", telefono: "7222222", domicilio: "Calle 1" })

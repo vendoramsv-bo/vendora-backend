@@ -135,7 +135,9 @@ configuracionNegocioRouter.openapi(
     path: "/propietarios/{id}",
     operationId: "tenant_editar_propietario",
     tags: ["Tenant · Negocio"],
-    middleware: ESCRITURA,
+    // Los datos personales del propietario los edita solo él (spec 036 del
+    // frontend, Clarificación Q4); un ADMIN los ve pero no los cambia.
+    middleware: SOLO_PROPIETARIO,
     request: { params: IdParamSchema, body: { content: { "application/json": { schema: EditarPropietarioSchema } } } },
     responses: { 200: okResponse("Propietario actualizado", PropietarioSchema), ...errorResponses },
   }),

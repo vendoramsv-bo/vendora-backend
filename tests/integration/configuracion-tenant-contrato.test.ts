@@ -140,7 +140,7 @@ describe("US4 — propietario (Q1: uno por negocio)", () => {
   it("existen consultar y editar", () => {
     get("/api/tenant/propietarios", "get")
     expect(bodyProps(get("/api/tenant/propietarios/{id}", "patch"))).toEqual(
-      ["domicilio", "nombre", "referenciaNombre", "referenciaTelefono", "telefono"],
+      ["domicilio", "imagenUrl", "nombre", "referenciaNombre", "referenciaTelefono", "telefono"],
     )
   })
 

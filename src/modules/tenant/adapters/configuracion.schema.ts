@@ -141,6 +141,7 @@ export const PropietarioSchema = z.object({
   domicilio: z.string().optional(),
   referenciaNombre: z.string().optional(),
   referenciaTelefono: z.string().optional(),
+  imagenUrl: z.string().nullable().optional(),
   createdAt: z.string(),
 })
 export const EditarPropietarioSchema = z
@@ -150,6 +151,9 @@ export const EditarPropietarioSchema = z
     domicilio: z.string().max(200),
     referenciaNombre: z.string().max(100),
     referenciaTelefono: TelefonoBolivianoSchema.or(z.literal("")),
+    // La foto se sube antes con POST /api/tenant/upload-url (propósito
+    // `propietario`) y acá llega su URL pública. `null` quita la foto.
+    imagenUrl: z.string().url().nullable(),
   })
   .partial()
 

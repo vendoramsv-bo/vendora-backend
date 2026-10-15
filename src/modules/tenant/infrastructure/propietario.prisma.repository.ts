@@ -22,6 +22,8 @@ export class PropietarioPrismaRepository implements IPropietarioRepository {
             nombreReferencia: d.referenciaNombre,
             telefonoReferencia: d.referenciaTelefono,
           }),
+          // `sinUndefined` deja pasar `null`: así se puede quitar la foto.
+          ...(d.imagenUrl !== undefined ? { imagenUrl: d.imagenUrl } : {}),
           updatedById: actorUserId,
         },
       })
@@ -44,6 +46,7 @@ function aItem(f: Fila): PropietarioItem {
     ...(f.domicilio ? { domicilio: f.domicilio } : {}),
     ...(f.nombreReferencia ? { referenciaNombre: f.nombreReferencia } : {}),
     ...(f.telefonoReferencia ? { referenciaTelefono: f.telefonoReferencia } : {}),
+    imagenUrl: f.imagenUrl ?? null,
     createdAt: new Date(f.createdAt).toISOString(),
   }
 }

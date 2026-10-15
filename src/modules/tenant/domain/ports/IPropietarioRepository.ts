@@ -4,6 +4,8 @@ export interface DatosPropietario {
   domicilio?: string
   referenciaNombre?: string
   referenciaTelefono?: string
+  /** URL pública de la foto (propósito de subida `propietario`); `null` la quita. */
+  imagenUrl?: string | null
 }
 
 export interface PropietarioItem extends DatosPropietario {
