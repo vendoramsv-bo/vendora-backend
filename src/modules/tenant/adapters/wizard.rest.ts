@@ -3,6 +3,7 @@ import type { HonoEnv } from "../../../core/hono-context.js"
 import { requireAuth, requireTenantActivo, requireRol } from "../../../core/hono-context.js"
 import { prisma } from "../../autenticacion/infrastructure/better-auth.setup.js"
 import { errorResponses, okResponse, createdResponse } from "../../../core/openapi-responses.js"
+import { IdentidadNegocioPatchSchema, camposIdentidad, conflictoIdentidad } from "./identidad-negocio.js"
 import { SincronizarProductosUseCase } from "../../catalogo/application/producto/sincronizar-productos-usecase.js"
 import { ProductoPrismaRepository } from "../../catalogo/infrastructure/producto.prisma.repository.js"
 import { getCatalogoNotificador } from "../../catalogo/infrastructure/catalogo.notificador.provider.js"
@@ -142,6 +143,8 @@ const PropietarioUpdateSchema = z.object({
 }).optional()
 
 const ConfigPatchSchema = z.object({
+  // Nombre y logo del negocio, desde la configuración (spec 036 del frontend, B1).
+  ...IdentidadNegocioPatchSchema.shape,
   ultimoPasoCreacion: z.string().optional(),
   nombreLargo: z.string().optional(),
   descripcion: z.string().optional(),
@@ -187,9 +190,17 @@ wizardRouter.openapi(
     }
     if (body.nombreLargo !== undefined) tenantUpdate.nombreLargo = body.nombreLargo
     if (body.descripcion !== undefined) tenantUpdate.descripcion = body.descripcion
+    Object.assign(tenantUpdate, camposIdentidad(body))
 
     if (Object.keys(tenantUpdate).length > 1) {
-      await db.tenant.update({ where: { id: tenantId }, data: tenantUpdate })
+      try {
+        await db.tenant.update({ where: { id: tenantId }, data: tenantUpdate })
+      } catch (err) {
+        // name y nombreLargo son únicos entre negocios: se informa en el campo.
+        const conflicto = conflictoIdentidad(err)
+        if (conflicto) return c.json(conflicto, 409)
+        throw err
+      }
     }
 
     // Propietario upsert
