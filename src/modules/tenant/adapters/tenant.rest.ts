@@ -7,6 +7,7 @@ import { ObtenerTenantUseCase } from "../application/obtener-tenant.usecase.js"
 import { ListarTenantsUsuarioUseCase } from "../application/listar-tenants-usuario.usecase.js"
 import { ListarMiembrosUseCase } from "../application/listar-miembros.usecase.js"
 import { ListarInvitacionesUseCase } from "../application/listar-invitaciones.usecase.js"
+import { MisNegociosUseCase } from "../application/mis-negocios.usecase.js"
 import {
   QueryParamsTenantSchema,
   QueryParamsMiembrosSchema,
@@ -17,6 +18,7 @@ import {
   InvitacionResponseSchema,
   EliminarNegocioSchema,
   EliminarNegocioResponseSchema,
+  MisNegociosResponse,
 } from "./tenant.schema.js"
 import {
   PreferenciaPresentacionResponseSchema,
@@ -112,6 +114,32 @@ tenantRouter.openapi(
         params,
       ),
     )
+  },
+)
+
+// ─── GET /api/tenant/mis-negocios ─────────────────────────────────────────────
+//
+// Los negocios de la persona con su rol en cada uno (spec 037 B2). Sin
+// `requireTenantActivo`: lo usa la vitrina, fuera del panel. Se registra antes
+// de cualquier ruta paramétrica para que no se lea como un id.
+
+tenantRouter.openapi(
+  createRoute({
+    method: "get",
+    path: "/mis-negocios",
+    operationId: "tenant_get_mis_negocios",
+    tags: ["Tenant"],
+    security: [{ bearerAuth: [] }],
+    middleware: requireAuth,
+    responses: {
+      200: okResponse("Negocios de la persona con su rol", MisNegociosResponse),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const session = c.get("session")
+    const data = await new MisNegociosUseCase(db).ejecutar(session.user.id)
+    return c.json({ data }, 200)
   },
 )
 

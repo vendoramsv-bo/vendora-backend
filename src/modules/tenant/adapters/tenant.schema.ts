@@ -60,6 +60,24 @@ export const ListaTenantResponseSchema = z.object({
 
 export const QueryParamsTenantSchema = makeQueryParamsSchema(["name", "createdAt"] as const)
 
+// ─── Mis negocios (spec 037 B2) ───────────────────────────────────────────────
+
+export const MiNegocioSchema = z
+  .object({
+    id: z.string(),
+    slug: z.string(),
+    nombre: z.string(),
+    logoUrl: z.string().nullable(),
+    rol: z.string(),
+    esTienda: z.boolean(),
+    esConsultorio: z.boolean(),
+    esRestaurante: z.boolean(),
+  })
+  .openapi("MiNegocio")
+
+/** Lista plana, sin `meta`: una persona pertenece a pocos negocios (IV.4 no aplica). */
+export const MisNegociosResponse = z.object({ data: z.array(MiNegocioSchema) })
+
 // ─── Miembros ─────────────────────────────────────────────────────────────────
 
 export const MiembroResponseSchema = z.object({
