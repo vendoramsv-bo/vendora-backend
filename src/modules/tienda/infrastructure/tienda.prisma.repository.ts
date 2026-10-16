@@ -107,7 +107,27 @@ export class TiendaPrismaRepository implements ITiendaRepository {
           },
         },
         preferenciaPresentacion: { select: { tema: true, tipoLineado: true } },
-        localizaciones: { select: { latitud: true, longitud: true, direccion: true, ciudad: true, barrio: true } },
+        // Todas las sedes, la primera cargada primero. `email` queda afuera a
+        // propósito: publicarlo es decisión del propietario (spec 037 R4).
+        localizaciones: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            latitud: true,
+            longitud: true,
+            direccion: true,
+            ciudad: true,
+            barrio: true,
+            departamento: true,
+            descripcion: true,
+          },
+        },
+        // "Sobre nosotros" de la vitrina, en la misma llamada (spec 037 B1).
+        descripciones: {
+          where: { estado: "ACTIVO" },
+          orderBy: { orden: "asc" },
+          select: { id: true, descripcion: true, orden: true },
+        },
         propietarios: { where: { estado: "ACTIVO" }, select: { nombres: true, imagenUrl: true } },
         equipoDeTrabajo: { where: { estado: "ACTIVO" }, orderBy: { orden: "asc" }, select: { nombres: true, cargo: true, imagenUrl: true } },
         imagenes: { where: { estado: "ACTIVO" }, orderBy: { orden: "asc" }, select: { imagenUrl: true, descripcion: true, orden: true } },
@@ -146,6 +166,7 @@ export class TiendaPrismaRepository implements ITiendaRepository {
       propietarios: tenant.propietarios,
       equipoDeTrabajo: tenant.equipoDeTrabajo,
       localizaciones: tenant.localizaciones,
+      descripciones: tenant.descripciones,
       actividadesEconomicas: tenant.actividadesEconomicas.map((a: { claActividadEconomica: { nombre: string } | null }) => a.claActividadEconomica?.nombre ?? ""),
       // El enumerado de Prisma es `AZUL`; por HTTP viaja el id canónico `"azul"`.
       // Sin bajar la caja, `resolverTema` del cliente descartaría el tema en

@@ -23,7 +23,19 @@ export interface PerfilPublicoDTO {
   imagenes: Array<{ url: string; descripcion: string; orden: number }>
   propietarios: Array<{ nombres: string; imagenUrl: string | null }>
   equipoDeTrabajo: Array<{ nombres: string; cargo: string; imagenUrl: string | null }>
-  localizaciones: Array<{ latitud: number; longitud: number; direccion: string; ciudad: string; barrio: string | null }>
+  /** Todas las sedes, en orden de carga. Sin `email` (spec 037 R4). */
+  localizaciones: Array<{
+    id: string
+    latitud: number
+    longitud: number
+    direccion: string
+    ciudad: string
+    barrio: string | null
+    departamento: string
+    descripcion: string | null
+  }>
+  /** Descripciones ACTIVO del negocio, ordenadas por `orden` (spec 037 B1). */
+  descripciones: Array<{ id: string; descripcion: string; orden: number }>
   actividadesEconomicas: string[]
   /**
    * Tema del negocio, en id canónico minúscula (`"azul"`). Ausente si el
