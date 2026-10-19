@@ -5,6 +5,7 @@ import { organization, admin } from "better-auth/plugins"
 import { Resend } from "resend"
 import { PrismaClient } from "../../../generated/prisma/client.js"
 import { PrismaPg } from "@prisma/adapter-pg"
+import { elegirNegocioActivoInicial } from "./negocio-activo-inicial.js"
 
 const pgAdapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 export const prisma = new PrismaClient({ adapter: pgAdapter })
@@ -237,21 +238,16 @@ export const auth: any = betterAuth({
 
   // T036a — Restaurar activeOrganizationId al crear sesión.
   // BA inicializa activeOrganizationId en null por defecto; este hook
-  // lo puebla con el tenant más reciente del usuario.
+  // lo puebla con el tenant más reciente **disponible** del usuario: uno dado
+  // de baja no cuenta (frontend spec 038).
   databaseHooks: {
     session: {
       create: {
         before: async (session) => {
-          const ultimoMembro = await prisma.tenantMember.findFirst({
-            where: { userId: session.userId },
-            orderBy: { createdAt: "desc" },
-            select: { organizationId: true },
-          })
-
           return {
             data: {
               ...session,
-              activeOrganizationId: ultimoMembro?.organizationId ?? null,
+              activeOrganizationId: await elegirNegocioActivoInicial(prisma, session.userId),
             },
           }
         },
