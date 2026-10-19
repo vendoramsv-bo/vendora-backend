@@ -17,6 +17,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const TENANT = "tenant-1"
 const USER = "user-1"
 const NOMBRE = "La Esquina"
+const SLUG = "la-esquina"
+const NOMBRE_LARGO = "Almacén La Esquina"
 
 const tenantMemberFindUnique = vi.fn()
 const tenantFindUnique = vi.fn()
@@ -82,7 +84,7 @@ function eliminar(confirmacion: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  tenantFindUnique.mockResolvedValue({ name: NOMBRE, estado: "ACTIVO" })
+  tenantFindUnique.mockResolvedValue({ name: NOMBRE, slug: SLUG, nombreLargo: NOMBRE_LARGO, estado: "ACTIVO" })
   transaction.mockResolvedValue([{}, {}])
 })
 
@@ -149,7 +151,37 @@ describe("qué hace la baja (FR-025)", () => {
     expect(tenantUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: TENANT },
-        data: { estado: "ELIMINADO", updatedById: USER },
+        data: expect.objectContaining({ estado: "ELIMINADO", updatedById: USER }),
+      }),
+    )
+  })
+
+  it("libera nombre, slug y nombre largo para que se pueda crear otro negocio igual (038)", async () => {
+    como("PROPIETARIO")
+    await eliminar(NOMBRE)
+
+    const { data } = tenantUpdate.mock.calls[0][0]
+    expect(data.name).not.toBe(NOMBRE)
+    expect(data.name.startsWith(NOMBRE)).toBe(true)
+    expect(data.slug).not.toBe(SLUG)
+    expect(data.slug.startsWith(SLUG)).toBe(true)
+    expect(data.nombreLargo).not.toBe(NOMBRE_LARGO)
+    expect(data.nombreLargo.startsWith(NOMBRE_LARGO)).toBe(true)
+  })
+
+  it("la auditoría guarda los valores originales", async () => {
+    como("PROPIETARIO")
+    await eliminar(NOMBRE)
+
+    expect(auditLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cambios: expect.objectContaining({
+            name: expect.objectContaining({ de: NOMBRE }),
+            slug: expect.objectContaining({ de: SLUG }),
+            nombreLargo: expect.objectContaining({ de: NOMBRE_LARGO }),
+          }),
+        }),
       }),
     )
   })

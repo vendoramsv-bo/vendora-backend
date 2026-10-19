@@ -34,6 +34,7 @@ import { paginate } from "../../../core/query-params.js"
 import { TenantNoEncontrado, SinTenantActivo } from "../domain/tenant.errors.js"
 import { errorResponses, okResponse, paginadoSchema } from "../../../core/openapi-responses.js"
 import pino from "pino"
+import { identidadLiberada } from "../domain/identidad-liberada.js"
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" })
 
@@ -363,7 +364,7 @@ tenantRouter.openapi(
 
     const negocio = await db.tenant.findUnique({
       where: { id: tenantId },
-      select: { name: true, estado: true },
+      select: { name: true, slug: true, nombreLargo: true, estado: true },
     })
 
     if (!negocio) {
@@ -396,10 +397,26 @@ tenantRouter.openapi(
      * disponible, y de eso se encarga `resolverMiembroActivo` respondiendo
      * `403 NEGOCIO_ELIMINADO` a toda petición posterior (FR-024).
      */
+    // Nombre, slug y nombre largo son únicos: se liberan para que el
+    // propietario pueda crear otro negocio con los mismos datos (038). Los
+    // originales quedan en la auditoría.
+    const liberada = identidadLiberada({
+      id: tenantId,
+      name: negocio.name,
+      slug: negocio.slug,
+      nombreLargo: negocio.nombreLargo,
+    })
+
     await db.$transaction([
       db.tenant.update({
         where: { id: tenantId },
-        data: { estado: "ELIMINADO", updatedById: userId },
+        data: {
+          estado: "ELIMINADO",
+          updatedById: userId,
+          name: liberada.name,
+          slug: liberada.slug,
+          nombreLargo: liberada.nombreLargo,
+        },
       }),
       db.auditLog.create({
         data: {
@@ -407,7 +424,13 @@ tenantRouter.openapi(
           userId,
           tabla: "Tenant",
           accion: "DELETE",
-          cambios: { estado: { de: negocio.estado, a: "ELIMINADO" }, nombre: negocio.name },
+          cambios: {
+            estado: { de: negocio.estado, a: "ELIMINADO" },
+            nombre: negocio.name,
+            name: { de: negocio.name, a: liberada.name },
+            slug: { de: negocio.slug, a: liberada.slug },
+            nombreLargo: { de: negocio.nombreLargo, a: liberada.nombreLargo },
+          },
         },
       }),
     ])
